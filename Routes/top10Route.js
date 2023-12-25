@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router()
-const {getUser, postUser,
+const {getUser, postUser, getTop10, postTop10,
     
-  } = require('../controllers/userController')
+  } = require('../controllers/top10Controller')
 
-  router.route('/').get(getUser).post(postUser)
+  router.route('/').get(getTop10).post(postTop10)
   // router.route('/:id').put(updateTop10).delete(deleteTop10)
 
 

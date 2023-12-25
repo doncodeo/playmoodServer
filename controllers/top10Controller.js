@@ -21,16 +21,16 @@ const getTop10 = asyncHandler(async (req, res) => {
 const postTop10 = asyncHandler(async (req, res) => {
     try {
         
-        if (!req.body.thumbnail || !req.body.shortPreview || !req.body.descripton || !req.body.credit || !req.body.title || !req.body.category || !req.body.video ) {
+        if (!req.body.thumbnail || !req.body.shortPreview || !req.body.description || !req.body.credit || !req.body.title || !req.body.category || !req.body.video ) {
           
             res.status(400).json({ error: 'Please ensure no field is empty!' });
             return;
         }
 
-        const top = await Top10.create({
+        const top = await Top10.create({ 
             thumbnail: req.body.thumbnail,
             shortPreview: req.body.shortPreview,
-            descripton: req.body.descripton,
+            description: req.body.description,
             credit: req.body.credit,
             category: req.body.category,
             title: req.body.title, 
