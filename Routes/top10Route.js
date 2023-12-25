@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router()
-const {getUser, postUser, getTop10, postTop10,
+const {getTop10, postTop10,
     
   } = require('../controllers/top10Controller')
 
