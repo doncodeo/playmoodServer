@@ -23,31 +23,12 @@ role: {
     enum: userRoles, // Restrict the 'role' field to values in the 'userRoles' array
     default: "user" //Default role is user
 },   
-//     favorites: [{
-//     type: String,
-//     required: false
-// }],
+
 profileImage: {
     type: String,
-    unique: true  
+    // unique: true  
 },
-// friends: {
-//     type: String,
-//      required: false
-// },
-// watchlist: {
-//     type: String,
-//     required: false
-// },
-// history: {
-//     type: String,
-//     required: false
-// },
-// subscription: {
-//     type: String,
-//     required: false
 
-// }
 
 },
 {

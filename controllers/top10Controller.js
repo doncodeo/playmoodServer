@@ -1,16 +1,13 @@
 
-const asyncHandler = require ('express-async-handler')
-
-const Top10 = require('../models/top10Model')
+const asyncHandler = require ('express-async-handler');
+const Top10 = require('../models/top10Model');
 
 // @desc Get Top10
 // @route GET /api/top10
 // @access Private
 
 const getTop10 = asyncHandler(async (req, res) => {
-      
     const tops10 = await Top10.find()
-
     res.status(200).json(tops10)
 })
 
@@ -22,7 +19,6 @@ const postTop10 = asyncHandler(async (req, res) => {
     try {
         
         if (!req.body.thumbnail || !req.body.shortPreview || !req.body.description || !req.body.credit || !req.body.title || !req.body.category || !req.body.video ) {
-          
             res.status(400).json({ error: 'Please ensure no field is empty!' });
             return;
         }

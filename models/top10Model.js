@@ -29,7 +29,7 @@ const top10Schema = new mongoose.Schema({
     video: {
         type: String,
         require: true
-    }
+    } 
 }, 
 {
  timestamps: true,
