@@ -11,7 +11,7 @@ const {getUser,
 
   router.route('/').get(getUser).post(registerUser);
   router.route('/login').post(loginUser);
-  router.get('/me', getMe);
+  router.get('/me', protect, getMe);
   router.route('/:id').put(updateUser).delete(deleteUser); 
 
 

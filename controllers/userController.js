@@ -96,13 +96,12 @@ const loginUser = asyncHandler(async (req, res) => {
 });
 
 
-// @desc Get user data
+// @desc Get user profile 
 // @route GET/api/users/me
 // @access Public
 
 const getMe = asyncHandler( async (req, res) => {
     const {_id, name, email} = await userData.findById(req.user.id)
-    console.log(_id)
       
     res.status(200).json({
      id:_id,
