@@ -97,10 +97,10 @@ const loginUser = asyncHandler(async (req, res) => {
 
 
 // @desc Get user profile 
-// @route GET/api/users/me
+// @route GET/api/users/profile
 // @access Public
 
-const getMe = asyncHandler( async (req, res) => {
+const getUserprofile = asyncHandler( async (req, res) => {
     const {_id, name, email} = await userData.findById(req.user.id)
       
     res.status(200).json({
@@ -182,7 +182,7 @@ const generateToken = (id) => {
     getUser, 
     registerUser,
     loginUser,
-    getMe,
+    getUserprofile,
     updateUser,
     deleteUser,
  }
