@@ -35,4 +35,4 @@ const top10Schema = new mongoose.Schema({
  timestamps: true,
 })
 
-module.exports = mongoose.model('Top10', top10Schema)
+module.exports = mongoose.model('post', top10Schema)

@@ -35,4 +35,4 @@ profileImage: {
     timestamps: true
 })
 
-module.exports = mongoose.model('Profile' , userSchema)
+module.exports = mongoose.model('Profiles' , userSchema)
