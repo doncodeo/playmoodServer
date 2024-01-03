@@ -29,7 +29,7 @@ connectDB()
         app.use(bodyParser.urlencoded({extended:true}))
 
         // Routes 
-        app.use('/api/top10', require('./Routes/top10Route'))
+        app.use('/api/content', require('./Routes/contentRoute'))
         app.use('/api/user', require('./Routes/userRoute'))
 
     

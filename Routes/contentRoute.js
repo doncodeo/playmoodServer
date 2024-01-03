@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router()
-const {getTop10, postTop10,
+const {getContent, postContent,
     
-  } = require('../controllers/top10Controller')
+  } = require('../controllers/contentController')
 
-  router.route('/').get(getTop10).post(postTop10)
+  router.route('/').get(getContent).post(postContent)
   // router.route('/:id').put(updateTop10).delete(deleteTop10)
 
 

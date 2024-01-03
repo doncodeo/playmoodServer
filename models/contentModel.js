@@ -1,6 +1,6 @@
 const mongoose = require('mongoose') 
 
-const top10Schema = new mongoose.Schema({
+const contentSchema = new mongoose.Schema({
     
     title: {
         type: String,
@@ -35,4 +35,4 @@ const top10Schema = new mongoose.Schema({
  timestamps: true,
 })
 
-module.exports = mongoose.model('post', top10Schema)
+module.exports = mongoose.model('Contents', contentSchema)

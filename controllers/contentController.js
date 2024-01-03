@@ -1,21 +1,22 @@
 
 const asyncHandler = require ('express-async-handler');
-const Top10 = require('../models/top10Model');
+const contentSchema = require('../models/contentModel');
 
-// @desc Get Top10
-// @route GET /api/top10
+// @desc Get Content
+// @route GET /api/content
 // @access Private
 
-const getTop10 = asyncHandler(async (req, res) => {
-    const tops10 = await Top10.find()
-    res.status(200).json(tops10)
+const getContent = asyncHandler(async (req, res) => {
+    const content = await contentSchema.find()
+    console.log(content)
+    res.status(200).json(content)   
 })
 
-// @desc Post Top
-// @route POST /api/top
+// @desc Post Content
+// @route POST /api/content
 // @access Private
  
-const postTop10 = asyncHandler(async (req, res) => {
+const postContent = asyncHandler(async (req, res) => {
     try {
         
         if (!req.body.thumbnail || !req.body.shortPreview || !req.body.description || !req.body.credit || !req.body.title || !req.body.category || !req.body.video ) {
@@ -23,7 +24,7 @@ const postTop10 = asyncHandler(async (req, res) => {
             return;
         }
 
-        const top = await Top10.create({ 
+        const Contents = await contentSchema.create({ 
             thumbnail: req.body.thumbnail,
             shortPreview: req.body.shortPreview,
             description: req.body.description,
@@ -33,7 +34,7 @@ const postTop10 = asyncHandler(async (req, res) => {
             video: req.body.video
         });
  
-        res.status(200).json(top);
+        res.status(200).json(Contents);
     } catch (error) {
         console.error(error); // Log any errors to the console for debugging
         res.status(500).json({ error: 'Server error' });
@@ -114,8 +115,8 @@ const deleteTop10 = asyncHandler(async (req, res) => {
 
 
  module.exports = {
-    getTop10,
-    postTop10,
+    getContent,
+    postContent,
     updateTop10,
     deleteTop10,
  }
