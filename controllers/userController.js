@@ -147,15 +147,17 @@ const loginUser = asyncHandler(async (req, res) => {
 
 
     if(user && (await bcryptjs.compare(password, user.password))) {
+  console.log('User found during login:', user); // Add this log statement
         res.json({
             _id: user._id,
             name: user.name,
             email: user.email,
-            role: user.role,
-            token: generateToken(user._id, )
+             role: user.role,
+            token: generateToken(user._id, user.role)
         });
     }else {
         res.status(404).json({ error: 'User not found or invalid credentials' });
+
     }
 });
 
@@ -165,7 +167,11 @@ const loginUser = asyncHandler(async (req, res) => {
 // @access Public
 
 const getUserprofile = asyncHandler( async (req, res) => {
+<<<<<<< HEAD
     const {_id, name, email, profileImage, role} = await userData.findById(req.user.id)
+=======
+    const {_id, name, email, role, profileImage} = await userData.findById(req.user.id)
+>>>>>>> 1da42c55af776c584d5c823b673cb5fd59ffcca5
       
     res.status(200).json({
      id:_id,
