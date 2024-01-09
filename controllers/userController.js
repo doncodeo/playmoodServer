@@ -164,12 +164,13 @@ const loginUser = asyncHandler(async (req, res) => {
 // @access Public
 
 const getUserprofile = asyncHandler( async (req, res) => {
-    const {_id, name, email, profileImage} = await userData.findById(req.user.id)
+    const {_id, name, email, profileImage, role} = await userData.findById(req.user.id)
       
     res.status(200).json({
      id:_id,
      name,
      email,
+      role,
      profileImage
     })
  } )
