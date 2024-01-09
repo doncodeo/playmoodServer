@@ -40,6 +40,63 @@ const postContent = asyncHandler(async (req, res) => {
     }
 }); 
 
+// @desc Like a post
+// @route UPDATE /api/like/ {postId,userId}
+// @access Private
+
+const postLikes = asyncHandler(async (req, res) => {
+    try {
+        const likeId = req.body.postId;
+        const userId = req.body.userId;
+
+        const content = await contentSchema.findOne({ _id: likeId, likes: userId });
+ 
+        if (content) {
+            return res.status(400).json({ error: 'This User already liked this content' });
+        }
+
+        // Find the content by ID and update the likes array
+        const updatedContent = await contentSchema.findOneAndUpdate(
+            { _id: likeId }, // Query to find the document by its _id
+            { $push: { likes: userId } }, // Update to push the likeId to the likes array
+            { new: true } // Option to return the modified document
+        );
+
+        res.status(200).json({ likes: updatedContent.likes }); // Send the updated likes array in the response
+    } catch (error) {
+        console.error(error); // Log any errors to the console for debugging
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+
+// @desc Like a post
+// @route UPDATE /api/like/ {postId,userId}
+// @access Private
+const unlike = asyncHandler(async (req, res) => {
+    try {
+        const userId = req.body.userId;
+
+        const content = await contentSchema.findOne({ likes: userId });
+
+        const updatedContent = await contentSchema.findOneAndUpdate(
+            { _id: content },
+            { $pull: { likes: userId } },
+            { new: true }
+        );
+
+        if (!updatedContent) {
+            return res.status(404).json({ error: 'User not found in the likes array' });
+        }
+        
+        res.status(200).json({ likes: updatedContent.likes }); // Send the updated likes array in the response
+    } catch (error) {
+        console.error(error); // Log any errors to the console for debugging
+        res.status(500).json({ error: 'Server error' });
+    }
+}); 
+
+
 // @desc Update Top
 // @route UPDATE /api/top/:id
 // @access Private
@@ -118,4 +175,6 @@ const deleteTop10 = asyncHandler(async (req, res) => {
     postContent,
     updateTop10,
     deleteTop10,
+    postLikes,
+    unlike
  }

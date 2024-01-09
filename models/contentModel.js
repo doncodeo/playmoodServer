@@ -1,4 +1,5 @@
-const mongoose = require('mongoose') 
+const mongoose = require('mongoose');
+const {ObjectId} = mongoose.Schema.Types
 
 const contentSchema = new mongoose.Schema({
     
@@ -29,7 +30,8 @@ const contentSchema = new mongoose.Schema({
     video: {
         type: String,
         require: true
-    } 
+    }, 
+    likes: [{type:ObjectId, ref:'user'}],
 }, 
 {
  timestamps: true,
