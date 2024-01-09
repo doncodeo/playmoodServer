@@ -150,7 +150,8 @@ const loginUser = asyncHandler(async (req, res) => {
             _id: user._id,
             name: user.name,
             email: user.email,
-            token: generateToken(user._id)
+             role: user.role,
+            token: generateToken(user._id, user.role)
         });
     }else {
         res.status(404).json({ error: 'User not found or invalid credentials' });
@@ -164,13 +165,13 @@ const loginUser = asyncHandler(async (req, res) => {
 // @access Public
 
 const getUserprofile = asyncHandler( async (req, res) => {
-    const {_id, name, email, profileImage, role} = await userData.findById(req.user.id)
+    const {_id, name, email, role, profileImage} = await userData.findById(req.user.id)
       
     res.status(200).json({
      id:_id,
      name,
      email,
-      role,
+     role,
      profileImage
     })
  } )
