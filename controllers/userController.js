@@ -145,6 +145,7 @@ const loginUser = asyncHandler(async (req, res) => {
     const user = await userData.findOne({email});
 
     if(user && (await bcryptjs.compare(password, user.password))) {
+  console.log('User found during login:', user); // Add this log statement
         res.json({
             _id: user._id,
             name: user.name,
@@ -153,6 +154,7 @@ const loginUser = asyncHandler(async (req, res) => {
         });
     }else {
         res.status(404).json({ error: 'User not found or invalid credentials' });
+
     }
 });
 
