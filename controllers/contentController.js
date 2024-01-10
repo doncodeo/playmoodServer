@@ -7,10 +7,11 @@ const contentSchema = require('../models/contentModel');
 // @access Private
 
 const getContent = asyncHandler(async (req, res) => {
-    const content = await contentSchema.find(); // Change this line
+    console.log('Fetching content...');
+    const content = await contentSchema.find();
+    console.log('Fetched content:', content);
     res.status(200).json(content);
 });
-
 // @desc Post Content
 // @route POST /api/content
 // @access Private
