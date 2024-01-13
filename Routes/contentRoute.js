@@ -7,7 +7,7 @@ const {getContent, postContent,postLikes, unlike
   router.route('/').get(getContent).post(postContent);
   router.route('/like').put(postLikes);
   router.route('/unlike').put(unlike)
-  // router.route('/:id').put(updateTop10).delete(deleteTop10)
+  // router.route('/:id').put(updateTop10).delete(deleteTop10) 
 
 
 module.exports = router  

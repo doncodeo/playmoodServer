@@ -180,6 +180,4 @@ const deleteTop10 = asyncHandler(async (req, res) => {
     deleteTop10,
     postLikes,
     unlike,
-
-    createPost
  }
