@@ -20,6 +20,7 @@ const getUser = asyncHandler(async (req, res) => {
 })
 
 
+
 // @desc Register new users
 // @route post /api/users
 // @access Public
@@ -72,7 +73,7 @@ const registerUser = asyncHandler(async (req, res) => {
             throw new Error('Invalid user data');
         }
 
-        console.log('User registration completed'); // Log exit point
+        console.log('User registration completed'); // Log exit     point
 
     } catch (error) {
         console.error(error); // Log any errors to the console for debugging
