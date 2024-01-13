@@ -46,11 +46,17 @@ const registerUser = asyncHandler(async (req, res) => {
         const salt = await bcryptjs.genSalt(10);
         const hashedPassword = await bcryptjs.hash(password, salt);
 
-        // Create user without profile image
+        // Set default values for profileImage and cloudinary_id
+        const defaultProfileImage = 'https://t3.ftcdn.net/jpg/05/16/27/58/360_F_516275801_f3Fsp17x6HQK0xQgDQEELoTuERO4SsWV.jpg'; // Replace with your default image URL
+        const defaultCloudinaryId = 'user-uploads/qdayeocck7k6zzqqery15'; // Replace with your default cloudinary_id
+
+        // Create user with default profile image and cloudinary_id
         const user = await userData.create({
             name,
             email,
             password: hashedPassword,
+            profileImage: defaultProfileImage,
+            cloudinary_id: defaultCloudinaryId,
         });
 
         if (user) {
@@ -108,7 +114,6 @@ const deleteUser = asyncHandler(async (req, res) => {
 // @desc Update user
 // @route post /api/users/:id
 // @access Public
-
 const updateUser = asyncHandler(async (req, res) => {
     try {
         const userId = req.params.id; // Assuming the user ID is passed as a parameter
@@ -121,26 +126,24 @@ const updateUser = asyncHandler(async (req, res) => {
             return;
         }
 
-        // Update the user's profile image in Cloudinary if a file is provided
-        if (req.file) {
-            const updatedCloudinaryResult = await cloudinary.uploader.upload(req.file.path, {
-                folder: 'user-uploads',
-                public_id: user._id, // Set public_id to a unique identifier like user._id
-            });
+        console.log(req.file.path);
 
-            // If updating the profile image, delete the old image in Cloudinary
-            if (user.cloudinary_id) {
-                await cloudinary.uploader.destroy(user.cloudinary_id);
-            }
+        // Update the user's profile image in Cloudinary
+        const updatedCloudinaryResult = await cloudinary.uploader.upload(req.file.path, {
+            folder: 'user-uploads',
+            public_id: user._id, // Set public_id to a unique identifier like user._id
+        });
 
-            // Update user profile image data
-            user.profileImage = updatedCloudinaryResult.secure_url;
-            user.cloudinary_id = updatedCloudinaryResult.public_id;
+        // If updating the profile image, delete the old image in Cloudinary
+        if (user.cloudinary_id) {
+            await cloudinary.uploader.destroy(user.cloudinary_id);
         }
 
-        // Update other user data if provided in the request
+        // Update user data in MongoDB
         user.name = req.body.name || user.name;
         user.email = req.body.email || user.email;
+        user.profileImage = updatedCloudinaryResult.secure_url;
+        user.cloudinary_id = updatedCloudinaryResult.public_id;
 
         // Save the updated user in MongoDB
         const updatedUser = await user.save();
@@ -152,6 +155,7 @@ const updateUser = asyncHandler(async (req, res) => {
                 name: updatedUser.name,
                 email: updatedUser.email,
                 profileImage: updatedUser.profileImage,
+                cloudinary_id: updatedUser.cloudinary_id, // Update the cloudinary_id
             },
         });
     } catch (error) {
