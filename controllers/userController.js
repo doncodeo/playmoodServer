@@ -26,46 +26,36 @@ const getUser = asyncHandler(async (req, res) => {
 
 const registerUser = asyncHandler(async (req, res) => {
     try {
+        const { name, email, password } = req.body;
 
-        const cloudinaryResult = await cloudinary.uploader.upload(req.file.path, {
-            folder: 'user-uploads',
-        });
-
-        const {name, email, password} = req.body
-        
         if (!name || !email || !password) {
-          
-            res.status(400).json({ error: 'important fields missing!' });
+            res.status(400).json({ error: 'Important fields missing!' });
             return;
         }
 
-        // check for existing user
-        const userExist = await userData.findOne({email})
-  
-        if(userExist){
-            console.log("User already exist", email);
+        // Check for existing user
+        const userExist = await userData.findOne({ email });
+
+        if (userExist) {
+            console.log("User already exists", email);
             res.status(400);
-            throw new Error ("User already exist!!!")
+            throw new Error("User already exists!!!");
         }
 
-        // Hash password 
+        // Hash password
         const salt = await bcryptjs.genSalt(10);
         const hashedPassword = await bcryptjs.hash(password, salt);
-        // console.log(hashedPassword)
 
-        // create user
+        // Create user without profile image
         const user = await userData.create({
             name,
             email,
-            password:hashedPassword,
-            profileImage: cloudinaryResult.secure_url,
-            cloudinary_id: cloudinaryResult.public_id,
-        })
+            password: hashedPassword,
+        });
 
         if (user) {
             console.log('User created:', user.email);
-            console.log(cloudinaryResult)
-            res.status(201).json({user});
+            res.status(201).json({ user });
         } else {
             console.log('User creation failed');
             res.status(400);
@@ -78,7 +68,8 @@ const registerUser = asyncHandler(async (req, res) => {
         console.error(error); // Log any errors to the console for debugging
         res.status(500).json({ error: 'Server error' });
     }
-}); 
+});
+
 
 // @desc Delete user
 // @route post /api/users/:id
