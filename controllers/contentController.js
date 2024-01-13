@@ -1,6 +1,8 @@
 
 const asyncHandler = require ('express-async-handler');
 const contentSchema = require('../models/contentModel');
+const cloudinary = require('../config/cloudinary');
+
 
 // @desc Get Content
 // @route GET /api/content
@@ -14,7 +16,8 @@ const getContent = asyncHandler(async (req, res) => {
 // @desc Post Content
 // @route POST /api/content
 // @access Private
- 
+
+
 const postContent = asyncHandler(async (req, res) => {
     try {
         
@@ -176,5 +179,7 @@ const deleteTop10 = asyncHandler(async (req, res) => {
     updateTop10,
     deleteTop10,
     postLikes,
-    unlike
+    unlike,
+
+    createPost
  }

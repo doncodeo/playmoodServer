@@ -2,7 +2,9 @@
 const asyncHandler = require ('express-async-handler');
 const userData = require('../models/userModel');
 const jwt = require("jsonwebtoken");
-const bcryptjs = require("bcryptjs");
+const bcryptjs = require("bcryptjs");               
+const cloudinary = require('../config/cloudinary');
+
 
 const generateToken = (id, role) => {
     return jwt.sign({ id, role }, process.env.JWT_SECRET, {
@@ -24,7 +26,12 @@ const getUser = asyncHandler(async (req, res) => {
 
 const registerUser = asyncHandler(async (req, res) => {
     try {
-        const {name, email, password, profileImage, role} = req.body
+
+        const cloudinaryResult = await cloudinary.uploader.upload(req.file.path, {
+            folder: 'user-uploads',
+        });
+
+        const {name, email, password} = req.body
         
         if (!name || !email || !password) {
           
@@ -44,25 +51,21 @@ const registerUser = asyncHandler(async (req, res) => {
         // Hash password 
         const salt = await bcryptjs.genSalt(10);
         const hashedPassword = await bcryptjs.hash(password, salt);
-        console.log(hashedPassword)
+        // console.log(hashedPassword)
 
         // create user
         const user = await userData.create({
             name,
             email,
             password:hashedPassword,
-            profileImage,
-            role
+            profileImage: cloudinaryResult.secure_url,
+            cloudinary_id: cloudinaryResult.public_id,
         })
 
         if (user) {
             console.log('User created:', user.email);
-            res.status(201).json({
-                _id: user._id,
-                name: user.name,
-                email: user.email,
-                token: generateToken(user._id)
-            });
+            console.log(cloudinaryResult)
+            res.status(201).json({user});
         } else {
             console.log('User creation failed');
             res.status(400);
@@ -76,6 +79,94 @@ const registerUser = asyncHandler(async (req, res) => {
         res.status(500).json({ error: 'Server error' });
     }
 }); 
+
+// @desc Delete user
+// @route post /api/users/:id
+// @access Public
+
+const deleteUser = asyncHandler(async (req, res) => {
+  try {
+    const userId = req.params.id; // Assuming the user ID is passed as a parameter
+
+    // Fetch the user from MongoDB
+    const user = await userData.findById(userId);
+    console.log(user) 
+
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    // Delete the user's profile image from Cloudinary
+    const publicId = user.profileImage && user.cloudinary_id;
+    console.log('Before image deletion - Public ID:', publicId);
+    if (publicId) {
+
+      await cloudinary.uploader.destroy(publicId);
+    }
+    // Delete the user from MongoDB
+    await user.deleteOne();
+
+    res.status(200).json({ message: 'User deleted successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// @desc Update user
+// @route post /api/users/:id
+// @access Public
+
+const updateUser = asyncHandler(async (req, res) => {
+    try {
+      const userId = req.params.id; // Assuming the user ID is passed as a parameter
+  
+      // Fetch the user from MongoDB
+      const user = await userData.findById(userId);
+  
+      if (!user) {
+        res.status(404).json({ error: 'User not found' });
+        return;
+      }
+
+      console.log(req.file.path)
+  
+      // Update the user's profile image in Cloudinary
+      const updatedCloudinaryResult = await cloudinary.uploader.upload(req.file.path, {
+        folder: 'user-uploads',
+        public_id: user._id, // Set public_id to a unique identifier like user._id
+      });
+  
+      // If updating the profile image, delete the old image in Cloudinary
+      if (user.cloudinary_id) {
+        await cloudinary.uploader.destroy(user.cloudinary_id);
+      }
+  
+      // Update user data in MongoDB
+      user.name = req.body.name || user.name;
+      user.email = req.body.email || user.email;
+      user.profileImage = updatedCloudinaryResult.secure_url;
+      user.cloudinary_id = updatedCloudinaryResult.public_id;
+  
+      // Save the updated user in MongoDB
+      const updatedUser = await user.save();
+  
+      res.status(200).json({
+        message: 'User updated successfully',
+        user: {
+          _id: updatedUser._id,
+          name: updatedUser.name,
+          email: updatedUser.email,
+          profileImage: updatedUser.profileImage,
+        },
+      });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: 'Server error' });
+    }
+});
+  
 
 const createUser = asyncHandler(async (req, res) => {
     try {
@@ -132,8 +223,6 @@ const createUser = asyncHandler(async (req, res) => {
     }
 }); 
 
-
-
 // @desc Authenticate a user
 // @route POST /api/users/login
 // @access Public
@@ -168,8 +257,6 @@ const loginUser = asyncHandler(async (req, res) => {
 
 const getUserprofile = asyncHandler( async (req, res) => {
     const {_id, name, email, profileImage, role} = await userData.findById(req.user.id)
-
-      
     res.status(200).json({
      id:_id,
      name,
@@ -178,67 +265,6 @@ const getUserprofile = asyncHandler( async (req, res) => {
      profileImage
     })
  } )
-
-
-// @desc Update Top
-// @route UPDATE /api/top/:id
-// @access Private
-
-const updateUser = asyncHandler(async (req, res) => {
-    try {
-        const userId = req.params.id;
-        
-        // Check if the top document with the given ID exists
-        const user = await userData.findById(userId);
-
-        if (!user) {
-            res.status(400).json({ error: 'Document does not exit!' });
-            return;
-        }
-
-        // Update the fields you want to change
-        if (req.body.name) {
-            user.name = req.body.name;
-        }
-        if (req.body.email) {
-            user.email = req.body.email;
-        }
-        if (req.body.profileImage) {
-            user.profileImage = req.body.profileImage;
-        }
-        
-        // Save the updated document
-        await user.save();
-
-        res.status(200).json(user);
-    } catch (error) {
-        res.status(500).json({ error: 'Server error' });
-    }
-})
-
-// @desc Delete Top 
-// @route DELETE /api/top/:id
-// @access Private
-
-const deleteUser = asyncHandler(async (req, res) => {
-    try {
-        const userId = req.params.id; 
-        console.log(userId)
-        const user = await userData.findById(userId);
-
-        if (!user) {
-            res.status(400).json({ error: 'Document not found!' });
-            return;
-        }
-
-        // Delete the top document
-        await user.remove()
-        
-        res.status(200).json({ id: req.params.id });
-    } catch (error) {
-        res.status(500).json({ error: 'Server error' });
-    }
-})
 
 
  module.exports = {

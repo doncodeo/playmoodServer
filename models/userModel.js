@@ -29,6 +29,10 @@ profileImage: {
     // unique: true  
 },
 
+cloudinary_id: {
+    type: String,
+}
+
 
 },
 {
