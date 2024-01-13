@@ -9,10 +9,11 @@ const cloudinary = require('../config/cloudinary');
 // @access Private
 
 const getContent = asyncHandler(async (req, res) => {
-    const content = await contentSchema.find()
-    res.status(200).json(content)   
-})
-
+    console.log('Fetching content...');
+    const content = await contentSchema.find();
+    console.log('Fetched content:', content);
+    res.status(200).json(content);
+});
 // @desc Post Content
 // @route POST /api/content
 // @access Private
@@ -179,5 +180,5 @@ const deleteTop10 = asyncHandler(async (req, res) => {
     updateTop10,
     deleteTop10,
     postLikes,
-    unlike,
+    unlike
  }
