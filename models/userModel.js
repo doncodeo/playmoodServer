@@ -31,6 +31,10 @@ profileImage: {
 
 cloudinary_id: {
     type: String,
+},
+
+thumnail_id: {
+    type: String,
 }
 
 

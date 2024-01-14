@@ -30,6 +30,10 @@ const contentSchema = new mongoose.Schema({
         require: true
     }, 
     likes: [{type:ObjectId, ref:'user'}],
+    cloudinary_id: {
+        type: String,
+    },
+    
 }, 
 {
  timestamps: true,

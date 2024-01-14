@@ -34,19 +34,24 @@ const createContent = asyncHandler(async (req, res) => {
             folder: "contents"
          });
 
+         // Set default values for profileImage and cloudinary_id
+        const defaultProfileImage = 'https://res.cloudinary.com/di97mcvbu/image/upload/v1705254137/contents/raiwsn8fpx870pboiodp.png'; // Replace with your default image URL
+        const defaultCloudinaryId = 'contents/raiwsn8fpx870pboiodp'; // Replace with your default cloudinary_id
+
         // Create content
         const content = await contentSchema.create({
           title,
           category,
           description,
-          thumbnail,
           credit,
+          thumbnail: defaultProfileImage,
           video: cloudinaryResult.secure_url,
+          cloudinary_id: cloudinaryResult.public_id,
+          thumnail_id: defaultCloudinaryId  
         });
     
         if (content) {
-          console.log('Content created:', content.title);
-          console.log(cloudinaryResult);
+          console.log('Content created:', content.video);
           res.status(201).json({
             _id: content._id,
             title: content.title,
@@ -57,6 +62,7 @@ const createContent = asyncHandler(async (req, res) => {
             video: content.video,
             likes: content.likes,
             cloudinary_id: cloudinaryResult.public_id,
+            thumnail_id: defaultCloudinaryId
           });
         } else {
           console.log('Content creation failed');
@@ -127,31 +133,6 @@ const createContent = asyncHandler(async (req, res) => {
 //     }
 // });
 
-// old content creation
-// const postContent = asyncHandler(async (req, res) => {
-//     try {
-        
-//         if (!req.body.thumbnail || !req.body.shortPreview || !req.body.description || !req.body.credit || !req.body.title || !req.body.category || !req.body.video ) {
-//             res.status(400).json({ error: 'Please ensure no field is empty!' });
-//             return;
-//         }
-
-//         const Contents = await contentSchema.create({ 
-//             thumbnail: req.body.thumbnail,
-//             shortPreview: req.body.shortPreview,
-//             description: req.body.description,
-//             credit: req.body.credit,
-//             category: req.body.category,
-//             title: req.body.title, 
-//             video: req.body.video
-//         });
- 
-//         res.status(200).json(Contents);
-//     } catch (error) {
-//         console.error(error); // Log any errors to the console for debugging
-//         res.status(500).json({ error: 'Server error' });
-//     }
-// }); 
 
 // @desc Like a post
 // @route UPDATE /api/like/ {postId,userId}
@@ -258,36 +239,56 @@ const updateTop10 = asyncHandler(async (req, res) => {
     }
 })
 
-// @desc Delete Top
-// @route DELETE /api/top/:id
+// @desc Delete content
+// @route DELETE /api/content/:id
 // @access Private
 
-const deleteTop10 = asyncHandler(async (req, res) => {
-    try {
-        const topId = req.params.id; 
-        console.log(topId)
-        const top = await Top10.findById(topId);
 
-        if (!top) {
-            res.status(400).json({ error: 'Document not found!' });
-            return;
+const deleteContent = asyncHandler(async (req, res) => {
+    const contentId = req.params.id;
+
+    try {
+        // Fetch the content details from MongoDB
+        const content = await contentSchema.findById(contentId);
+        console.log(content)
+        if (!content) {
+            return res.status(404).json({ error: 'Content not found' });
         }
 
-        // Delete the top document
-        await top.remove()
-        
-        res.status(200).json({ id: req.params.id });
+        // Delete the video from Cloudinary
+        const videoPublicId = content.video && content.cloudinary_id;
+        if (videoPublicId) {
+            await cloudinary.uploader.destroy(videoPublicId);
+        }
+
+        // Delete the thumbnail from Cloudinary
+        const thumbnailPublicId = content.thumbnail && content.thumbnail.split('/').pop();
+        if (thumbnailPublicId) {
+            await cloudinary.uploader.destroy(thumbnailPublicId);
+        }
+
+        // Delete the content from MongoDB
+        await content.deleteOne();
+
+        console.log('Content deleted:', content);
+
+        res.status(200).json({ message: 'Content deleted successfully' });
     } catch (error) {
+        console.error(error);
         res.status(500).json({ error: 'Server error' });
     }
-})
+});
+
+
+
+
 
 
  module.exports = {
     getContent,
     updateTop10,
-    deleteTop10,
     postLikes,
     unlike,
-    createContent
+    createContent,
+    deleteContent
  }
