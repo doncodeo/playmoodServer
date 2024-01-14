@@ -14,35 +14,144 @@ const getContent = asyncHandler(async (req, res) => {
     console.log('Fetched content:', content);
     res.status(200).json(content);
 });
+
+
 // @desc Post Content
 // @route POST /api/content
-// @access Private
 
-
-const postContent = asyncHandler(async (req, res) => {
+const createContent = asyncHandler(async (req, res) => {
     try {
-        
-        if (!req.body.thumbnail || !req.body.shortPreview || !req.body.description || !req.body.credit || !req.body.title || !req.body.category || !req.body.video ) {
-            res.status(400).json({ error: 'Please ensure no field is empty!' });
-            return;
+        const { title, category, description, thumbnail, credit } = req.body;
+    
+        // Check if required fields are missing
+        if (!title || !category || !description || !credit) {
+          return res.status(400).json({ error: 'Important fields missing!' });
         }
+    
+        // Upload video to Cloudinary
+        const cloudinaryResult = await cloudinary.uploader.upload(req.file.path, { 
+            resource_type: 'video',
+            folder: "contents"
+         });
 
-        const Contents = await contentSchema.create({ 
-            thumbnail: req.body.thumbnail,
-            shortPreview: req.body.shortPreview,
-            description: req.body.description,
-            credit: req.body.credit,
-            category: req.body.category,
-            title: req.body.title, 
-            video: req.body.video
+        // Create content
+        const content = await contentSchema.create({
+          title,
+          category,
+          description,
+          thumbnail,
+          credit,
+          video: cloudinaryResult.secure_url,
         });
- 
-        res.status(200).json(Contents);
-    } catch (error) {
-        console.error(error); // Log any errors to the console for debugging
+    
+        if (content) {
+          console.log('Content created:', content.title);
+          console.log(cloudinaryResult);
+          res.status(201).json({
+            _id: content._id,
+            title: content.title,
+            category: content.category,
+            description: content.description,
+            thumbnail: content.thumbnail,
+            credit: content.credit,
+            video: content.video,
+            likes: content.likes,
+            cloudinary_id: cloudinaryResult.public_id,
+          });
+        } else {
+          console.log('Content creation failed');
+          res.status(400).json({ error: 'Invalid content data' });
+        }
+    
+        console.log('Content creation completed');
+    
+      } catch (error) {
+        console.error(error);
         res.status(500).json({ error: 'Server error' });
-    }
-}); 
+      }
+})
+
+
+// authenticated user
+// const createContent = asyncHandler(async (req, res) => {
+//     try {
+//         const { title, category, description, thumbnail, credit } = req.body;
+
+//         // Check if required fields are missing
+//         if (!title || !category || !description || !thumbnail || !credit) {
+//             return res.status(400).json({ error: 'Important fields missing!' });
+//         }
+
+//         // Assuming you have the user ID available (you need to obtain this from your authentication logic)
+//         const userId = req.user._id; // Assuming you have user information in the request object
+
+//         // Upload video to Cloudinary
+//         const cloudinaryResult = await cloudinary.uploader.upload(req.file.path, {
+//             resource_type: 'video',
+//             folder: 'content',
+//         });
+
+//         // Create content with user ID
+//         const content = await Content.create({
+//             user: userId,
+//             title,
+//             category,
+//             description,
+//             thumbnail,
+//             credit,
+//             video: cloudinaryResult.secure_url,
+//         });
+
+//         if (content) {
+//             console.log('Content created:', content.title);
+//             console.log(cloudinaryResult);
+//             res.status(201).json({
+//                 _id: content._id,
+//                 title: content.title,
+//                 category: content.category,
+//                 description: content.description,
+//                 thumbnail: content.thumbnail,
+//                 credit: content.credit,
+//                 video: content.video,
+//                 likes: content.likes,
+//             });
+//         } else {
+//             console.log('Content creation failed');
+//             res.status(400).json({ error: 'Invalid content data' });
+//         }
+
+//         console.log('Content creation completed');
+//     } catch (error) {
+//         console.error(error);
+//         res.status(500).json({ error: 'Server error' });
+//     }
+// });
+
+// old content creation
+// const postContent = asyncHandler(async (req, res) => {
+//     try {
+        
+//         if (!req.body.thumbnail || !req.body.shortPreview || !req.body.description || !req.body.credit || !req.body.title || !req.body.category || !req.body.video ) {
+//             res.status(400).json({ error: 'Please ensure no field is empty!' });
+//             return;
+//         }
+
+//         const Contents = await contentSchema.create({ 
+//             thumbnail: req.body.thumbnail,
+//             shortPreview: req.body.shortPreview,
+//             description: req.body.description,
+//             credit: req.body.credit,
+//             category: req.body.category,
+//             title: req.body.title, 
+//             video: req.body.video
+//         });
+ 
+//         res.status(200).json(Contents);
+//     } catch (error) {
+//         console.error(error); // Log any errors to the console for debugging
+//         res.status(500).json({ error: 'Server error' });
+//     }
+// }); 
 
 // @desc Like a post
 // @route UPDATE /api/like/ {postId,userId}
@@ -176,9 +285,9 @@ const deleteTop10 = asyncHandler(async (req, res) => {
 
  module.exports = {
     getContent,
-    postContent,
     updateTop10,
     deleteTop10,
     postLikes,
-    unlike
+    unlike,
+    createContent
  }

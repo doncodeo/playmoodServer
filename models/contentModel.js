@@ -16,12 +16,10 @@ const contentSchema = new mongoose.Schema({
         required: true, 
     },
     thumbnail: {
-        type: String,
-        required: true, 
+        type: String
       },
     shortPreview: {
         type: String,
-        required: true,
     },
     credit: {
         type: String,
@@ -38,3 +36,56 @@ const contentSchema = new mongoose.Schema({
 })
 
 module.exports = mongoose.model('Contents', contentSchema)
+
+
+
+
+
+// const contentSchema = new mongoose.Schema(
+//   {
+//     user: {
+//       type: mongoose.Schema.Types.ObjectId,
+//       ref: 'User', // Reference to the User model
+//       required: true,
+//     },
+//     title: {
+//       type: String,
+//       required: true,
+//     },
+//     category: {
+//       type: String,
+//       required: true,
+//     },
+//     description: {
+//       type: String,
+//       required: true,
+//     },
+//     thumbnail: {
+//       type: String,
+//       required: true,
+//     },
+//     shortPreview: {
+//       type: String,
+//     },
+//     credit: {
+//       type: String,
+//       required: true,
+//     },
+//     video: {
+//       type: String,
+//       require: true,
+//     },
+//     likes: [{ type: ObjectId, ref: 'User' }],
+//   },
+//   {
+//     timestamps: true,
+//   }
+// );
+
+// Populate the 'user' field with the actual user data
+// contentSchema.pre('findOne', function (next) {
+//   this.populate('user');
+//   next();
+// });
+
+// module.exports = mongoose.model('Content', contentSchema);

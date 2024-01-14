@@ -12,12 +12,11 @@ const {getUser,
   const {protect} = require('../middleware/authmiddleware');
   
 
-// router.route('/').get(getUser).post(upload.array('files', 2), registerUser);
   router.route('/').get(getUser).post( upload.single("image"), registerUser);
   router.route('/create').post(createUser)
   router.route('/login').post(loginUser);
   router.get('/profile', protect, getUserprofile);
-  // router.route('/:id').put(upload.single("image"), updateUser).delete(deleteUser); 
+  router.route('/:id').put(upload.single("image"), updateUser).delete(deleteUser); 
 
 
   router.route('/test-upload').post(upload.array('files', 2), (req, res) => {

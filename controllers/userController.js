@@ -20,7 +20,6 @@ const getUser = asyncHandler(async (req, res) => {
 })
 
 
-
 // @desc Register new users
 // @route post /api/users
 // @access Public
@@ -87,8 +86,7 @@ const deleteUser = asyncHandler(async (req, res) => {
     const userId = req.params.id; // Assuming the user ID is passed as a parameter
 
     // Fetch the user from MongoDB
-    const user = await userData.findById(userId);
-    console.log(user) 
+    const user = await userData.findById(userId); 
 
     if (!user) {
       res.status(404).json({ error: 'User not found' });
@@ -126,8 +124,6 @@ const updateUser = asyncHandler(async (req, res) => {
             res.status(404).json({ error: 'User not found' });
             return;
         }
-
-        console.log(req.file.path);
 
         // Update the user's profile image in Cloudinary
         const updatedCloudinaryResult = await cloudinary.uploader.upload(req.file.path, {
