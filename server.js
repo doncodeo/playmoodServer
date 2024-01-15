@@ -4,6 +4,7 @@ const bodyParser = require('body-parser');
 const dotenv = require('dotenv').config();
 const connectDB = require('./config/db');
 const { MongoClient } = require('mongodb');
+const path = require('path'); // Import the path module
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -34,6 +35,11 @@ connectDB()
         app.use('/api/content', require('./Routes/contentRoute'));
         app.use('/api/user', require('./Routes/userRoute'));
         
+
+        // Serve index.html for any route
+        app.get('*', (req, res) => {
+            res.sendFile(path.join(__dirname, 'public', 'index.html'));
+        });
 
     
 
