@@ -125,22 +125,27 @@ const updateUser = asyncHandler(async (req, res) => {
             return;
         }
 
-        // Update the user's profile image in Cloudinary
-        const updatedCloudinaryResult = await cloudinary.uploader.upload(req.file.path, {
-            folder: 'user-uploads',
-            public_id: user._id, // Set public_id to a unique identifier like user._id
-        });
+        // Check if a file is present in the request
+        if (req.file) {
+            // Update the user's profile image in Cloudinary
+            const updatedCloudinaryResult = await cloudinary.uploader.upload(req.file.path, {
+                folder: 'user-uploads',
+                public_id: user._id, // Set public_id to a unique identifier like user._id
+            });
 
-        // If updating the profile image, delete the old image in Cloudinary
-        if (user.cloudinary_id) {
-            await cloudinary.uploader.destroy(user.cloudinary_id);
+            // If updating the profile image, delete the old image in Cloudinary
+            if (user.cloudinary_id) {
+                await cloudinary.uploader.destroy(user.cloudinary_id);
+            }
+
+            // Update the user's profileImage and cloudinary_id
+            user.profileImage = updatedCloudinaryResult.secure_url;
+            user.cloudinary_id = updatedCloudinaryResult.public_id;
         }
 
-        // Update user data in MongoDB
+        // Update other user data in MongoDB (name, email, etc.)
         user.name = req.body.name || user.name;
         user.email = req.body.email || user.email;
-        user.profileImage = updatedCloudinaryResult.secure_url;
-        user.cloudinary_id = updatedCloudinaryResult.public_id;
 
         // Save the updated user in MongoDB
         const updatedUser = await user.save();
@@ -152,7 +157,7 @@ const updateUser = asyncHandler(async (req, res) => {
                 name: updatedUser.name,
                 email: updatedUser.email,
                 profileImage: updatedUser.profileImage,
-                cloudinary_id: updatedUser.cloudinary_id, // Update the cloudinary_id
+                cloudinary_id: updatedUser.cloudinary_id,
             },
         });
     } catch (error) {
