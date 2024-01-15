@@ -29,6 +29,10 @@ const contentSchema = new mongoose.Schema({
         type: String,
         require: true
     }, 
+    image: {
+        type: String,
+        require: true
+    }, 
     likes: [{type:ObjectId, ref:'user'}],
     cloudinary_id: {
         type: String,
