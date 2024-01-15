@@ -4,10 +4,13 @@ const bodyParser = require('body-parser');
 const dotenv = require('dotenv').config();
 const connectDB = require('./config/db');
 const { MongoClient } = require('mongodb');
+const path = require('path'); // Import the path module
 
 const app = express();
 const port = process.env.PORT || 5000;
 
+
+app.use(express.static('public'));
 // MongoDB Configuration 
 
 const uri = process.env.MONGO_CONNECTION_STRING;
@@ -20,7 +23,17 @@ const client = new MongoClient(uri)
 connectDB()
     .then(()=>{
         // enable CORS 
-        app.use(cors());
+     const allowedOrigins = [
+  'http://localhost:5173',
+   ' https://playmoodtv.com/',
+  // Add any other origins as needed
+];
+
+app.use(cors({
+  origin: allowedOrigins,
+}));
+
+
 
         // Middleware for JSON and URL-encoded data
         app.use(express.json());
@@ -32,6 +45,18 @@ connectDB()
         app.use('/api/content', require('./Routes/contentRoute'));
         app.use('/api/user', require('./Routes/userRoute'));
         
+
+     // Serve index.html for any route (excluding OPTIONS method)
+  app.get('*', (req, res) => {
+  if (req.method !== 'OPTIONS') {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  }
+});
+
+// Handling Preflight OPTIONS requests
+app.options('*', cors());
+
+
 
     
 

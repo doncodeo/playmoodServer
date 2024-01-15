@@ -13,7 +13,8 @@ module.exports = multer({
         }
         cb(null, true)
     }
-});
+}) // Add this line
+
 
 
 
