@@ -23,7 +23,7 @@ const client = new MongoClient(uri)
 connectDB()
     .then(()=>{
         // enable CORS 
-        app.use(cors());
+       app.use(cors({ origin: '*' }));
 
         // Middleware for JSON and URL-encoded data
         app.use(express.json());
