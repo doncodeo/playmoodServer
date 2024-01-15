@@ -98,9 +98,15 @@ const updateContent = asyncHandler(async (req, res) => {
             public_id: content._id, // Set public_id to a unique identifier like user._id
         });
 
+        console.log(updatedCloudinaryResult)
+
         // If updating the thumbnail, delete the old thumbnail in Cloudinary
         if (content.cloudinary_id) {
             await cloudinary.uploader.destroy(content.cloudinary_id);
+
+              // Update the user's profileImage and cloudinary_id
+              content.thumbnail = updatedCloudinaryResult.secure_url;
+              content.cloudinary_id = updatedCloudinaryResult.public_id;
         }
 
         // Update user data in MongoDB
