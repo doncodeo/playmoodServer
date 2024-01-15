@@ -13,7 +13,7 @@ module.exports = multer({
         }
         cb(null, true)
     }
-}).single('profileImage'); // Add this line
+}) // Add this line
 
 
 
