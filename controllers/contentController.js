@@ -21,61 +21,65 @@ const getContent = asyncHandler(async (req, res) => {
 
 const createContent = asyncHandler(async (req, res) => {
     try {
-        const { title, category, description, thumbnail, credit } = req.body;
-    
+        const { title, category, description, credit } = req.body;
+
         // Check if required fields are missing
         if (!title || !category || !description || !credit) {
-          return res.status(400).json({ error: 'Important fields missing!' });
+            return res.status(400).json({ error: 'Important fields missing!' });
         }
-    
+
         // Upload video to Cloudinary
-        const cloudinaryResult = await cloudinary.uploader.upload(req.file.path, { 
+        const cloudinaryResult = await cloudinary.uploader.upload(req.file.path, {
             resource_type: 'video',
             folder: "contents"
-         });
+        });
 
-         // Set default values for profileImage and cloudinary_id
+        // Set default values for profileImage and cloudinary_id
         const defaultProfileImage = 'https://res.cloudinary.com/di97mcvbu/image/upload/v1705254137/contents/raiwsn8fpx870pboiodp.png'; // Replace with your default image URL
         const defaultCloudinaryId = 'contents/raiwsn8fpx870pboiodp'; // Replace with your default cloudinary_id
 
+        // Check if thumbnail is provided, otherwise set a default value
+        const thumbnail = req.file ? cloudinaryResult.secure_url : defaultProfileImage;
+
         // Create content
         const content = await contentSchema.create({
-          title,
-          category,
-          description,
-          credit,
-          thumbnail: defaultProfileImage,
-          video: cloudinaryResult.secure_url,
-          cloudinary_id: cloudinaryResult.public_id,
-          thumnail_id: defaultCloudinaryId  
-        });
-    
-        if (content) {
-          console.log('Content created:', content.video);
-          res.status(201).json({
-            _id: content._id,
-            title: content.title,
-            category: content.category,
-            description: content.description,
-            thumbnail: content.thumbnail,
-            credit: content.credit,
-            video: content.video,
-            likes: content.likes,
+            title,
+            category,
+            description,
+            credit,
+            thumbnail,
+            video: cloudinaryResult.secure_url,
             cloudinary_id: cloudinaryResult.public_id,
             thumnail_id: defaultCloudinaryId
-          });
+        });
+
+        if (content) {
+            console.log('Content created:', content.video);
+            res.status(201).json({
+                _id: content._id,
+                title: content.title,
+                category: content.category,
+                description: content.description,
+                thumbnail: content.thumbnail,
+                credit: content.credit,
+                video: content.video,
+                likes: content.likes,
+                cloudinary_id: cloudinaryResult.public_id,
+                thumnail_id: defaultCloudinaryId
+            });
         } else {
-          console.log('Content creation failed');
-          res.status(400).json({ error: 'Invalid content data' });
+            console.log('Content creation failed');
+            res.status(400).json({ error: 'Invalid content data' });
         }
-    
+
         console.log('Content creation completed');
-    
-      } catch (error) {
+
+    } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Server error' });
-      }
-})
+    }
+});
+
 
 
 // authenticated user
