@@ -23,7 +23,8 @@ const client = new MongoClient(uri)
 connectDB()
     .then(()=>{
         // enable CORS 
-       app.use(cors({ origin: '*' }))
+     app.use(cors({ origin: 'http://localhost:5173', credentials: true }));
+
 
 
         // Middleware for JSON and URL-encoded data
