@@ -30,15 +30,7 @@ connectDB()
 ];
 
 app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'The CORS policy for this site does not allow access from the specified origin.';
-      return callback(new Error(msg), false);
-    }
-    return callback(null, true);
-  },
+  origin: allowedOrigins,
 }));
 
 
@@ -54,13 +46,16 @@ app.use(cors({
         app.use('/api/user', require('./Routes/userRoute'));
         
 
-        // Serve index.html for any route
-      app.get('*', (req, res) => {
-  // Exclude OPTIONS method from serving index.html
+     // Serve index.html for any route (excluding OPTIONS method)
+  app.get('*', (req, res) => {
   if (req.method !== 'OPTIONS') {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
   }
 });
+
+// Handling Preflight OPTIONS requests
+app.options('*', cors());
+
 
 
     
