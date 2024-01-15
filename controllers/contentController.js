@@ -11,7 +11,7 @@ const cloudinary = require('../config/cloudinary');
 const getContent = asyncHandler(async (req, res) => {
     console.log('Fetching content...');
     const content = await contentSchema.find();
-    console.log('Fetched content:', content);
+    // console.log('Fetched content:', content);
     res.status(200).json(content);
 });
 
@@ -77,6 +77,61 @@ const createContent = asyncHandler(async (req, res) => {
       }
 })
 
+const updateContent = asyncHandler(async (req, res) => {
+    try {
+        const contentId = req.params.id; // Assuming the user ID is passed as a parameter
+
+        // Fetch the user from MongoDB
+        const content = await contentSchema.findById(contentId);
+
+        if (!content) {
+            res.status(404).json({ error: 'User not found' });
+            return;
+        }
+
+        // Update the thumbnail in Cloudinary
+        const updatedCloudinaryResult = await cloudinary.uploader.upload(req.file.path, {
+            folder: 'contents',
+            public_id: content._id, // Set public_id to a unique identifier like user._id
+        });
+
+        // If updating the thumbnail, delete the old thumbnail in Cloudinary
+        if (content.cloudinary_id) {
+            await cloudinary.uploader.destroy(content.cloudinary_id);
+        }
+
+        // Update user data in MongoDB
+        content.title = req.body.name || content.title;
+        content.category = req.body.category || content.category;
+        content.description = req.body.description || content.description;
+        content.credit = req.body.credit || content.credit;
+        content.thumbnail = req.body.thumbnail || content.thumbnail;
+        content.video = req.body.video || content.video;
+        content.likes = req.body.likes || content.likes;
+        content.cloudinary_id = updatedCloudinaryResult.public_id;
+
+        // Save the updated content in MongoDB
+        const updatedContent = await content.save();
+
+        res.status(200).json({
+            message: 'content updated successfully',
+            user: {
+                _id: updatedContent._id,
+                title: updatedContent.name,
+                category: updatedContent.category,
+                description: updatedContent.description,
+                credit: updatedContent.credit,
+                thumbnail: updatedContent.thumbnail,
+                video: updatedContent.video,
+                likes: updatedContent.likes,
+                cloudinary_id: updatedContent.cloudinary_id, // Update the cloudinary_id
+            },
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
 
 // authenticated user
 // const createContent = asyncHandler(async (req, res) => {
@@ -286,7 +341,7 @@ const deleteContent = asyncHandler(async (req, res) => {
 
  module.exports = {
     getContent,
-    updateTop10,
+    updateContent,
     postLikes,
     unlike,
     createContent,
