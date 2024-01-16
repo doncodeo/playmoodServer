@@ -43,8 +43,8 @@ const createContent = asyncHandler(async (req, res) => {
 
     // Upload image to Cloudinary (if provided)
 let imageCloudinaryResult;
-if (req.file && req.file.image) {
-  imageCloudinaryResult = await cloudinary.uploader.upload(req.file.image.path, {
+if (req.files && req.files.image) {
+  imageCloudinaryResult = await cloudinary.uploader.upload(req.files.image[0].path, {
     resource_type: 'image',
     folder: 'contents',
   });
