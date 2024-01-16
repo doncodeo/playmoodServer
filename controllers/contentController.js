@@ -20,7 +20,6 @@ const getContent = asyncHandler(async (req, res) => {
 // @route POST /api/content
 
 // contentController.js
-// contentController.js
 const createContent = asyncHandler(async (req, res) => {
   try {
     const { title, category, description, credit } = req.body;
@@ -93,7 +92,6 @@ const createContent = asyncHandler(async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
-
 
 
 //updateContent
