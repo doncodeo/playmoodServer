@@ -34,27 +34,33 @@ const createContent = asyncHandler(async (req, res) => {
     console.log('Request Files:', req.files);
 
     // Upload video to Cloudinary
-    const videoCloudinaryResult = req.file
-      ? await cloudinary.uploader.upload(req.file.path, {
+    const videoUploadPromise = req.file
+      ? cloudinary.uploader.upload(req.file.path, {
           resource_type: 'video',
           folder: 'contents',
         })
       : null;
 
     // Upload image to Cloudinary (if provided)
-    let imageCloudinaryResult;
-    if (req.files && req.files.image) {
-      imageCloudinaryResult = await cloudinary.uploader.upload(req.files.image[0].path, {
-        resource_type: 'image',
-        folder: 'contents',
-      });
-    }
+    const imageUploadPromise =
+      req.files && req.files.image
+        ? cloudinary.uploader.upload(req.files.image[0].path, {
+            resource_type: 'image',
+            folder: 'contents',
+          })
+        : null;
+
+    const [videoCloudinaryResult, imageCloudinaryResult] = await Promise.all([
+      videoUploadPromise,
+      imageUploadPromise,
+    ]);
 
     console.log('Video Cloudinary Result:', videoCloudinaryResult);
     console.log('Image Cloudinary Result:', imageCloudinaryResult);
 
     // Set default values for profileImage and cloudinary_id
-    const defaultProfileImage = 'https://res.cloudinary.com/di97mcvbu/image/upload/v1705254137/contents/raiwsn8fpx870pboiodp.png';
+    const defaultProfileImage =
+      'https://res.cloudinary.com/di97mcvbu/image/upload/v1705254137/contents/raiwsn8fpx870pboiodp.png';
     const defaultCloudinaryId = 'contents/raiwsn8fpx870pboiodp';
 
     // Check if thumbnail is provided, otherwise set a default value
@@ -99,8 +105,6 @@ const createContent = asyncHandler(async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
-
-module.exports = createContent;
 
 
 
