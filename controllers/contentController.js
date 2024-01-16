@@ -20,6 +20,7 @@ const getContent = asyncHandler(async (req, res) => {
 // @route POST /api/content
 
 // contentController.js
+// contentController.js
 const createContent = asyncHandler(async (req, res) => {
   try {
     const { title, category, description, credit } = req.body;
@@ -30,12 +31,13 @@ const createContent = asyncHandler(async (req, res) => {
     }
 
     // Upload video to Cloudinary
-    const videoCloudinaryResult = req.files.video
-      ? await cloudinary.uploader.upload(req.files.video.path, {
-          resource_type: 'video',
-          folder: "contents",
-        })
-      : null;
+    let videoCloudinaryResult;
+    if (req.files.video) {
+      videoCloudinaryResult = await cloudinary.uploader.upload(req.files.video.path, {
+        resource_type: 'video',
+        folder: "contents",
+      });
+    }
 
     // Upload image to Cloudinary (if provided)
     let imageCloudinaryResult;
@@ -92,7 +94,6 @@ const createContent = asyncHandler(async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
-
 
 //updateContent
 
