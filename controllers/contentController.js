@@ -57,10 +57,10 @@ const createContent = asyncHandler(async (req, res) => {
           })
         : null;
 
-    const [videoCloudinaryResult, imageCloudinaryResult] = await Promise.all([
-      videoUploadPromise,
-      imageUploadPromise,
-    ]);
+   const [videoResult, imageCloudinaryResult] = await Promise.all([
+  videoUploadPromise,
+  imageUploadPromise,
+]);
 
     console.log('Video Cloudinary Result:', videoCloudinaryResult);
     console.log('Image Cloudinary Result:', imageCloudinaryResult);
