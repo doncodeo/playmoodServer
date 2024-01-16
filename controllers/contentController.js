@@ -60,17 +60,17 @@ const createContent = asyncHandler(async (req, res) => {
     const thumbnail = imageCloudinaryResult ? imageCloudinaryResult.secure_url : defaultProfileImage;
 
     // Create content
-    const content = await contentSchema.create({
-      title,
-      category,
-      description,
-      credit,
-      thumbnail,
-      video: videoCloudinaryResult ? videoCloudinaryResult.secure_url : null,
-      cloudinary_id: videoCloudinaryResult ? videoCloudinaryResult.public_id : null,
-      thumbnail_id: imageCloudinaryResult ? imageCloudinaryResult.public_id : defaultCloudinaryId,
-      image: imageCloudinaryResult ? imageCloudinaryResult.secure_url : null,
-    });
+  const content = await contentSchema.create({
+  title,
+  category,
+  description,
+  credit,
+  thumbnail,
+  video: videoCloudinaryResult ? videoCloudinaryResult.secure_url : null,
+  cloudinary_id: videoCloudinaryResult ? videoCloudinaryResult.public_id : null,
+  thumbnail_id: imageCloudinaryResult ? imageCloudinaryResult.public_id : defaultCloudinaryId,
+  image: imageCloudinaryResult ? imageCloudinaryResult.secure_url : null,
+});
 
     if (content) {
       console.log('Content created:', content.video);
