@@ -30,24 +30,24 @@ const createContent = asyncHandler(async (req, res) => {
     }
 
     // Upload video to Cloudinary
-    const videoCloudinaryResult = req.files.video
-      ? await cloudinary.uploader.upload(req.files.video[0].path, {
+    const videoCloudinaryResult = req.file
+      ? await cloudinary.uploader.upload(req.file.path, {
           resource_type: 'video',
           folder: 'contents',
         })
       : null;
 
     // Upload image to Cloudinary (if provided)
-    const imageCloudinaryResult = req.files.image
-      ? await cloudinary.uploader.upload(req.files.image[0].path, {
-          resource_type: 'image',
-          folder: 'contents',
-        })
-      : null;
+    let imageCloudinaryResult;
+    if (req.files && req.files.image) {
+      imageCloudinaryResult = await cloudinary.uploader.upload(req.files.image[0].path, {
+        resource_type: 'image',
+        folder: 'contents',
+      });
+    }
 
     // Set default values for profileImage and cloudinary_id
-    const defaultProfileImage =
-      'https://res.cloudinary.com/di97mcvbu/image/upload/v1705254137/contents/raiwsn8fpx870pboiodp.png';
+    const defaultProfileImage = 'https://res.cloudinary.com/di97mcvbu/image/upload/v1705254137/contents/raiwsn8fpx870pboiodp.png';
     const defaultCloudinaryId = 'contents/raiwsn8fpx870pboiodp';
 
     // Check if thumbnail is provided, otherwise set a default value
@@ -62,9 +62,7 @@ const createContent = asyncHandler(async (req, res) => {
       thumbnail,
       video: videoCloudinaryResult ? videoCloudinaryResult.secure_url : null,
       cloudinary_id: videoCloudinaryResult ? videoCloudinaryResult.public_id : null,
-      thumbnail_id: imageCloudinaryResult
-        ? imageCloudinaryResult.public_id
-        : defaultCloudinaryId,
+      thumbnail_id: imageCloudinaryResult ? imageCloudinaryResult.public_id : defaultCloudinaryId,
       image: imageCloudinaryResult ? imageCloudinaryResult.secure_url : null,
     });
 
@@ -94,8 +92,6 @@ const createContent = asyncHandler(async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
-
-
 
 
 
