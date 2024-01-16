@@ -30,10 +30,10 @@ const createContent = asyncHandler(async (req, res) => {
       }
 
       // Upload video to Cloudinary
-      const cloudinaryResult = await cloudinary.uploader.upload(req.file.path, {
-          resource_type: 'video',
-          folder: "contents"
-      });
+    const cloudinaryResult = await cloudinary.uploader.upload(req.files.video[0].path, {
+      resource_type: 'video',
+      folder: "contents"
+    });
 
       // Set default values for profileImage and cloudinary_id
       const defaultProfileImage = 'https://res.cloudinary.com/di97mcvbu/image/upload/v1705254137/contents/raiwsn8fpx870pboiodp.png'; // Replace with your default image URL
