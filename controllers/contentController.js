@@ -42,13 +42,13 @@ const createContent = asyncHandler(async (req, res) => {
       : null;
 
     // Upload image to Cloudinary (if provided)
-    let imageCloudinaryResult;
-    if (req.files && req.files.image) {
-      imageCloudinaryResult = await cloudinary.uploader.upload(req.files.image[0].path, {
-        resource_type: 'image',
-        folder: 'contents',
-      });
-    }
+let imageCloudinaryResult;
+if (req.file && req.file.image) {
+  imageCloudinaryResult = await cloudinary.uploader.upload(req.file.image.path, {
+    resource_type: 'image',
+    folder: 'contents',
+  });
+}
         
     console.log('Video Cloudinary Result:', videoCloudinaryResult);
     console.log('Image Cloudinary Result:', imageCloudinaryResult);
