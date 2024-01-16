@@ -18,7 +18,6 @@ const getContent = asyncHandler(async (req, res) => {
 
 // @desc Post Content
 // @route POST /api/content
-// contentController.js
 
 const createContent = asyncHandler(async (req, res) => {
   try {
@@ -30,10 +29,10 @@ const createContent = asyncHandler(async (req, res) => {
       }
 
       // Upload video to Cloudinary
-    const cloudinaryResult = await cloudinary.uploader.upload(req.files.video[0].path, {
-      resource_type: 'video',
-      folder: "contents"
-    });
+      const cloudinaryResult = await cloudinary.uploader.upload(req.file.path, {
+          resource_type: 'video',
+          folder: "contents"
+      });
 
       // Set default values for profileImage and cloudinary_id
       const defaultProfileImage = 'https://res.cloudinary.com/di97mcvbu/image/upload/v1705254137/contents/raiwsn8fpx870pboiodp.png'; // Replace with your default image URL
@@ -81,10 +80,6 @@ const createContent = asyncHandler(async (req, res) => {
   }
 });
 
-
-
-
-//updateContent
 const updateContent = asyncHandler(async (req, res) => {
     try {
         const contentId = req.params.id; // Assuming the user ID is passed as a parameter
