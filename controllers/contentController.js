@@ -29,6 +29,10 @@ const createContent = asyncHandler(async (req, res) => {
       return res.status(400).json({ error: 'Important fields missing!' });
     }
 
+    console.log('Request Body:', req.body);
+    console.log('Request File:', req.file);
+    console.log('Request Files:', req.files);
+
     // Upload video to Cloudinary
     const videoCloudinaryResult = req.file
       ? await cloudinary.uploader.upload(req.file.path, {
@@ -45,7 +49,9 @@ const createContent = asyncHandler(async (req, res) => {
         folder: 'contents',
       });
     }
-
+        
+    console.log('Video Cloudinary Result:', videoCloudinaryResult);
+    console.log('Image Cloudinary Result:', imageCloudinaryResult);
     // Set default values for profileImage and cloudinary_id
     const defaultProfileImage = 'https://res.cloudinary.com/di97mcvbu/image/upload/v1705254137/contents/raiwsn8fpx870pboiodp.png';
     const defaultCloudinaryId = 'contents/raiwsn8fpx870pboiodp';
