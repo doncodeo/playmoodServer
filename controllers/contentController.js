@@ -22,89 +22,62 @@ const getContent = asyncHandler(async (req, res) => {
 
 const createContent = asyncHandler(async (req, res) => {
   try {
-    const { title, category, description, credit } = req.body;
+      const { title, category, description, credit } = req.body;
 
-    // Check if required fields are missing
-    if (!title || !category || !description || !credit) {
-      return res.status(400).json({ error: 'Important fields missing!' });
-    }
-
-    console.log('Request Body:', req.body);
-    console.log('Request File:', req.file);
-    console.log('Request Files:', req.files);
-
-    // Upload video to Cloudinary
-    let videoCloudinaryResult;
-    if (req.file) {
-      try {
-        videoCloudinaryResult = await cloudinary.uploader.upload(req.file.path, {
-          resource_type: 'video',
-          folder: 'contents',
-        });
-        console.log('Video Cloudinary Result:', videoCloudinaryResult);
-      } catch (videoUploadError) {
-        console.error('Error uploading video to Cloudinary:', videoUploadError);
-        return res.status(500).json({ error: 'Error uploading video to Cloudinary' });
+      // Check if required fields are missing
+      if (!title || !category || !description || !credit) {
+          return res.status(400).json({ error: 'Important fields missing!' });
       }
-    }
 
-    // Upload image to Cloudinary (if provided)
-   const imageUploadPromise = req.files && req.files.image
-      ? cloudinary.uploader.upload(req.files.image[0].path, {
-          resource_type: 'image',
-          folder: 'contents',
-        })
-      : null;
-
-    const imageCloudinaryResult = await imageUploadPromise;
-
-    console.log('Image Cloudinary Result:', imageCloudinaryResult);
-
-    // Set default values for profileImage and cloudinary_id
-    const defaultProfileImage =
-      'https://res.cloudinary.com/di97mcvbu/image/upload/v1705254137/contents/raiwsn8fpx870pboiodp.png';
-    const defaultCloudinaryId = 'contents/raiwsn8fpx870pboiodp';
-
-    // Check if thumbnail is provided, otherwise set a default value
-    const thumbnail = imageCloudinaryResult ? imageCloudinaryResult.secure_url : defaultProfileImage;
-
-    // Create content
-    const content = await contentSchema.create({
-      title,
-      category,
-      description,
-      credit,
-      thumbnail,
-      video: videoCloudinaryResult ? videoCloudinaryResult.secure_url : null,
-      cloudinary_id: videoCloudinaryResult ? videoCloudinaryResult.public_id : null,
-      thumbnail_id: imageCloudinaryResult ? imageCloudinaryResult.public_id : defaultCloudinaryId,
-      image: imageCloudinaryResult ? imageCloudinaryResult.secure_url : null,
-    });
-
-    if (content) {
-      console.log('Content created:', content.video);
-      res.status(201).json({
-        _id: content._id,
-        title: content.title,
-        category: content.category,
-        description: content.description,
-        thumbnail: content.thumbnail,
-        credit: content.credit,
-        video: content.video,
-        image: content.image,
-        likes: content.likes,
-        cloudinary_id: content.cloudinary_id,
-        thumbnail_id: content.thumbnail_id,
+      // Upload video to Cloudinary
+      const cloudinaryResult = await cloudinary.uploader.upload(req.file.path, {
+          resource_type: 'video',
+          folder: "contents"
       });
-    } else {
-      console.log('Content creation failed');
-      res.status(400).json({ error: 'Invalid content data' });
-    }
 
-    console.log('Content creation completed');
+      // Set default values for profileImage and cloudinary_id
+      const defaultProfileImage = 'https://res.cloudinary.com/di97mcvbu/image/upload/v1705254137/contents/raiwsn8fpx870pboiodp.png'; // Replace with your default image URL
+      const defaultCloudinaryId = 'contents/raiwsn8fpx870pboiodp'; // Replace with your default cloudinary_id
+
+      // Check if thumbnail is provided, otherwise set a default value
+      const thumbnail = req.file ? cloudinaryResult.secure_url : defaultProfileImage;
+
+      // Create content
+      const content = await contentSchema.create({
+          title,
+          category,
+          description,
+          credit,
+          thumbnail,
+          video: cloudinaryResult.secure_url,
+          cloudinary_id: cloudinaryResult.public_id,
+          thumnail_id: defaultCloudinaryId
+      });
+
+      if (content) {
+          console.log('Content created:', content.video);
+          res.status(201).json({
+              _id: content._id,
+              title: content.title,
+              category: content.category,
+              description: content.description,
+              thumbnail: content.thumbnail,
+              credit: content.credit,
+              video: content.video,
+              likes: content.likes,
+              cloudinary_id: cloudinaryResult.public_id,
+              thumnail_id: defaultCloudinaryId
+          });
+      } else {
+          console.log('Content creation failed');
+          res.status(400).json({ error: 'Invalid content data' });
+      }
+
+      console.log('Content creation completed');
+
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Server error' });
+      console.error(error);
+      res.status(500).json({ error: 'Server error' });
   }
 });
 
