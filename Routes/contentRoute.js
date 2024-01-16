@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const asyncHandler = require('express-async-handler');
 const { getContent, postLikes, unlike, createContent, updateContent, deleteContent } = require('../controllers/contentController');
 const upload = require('../middleware/multer');
 
@@ -10,3 +11,4 @@ router.route('/like').put(postLikes);
 router.route('/unlike').put(unlike);
 
 module.exports = router;
+
