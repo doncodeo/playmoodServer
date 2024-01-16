@@ -25,7 +25,7 @@ connectDB()
         // enable CORS 
      const allowedOrigins = [
   'http://localhost:5173',
-   ' https://playmoodtv.com/',
+   ' https://playmoodtv.com',
   // Add any other origins as needed
 ];
 
