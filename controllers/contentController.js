@@ -20,6 +20,7 @@ const getContent = asyncHandler(async (req, res) => {
 // @route POST /api/content
 
 // contentController.js
+// contentController.js
 const createContent = asyncHandler(async (req, res) => {
   try {
     const { title, category, description, credit } = req.body;
@@ -30,10 +31,12 @@ const createContent = asyncHandler(async (req, res) => {
     }
 
     // Upload video to Cloudinary
-    const videoCloudinaryResult = await cloudinary.uploader.upload(req.files.video.path, {
-      resource_type: 'video',
-      folder: "contents",
-    });
+    const videoCloudinaryResult = req.files.video
+      ? await cloudinary.uploader.upload(req.files.video.path, {
+          resource_type: 'video',
+          folder: "contents",
+        })
+      : null;
 
     // Upload image to Cloudinary (if provided)
     let imageCloudinaryResult;
@@ -58,8 +61,8 @@ const createContent = asyncHandler(async (req, res) => {
       description,
       credit,
       thumbnail,
-      video: videoCloudinaryResult.secure_url,
-      cloudinary_id: videoCloudinaryResult.public_id,
+      video: videoCloudinaryResult ? videoCloudinaryResult.secure_url : null,
+      cloudinary_id: videoCloudinaryResult ? videoCloudinaryResult.public_id : null,
       thumbnail_id: imageCloudinaryResult ? imageCloudinaryResult.public_id : defaultCloudinaryId,
       image: imageCloudinaryResult ? imageCloudinaryResult.secure_url : null,
     });
@@ -90,6 +93,7 @@ const createContent = asyncHandler(async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
+
 
 
 //updateContent
