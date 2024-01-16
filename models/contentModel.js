@@ -25,10 +25,6 @@ const contentSchema = new mongoose.Schema({
         type: String,
         required: true, 
     },
-    image: {
-        type: String,
-        require: true
-    }, 
     video: {
         type: String,
         require: true
