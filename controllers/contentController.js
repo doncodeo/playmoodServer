@@ -34,14 +34,14 @@ const createContent = asyncHandler(async (req, res) => {
     console.log('Request Files:', req.files);
 
     // Upload video to Cloudinary
-     let videoCloudinaryResult;
+       let videoUploadPromise;
     if (req.file) {
       try {
-        videoCloudinaryResult = await cloudinary.uploader.upload(req.file.path, {
+        videoUploadPromise = cloudinary.uploader.upload(req.file.path, {
           resource_type: 'video',
           folder: 'contents',
         });
-        console.log('Video Cloudinary Result:', videoCloudinaryResult);
+        console.log('Video Cloudinary Result:', await videoUploadPromise);
       } catch (videoUploadError) {
         console.error('Error uploading video to Cloudinary:', videoUploadError);
         return res.status(500).json({ error: 'Error uploading video to Cloudinary' });
@@ -49,18 +49,18 @@ const createContent = asyncHandler(async (req, res) => {
     }
 
     // Upload image to Cloudinary (if provided)
-    const imageUploadPromise =
-      req.files && req.files.image
-        ? cloudinary.uploader.upload(req.files.image[0].path, {
-            resource_type: 'image',
-            folder: 'contents',
-          })
-        : null;
+    const imageUploadPromise = req.files && req.files.image
+      ? cloudinary.uploader.upload(req.files.image[0].path, {
+          resource_type: 'image',
+          folder: 'contents',
+        })
+      : null;
 
-   const [videoResult, imageCloudinaryResult] = await Promise.all([
-  videoUploadPromise,
-  imageUploadPromise,
-]);
+    const [videoCloudinaryResult, imageCloudinaryResult] = await Promise.all([
+      videoUploadPromise,
+      imageUploadPromise,
+    ]);
+
 
     console.log('Video Cloudinary Result:', videoCloudinaryResult);
     console.log('Image Cloudinary Result:', imageCloudinaryResult);
