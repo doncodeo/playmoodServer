@@ -34,12 +34,19 @@ const createContent = asyncHandler(async (req, res) => {
     console.log('Request Files:', req.files);
 
     // Upload video to Cloudinary
-    const videoUploadPromise = req.file
-      ? cloudinary.uploader.upload(req.file.path, {
+     let videoCloudinaryResult;
+    if (req.file) {
+      try {
+        videoCloudinaryResult = await cloudinary.uploader.upload(req.file.path, {
           resource_type: 'video',
           folder: 'contents',
-        })
-      : null;
+        });
+        console.log('Video Cloudinary Result:', videoCloudinaryResult);
+      } catch (videoUploadError) {
+        console.error('Error uploading video to Cloudinary:', videoUploadError);
+        return res.status(500).json({ error: 'Error uploading video to Cloudinary' });
+      }
+    }
 
     // Upload image to Cloudinary (if provided)
     const imageUploadPromise =
