@@ -42,46 +42,6 @@ const createContent = asyncHandler(async (req, res) => {
       : null;
 
     // Upload image to Cloudinary (if provided)
-let imageCloudinaryResult;
-if (req.files && req.files.image) {
-  imageCloudinaryResult = await cloudinary.uploader.upload(req.files.image[0].path, {
-    resource_type: 'image',
-    folder: 'contents',
-  });
-}
-        
-    console.log('Video Cloudinary Result:', videoCloudinaryResult);
-    console.log('Image Cloudinary Result:', imageCloudinaryResult);
-    // Set default values for profileImage and cloudinary_id
-    const defaultProfileImage = 'https://res.cloudinary.com/di97mcvbu/image/upload/v1705254137/contents/raiwsn8fpx870pboiodp.png';
-    const defaultCloudinaryId = 'contents/raiwsn8fpx870pboiodp';
-
-    // Check if thumbnail is provided, otherwise set a default value
-    const thumbnail = imageCloudinaryResult ? imageCloudinaryResult.secure_url : defaultProfileImage;
-
-    // Create content
- const createContent = asyncHandler(async (req, res) => {
-  try {
-    const { title, category, description, credit } = req.body;
-
-    // Check if required fields are missing
-    if (!title || !category || !description || !credit) {
-      return res.status(400).json({ error: 'Important fields missing!' });
-    }
-
-    console.log('Request Body:', req.body);
-    console.log('Request File:', req.file);
-    console.log('Request Files:', req.files);
-
-    // Upload video to Cloudinary
-    const videoCloudinaryResult = req.file
-      ? await cloudinary.uploader.upload(req.file.path, {
-          resource_type: 'video',
-          folder: 'contents',
-        })
-      : null;
-
-    // Upload image to Cloudinary (if provided)
     let imageCloudinaryResult;
     if (req.files && req.files.image) {
       imageCloudinaryResult = await cloudinary.uploader.upload(req.files.image[0].path, {
@@ -139,6 +99,9 @@ if (req.files && req.files.image) {
     res.status(500).json({ error: 'Server error' });
   }
 });
+
+module.exports = createContent;
+
 
 
 
