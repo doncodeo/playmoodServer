@@ -18,9 +18,8 @@ const getContent = asyncHandler(async (req, res) => {
 
 // @desc Post Content
 // @route POST /api/content
+// contentController.js
 
-// contentController.js
-// contentController.js
 const createContent = asyncHandler(async (req, res) => {
   try {
     const { title, category, description, credit } = req.body;
@@ -31,25 +30,24 @@ const createContent = asyncHandler(async (req, res) => {
     }
 
     // Upload video to Cloudinary
-    let videoCloudinaryResult;
-    if (req.files.video) {
-      videoCloudinaryResult = await cloudinary.uploader.upload(req.files.video.path, {
-        resource_type: 'video',
-        folder: "contents",
-      });
-    }
+    const videoCloudinaryResult = req.files.video
+      ? await cloudinary.uploader.upload(req.files.video[0].path, {
+          resource_type: 'video',
+          folder: 'contents',
+        })
+      : null;
 
     // Upload image to Cloudinary (if provided)
-    let imageCloudinaryResult;
-    if (req.files.image) {
-      imageCloudinaryResult = await cloudinary.uploader.upload(req.files.image.path, {
-        resource_type: 'image',
-        folder: "contents",
-      });
-    }
+    const imageCloudinaryResult = req.files.image
+      ? await cloudinary.uploader.upload(req.files.image[0].path, {
+          resource_type: 'image',
+          folder: 'contents',
+        })
+      : null;
 
     // Set default values for profileImage and cloudinary_id
-    const defaultProfileImage = 'https://res.cloudinary.com/di97mcvbu/image/upload/v1705254137/contents/raiwsn8fpx870pboiodp.png';
+    const defaultProfileImage =
+      'https://res.cloudinary.com/di97mcvbu/image/upload/v1705254137/contents/raiwsn8fpx870pboiodp.png';
     const defaultCloudinaryId = 'contents/raiwsn8fpx870pboiodp';
 
     // Check if thumbnail is provided, otherwise set a default value
@@ -64,7 +62,9 @@ const createContent = asyncHandler(async (req, res) => {
       thumbnail,
       video: videoCloudinaryResult ? videoCloudinaryResult.secure_url : null,
       cloudinary_id: videoCloudinaryResult ? videoCloudinaryResult.public_id : null,
-      thumbnail_id: imageCloudinaryResult ? imageCloudinaryResult.public_id : defaultCloudinaryId,
+      thumbnail_id: imageCloudinaryResult
+        ? imageCloudinaryResult.public_id
+        : defaultCloudinaryId,
       image: imageCloudinaryResult ? imageCloudinaryResult.secure_url : null,
     });
 
@@ -95,8 +95,12 @@ const createContent = asyncHandler(async (req, res) => {
   }
 });
 
-//updateContent
 
+
+
+
+
+//updateContent
 const updateContent = asyncHandler(async (req, res) => {
     try {
         const contentId = req.params.id; // Assuming the user ID is passed as a parameter
