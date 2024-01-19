@@ -1,6 +1,7 @@
 
 const asyncHandler = require ('express-async-handler');
-const userData = require('../models/userModel');
+const userSchema = require('../models/userModel');
+const contentSchema = require('../models/contentModel');
 const jwt = require("jsonwebtoken");
 const bcryptjs = require("bcryptjs");               
 const cloudinary = require('../config/cloudinary');
@@ -270,6 +271,188 @@ const getUserprofile = asyncHandler( async (req, res) => {
     })
  } )
 
+ // @desc PUT Content
+// @route PUT /api/user/like/:id (user id) push the content id  {"contentId": "65a6fc7b72128447ad32024e", "userId": "65a8025e3af4e7929b379e7b"}
+
+const likeContent = asyncHandler(async (req, res) => {
+    try {
+        const contentId = req.body.contentId;
+        const userId = req.body.userId;
+
+        // Check if the user has already liked the content
+        const user = await userSchema.findOne({ _id: userId, likes: contentId });
+
+        if (user) {
+            return res.status(400).json({ error: 'This user already liked this content' });
+        }
+
+        // Find the user by ID and update the likes array
+        const updatedUser = await userSchema.findByIdAndUpdate(
+            userId,
+            { $push: { likes: contentId } },
+            { new: true }
+        );
+
+        res.status(200).json({ likes: updatedUser.likes, message: "User successfully like content" });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// @desc PUT Content
+// @route PUT /api/user/unlike/:id
+const unlikeContent = asyncHandler(async (req, res) => {
+    try {
+        const contentId = req.body.contentId;
+        const userId = req.body.userId;
+
+        // Find the user by ID and update the likes array to remove the contentId
+        const updatedUser = await userSchema.findByIdAndUpdate(
+            userId,
+            { $pull: { likes: contentId } },
+            { new: true }
+        );
+
+        if (!updatedUser) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        res.status(200).json({ likes: updatedUser.likes });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Server error', message: "user unliked content" });
+    }
+});
+
+// @desc GET Content
+// @route GET /api/user/getlike/:id
+
+const getLikedContents = asyncHandler(async (req, res) => {
+    const userId = req.body.userId;
+    
+    console.log(userId)
+
+    try {
+        const user = await userSchema.findById(userId).populate('likes');
+        res.status(200).json({ likedContents: user.likes });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+ // @desc PUT Content
+// @route PUT /api/content/watchlist/:id (user id) push the content id  {"contentId": "65a6fc7b72128447ad32024e", "userId": "65a8025e3af4e7929b379e7b"}
+
+const addWatchlist = asyncHandler(async (req, res) => {
+    try {
+        const contentId = req.body.contentId;
+        const userId = req.body.userId;
+
+        // Check if the user has already liked the content
+        const user = await userSchema.findOne({ _id: userId, watchlist: contentId });
+
+        if (user) {
+            return res.status(400).json({ error: 'This user already liked this content' });
+        }
+
+        // Find the user by ID and update the likes array
+        const updatedUser = await userSchema.findByIdAndUpdate(
+            userId,
+            { $push: { watchlist: contentId } },
+            { new: true }
+        );
+
+        res.status(200).json({ likes: updatedUser.watchlist, message: "Content successfully added to Watchlist" });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// @desc GET Content
+// @route GET /api/user/getlike/:id
+
+const getWatchlist = asyncHandler(async (req, res) => {
+    const userId = req.body.userId;
+    try {
+        const user = await userSchema.findById(userId).populate('watchlist');
+        res.status(200).json({ watchList: user.watchlist });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// @desc PUT Content
+// @route PUT /api/user/removelist/:id
+const removeWatchlist = asyncHandler(async (req, res) => {
+    try {
+        const contentId = req.body.contentId;
+        const userId = req.body.userId;
+
+        // Find the user by ID and update the likes array to remove the contentId
+        const updatedUser = await userSchema.findByIdAndUpdate(
+            userId,
+            { $pull: { watchlist: contentId } },
+            { new: true }
+        );
+
+        if (!updatedUser) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        res.status(200).json({ watchlist: updatedUser.watchlist });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Server error', message: "watchlist successfully removed!" });
+    }
+});
+
+
+
+/**
+ * @route   PUT /api/user/:userId/save-content/:contentId
+ * @desc    Save a content to user's history
+ * @access  Private
+ */
+const saveContentToHistory = asyncHandler(async (req, res) => {
+    const userId = req.body.userId;
+    const contentId = req.body.contentId;
+
+    try {
+        // Find the user by ID and update the history array
+        const updatedUser = await userSchema.findByIdAndUpdate(
+            userId,
+            { $push: { history: contentId } },
+            { new: true }
+        );
+
+        res.status(200).json({ history: updatedUser.history });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+/**
+ * @route   GET /api/user/:userId/history
+ * @desc    Get user's content viewing history
+ * @access  Public
+ */
+const getUserHistory = asyncHandler(async (req, res) => {
+    const userId = req.body.userId;
+
+    try {
+        const user = await userSchema.findById(userId).populate('history');
+        res.status(200).json({ history: user.history });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
 
  module.exports = {
     getUser, 
@@ -279,4 +462,12 @@ const getUserprofile = asyncHandler( async (req, res) => {
     getUserprofile,
     updateUser,
     deleteUser,
+    likeContent,
+    unlikeContent,
+    getLikedContents,
+    addWatchlist,
+    getWatchlist,
+    removeWatchlist,
+    saveContentToHistory,
+    getUserHistory,
  }

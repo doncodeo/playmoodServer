@@ -1,4 +1,5 @@
-const mongoose = require ('mongoose')
+const mongoose = require ('mongoose');
+const {ObjectId} = mongoose.Schema.Types
 
 // Define an enumeration for user roles
 const userRoles = ['user', 'creator', 'admin'];
@@ -35,7 +36,11 @@ cloudinary_id: {
 
 thumnail_id: {
     type: String,
-}
+},
+
+likes: [{ type: ObjectId, ref: 'Contents' }],
+watchlist: [{ type: ObjectId, ref: 'Contents' }],
+history: [{ type: ObjectId, ref: 'Contents' }],
 
 
 },

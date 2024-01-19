@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const {ObjectId} = mongoose.Schema.Types
+// const {ObjectId} = mongoose.Schema.Types
 
 const contentSchema = new mongoose.Schema({
     
@@ -29,7 +29,7 @@ const contentSchema = new mongoose.Schema({
         type: String,
         require: true
     }, 
-    likes: [{type:ObjectId, ref:'user'}],
+
     cloudinary_id: {
         type: String,
     },
