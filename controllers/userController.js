@@ -1,6 +1,7 @@
 
 const asyncHandler = require ('express-async-handler');
-const userSchema = require('../models/userModel');
+// const userSchema = require('../models/userModel');
+const userData = require('../models/userModel');
 const contentSchema = require('../models/contentModel');
 const jwt = require("jsonwebtoken");
 const bcryptjs = require("bcryptjs");               
@@ -280,14 +281,14 @@ const likeContent = asyncHandler(async (req, res) => {
         const userId = req.body.userId;
 
         // Check if the user has already liked the content
-        const user = await userSchema.findOne({ _id: userId, likes: contentId });
+        const user = await userData.findOne({ _id: userId, likes: contentId });
 
         if (user) {
             return res.status(400).json({ error: 'This user already liked this content' });
         }
 
         // Find the user by ID and update the likes array
-        const updatedUser = await userSchema.findByIdAndUpdate(
+        const updatedUser = await userData.findByIdAndUpdate(
             userId,
             { $push: { likes: contentId } },
             { new: true }
@@ -308,7 +309,7 @@ const unlikeContent = asyncHandler(async (req, res) => {
         const userId = req.body.userId;
 
         // Find the user by ID and update the likes array to remove the contentId
-        const updatedUser = await userSchema.findByIdAndUpdate(
+        const updatedUser = await userData.findByIdAndUpdate(
             userId,
             { $pull: { likes: contentId } },
             { new: true }
@@ -334,7 +335,7 @@ const getLikedContents = asyncHandler(async (req, res) => {
     console.log(userId)
 
     try {
-        const user = await userSchema.findById(userId).populate('likes');
+        const user = await userData.findById(userId).populate('likes');
         res.status(200).json({ likedContents: user.likes });
     } catch (error) {
         console.error(error);
@@ -351,14 +352,14 @@ const addWatchlist = asyncHandler(async (req, res) => {
         const userId = req.body.userId;
 
         // Check if the user has already liked the content
-        const user = await userSchema.findOne({ _id: userId, watchlist: contentId });
+        const user = await userData.findOne({ _id: userId, watchlist: contentId });
 
         if (user) {
             return res.status(400).json({ error: 'This user already liked this content' });
         }
 
         // Find the user by ID and update the likes array
-        const updatedUser = await userSchema.findByIdAndUpdate(
+        const updatedUser = await userData.findByIdAndUpdate(
             userId,
             { $push: { watchlist: contentId } },
             { new: true }
@@ -377,7 +378,7 @@ const addWatchlist = asyncHandler(async (req, res) => {
 const getWatchlist = asyncHandler(async (req, res) => {
     const userId = req.body.userId;
     try {
-        const user = await userSchema.findById(userId).populate('watchlist');
+        const user = await userData.findById(userId).populate('watchlist');
         res.status(200).json({ watchList: user.watchlist });
     } catch (error) {
         console.error(error);
@@ -393,7 +394,7 @@ const removeWatchlist = asyncHandler(async (req, res) => {
         const userId = req.body.userId;
 
         // Find the user by ID and update the likes array to remove the contentId
-        const updatedUser = await userSchema.findByIdAndUpdate(
+        const updatedUser = await userData.findByIdAndUpdate(
             userId,
             { $pull: { watchlist: contentId } },
             { new: true }
@@ -423,7 +424,7 @@ const saveContentToHistory = asyncHandler(async (req, res) => {
 
     try {
         // Find the user by ID and update the history array
-        const updatedUser = await userSchema.findByIdAndUpdate(
+        const updatedUser = await userData.findByIdAndUpdate(
             userId,
             { $push: { history: contentId } },
             { new: true }
@@ -445,7 +446,7 @@ const getUserHistory = asyncHandler(async (req, res) => {
     const userId = req.body.userId;
 
     try {
-        const user = await userSchema.findById(userId).populate('history');
+        const user = await userData.findById(userId).populate('history');
         res.status(200).json({ history: user.history });
     } catch (error) {
         console.error(error);
