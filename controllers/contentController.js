@@ -51,7 +51,7 @@ const createContent = asyncHandler(async (req, res) => {
           category,
           description,
           credit,
-          thumbnail,
+          thumbnail:defaultProfileImage,
           video: cloudinaryResult.secure_url,
           cloudinary_id: cloudinaryResult.public_id,
           thumnail_id: defaultCloudinaryId
@@ -131,7 +131,7 @@ const updateContent = asyncHandler(async (req, res) => {
 
         res.status(200).json({
             message: 'content updated successfully',
-            user: {
+            content: {
                 _id: updatedContent._id,
                 title: updatedContent.name,
                 category: updatedContent.category,
@@ -165,21 +165,17 @@ const deleteContent = asyncHandler(async (req, res) => {
         }
 
         // Delete the video from Cloudinary
-        const videoPublicId = content.video && content.cloudinary_id;
-        if (videoPublicId) {
-            await cloudinary.uploader.destroy(videoPublicId);
-        }
+        const publicId = content.video && content.cloudinary_id;
 
-        // Delete the thumbnail from Cloudinary
-        const thumbnailPublicId = content.thumbnail && content.thumbnail.split('/').pop();
-        if (thumbnailPublicId) {
-            await cloudinary.uploader.destroy(thumbnailPublicId);
+        if (publicId) {
+            await cloudinary.uploader.destroy(publicId);
+
         }
 
         // Delete the content from MongoDB
         await content.deleteOne();
 
-        console.log('Content deleted:', content);
+        // console.log('Content deleted:', content);
 
         res.status(200).json({ message: 'Content deleted successfully' });
     } catch (error) {
@@ -187,6 +183,7 @@ const deleteContent = asyncHandler(async (req, res) => {
         res.status(500).json({ error: 'Server error' });
     }
 });
+
 
  module.exports = {
     getContent,

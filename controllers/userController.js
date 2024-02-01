@@ -6,6 +6,9 @@ const contentSchema = require('../models/contentModel');
 const jwt = require("jsonwebtoken");
 const bcryptjs = require("bcryptjs");               
 const cloudinary = require('../config/cloudinary');
+const Token = require("../models/token");
+const crypto = require("crypto");
+const { verifyEmail } = require('../middleware/authmiddleware');
 
 
 const generateToken = (id, role) => {
@@ -64,6 +67,24 @@ const registerUser = asyncHandler(async (req, res) => {
         if (user) {
             console.log('User created:', user.email);
             res.status(201).json({ user });
+
+
+            // node mailer configs 
+            // const token = new Token({
+            //     userId: user._id,
+            //     token: crypto.randomBytes(16).toString('hex')
+            // });
+            // await token.save();
+            // console.log(token)
+            
+            // // send mail
+            // const link = `http://localhost:5000/api/users/confirm/${token.token}`;
+            // await verifyEmail (useremail, link);
+            // res.status(200).send({
+            //     message: "Verification mail sent, kindly check your email"
+            // })
+
+
         } else {
             console.log('User creation failed');
             res.status(400);
@@ -97,7 +118,7 @@ const deleteUser = asyncHandler(async (req, res) => {
 
     // Delete the user's profile image from Cloudinary
     const publicId = user.profileImage && user.cloudinary_id;
-    console.log('Before image deletion - Public ID:', publicId);
+    // console.log('Before image deletion - Public ID:', publicId);
     if (publicId) {
 
       await cloudinary.uploader.destroy(publicId);

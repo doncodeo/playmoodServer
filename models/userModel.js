@@ -41,8 +41,10 @@ thumnail_id: {
 likes: [{ type: ObjectId, ref: 'Contents' }],
 watchlist: [{ type: ObjectId, ref: 'Contents' }],
 history: [{ type: ObjectId, ref: 'Contents' }],
-
-
+verified: {
+    type: Boolean,
+    default: false
+}
 },
 {
     timestamps: true
