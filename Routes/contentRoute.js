@@ -5,11 +5,12 @@ const {getContent, createContent,updateContent, deleteContent, unlikeContent,get
   // const { single: uploadSingle } = require('../middleware/contentMulter');
   
 
-// router.route('/').get(getContent).post(uploadSingle('video'), createContent);
-router.route('/').get(getContent).post( upload.single("video"), createContent);
+router.route('/').get(getContent).post(upload.array('files', 2), createContent);
+
+// router.route('/').get(getContent).post( upload.single("video"), createContent);
 router.route('/:id').put(upload.single("video"), updateContent).delete(deleteContent); 
 
-  
+   
 
 
 module.exports = router  

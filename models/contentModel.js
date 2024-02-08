@@ -30,9 +30,12 @@ const contentSchema = new mongoose.Schema({
         require: true
     }, 
 
-    cloudinary_id: {
+    cloudinary_video_id: {
         type: String,
     },
+    cloudinary_thumbnail_id: {
+        type: String,
+    }
     
 }, 
 {

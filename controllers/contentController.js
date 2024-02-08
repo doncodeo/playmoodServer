@@ -24,65 +24,63 @@ const getContent = asyncHandler(async (req, res) => {
 // @route POST /api/content
 
 const createContent = asyncHandler(async (req, res) => {
-  try {
-      const { title, category, description, credit } = req.body;
+    try {
+        const { title, category, description, credit } = req.body;
 
-      // Check if required fields are missing
-      if (!title || !category || !description || !credit) {
-          return res.status(400).json({ error: 'Important fields missing!' });
-      }
+        // Check if required fields are missing
+        if (!title || !category || !description || !credit) {
+            return res.status(400).json({ error: 'Important fields missing!' });
+        }
 
-      // Upload video to Cloudinary
-      const cloudinaryResult = await cloudinary.uploader.upload(req.file.path, {
-          resource_type: 'video',
-          folder: "contents"
-      });
+        // Check if both video and thumbnail files are uploaded
+        if (!req.files || req.files.length !== 2) {
+            return res.status(400).json({ error: 'Both video and thumbnail files are required!' });
+        }
 
-      // Set default values for profileImage and cloudinary_id
-      const defaultProfileImage = 'https://res.cloudinary.com/di97mcvbu/image/upload/v1705254137/contents/raiwsn8fpx870pboiodp.png'; // Replace with your default image URL
-      const defaultCloudinaryId = 'contents/raiwsn8fpx870pboiodp'; // Replace with your default cloudinary_id
+        // Extract uploaded files
+        const [videoFile, thumbnailFile] = req.files;
 
-      // Check if thumbnail is provided, otherwise set a default value
-      const thumbnail = req.file ? cloudinaryResult.secure_url : defaultProfileImage;
+        // Upload video to Cloudinary
+        const videoResult = await cloudinary.uploader.upload(videoFile.path, {
+            resource_type: 'video',
+            folder: "videos"
+        });
 
-      // Create content
-      const content = await contentSchema.create({
-          title,
-          category,
-          description,
-          credit,
-          thumbnail:defaultProfileImage,
-          video: cloudinaryResult.secure_url,
-          cloudinary_id: cloudinaryResult.public_id,
-          thumnail_id: defaultCloudinaryId
-      });
+        // Upload thumbnail to Cloudinary
+        const thumbnailResult = await cloudinary.uploader.upload(thumbnailFile.path, {
+            folder: "thumbnails"
+        });
 
-      if (content) {
-          console.log('Content created:', content.video);
-          res.status(201).json({
-              _id: content._id,
-              title: content.title,
-              category: content.category,
-              description: content.description,
-              thumbnail: content.thumbnail,
-              credit: content.credit,
-              video: content.video,
-              likes: content.likes,
-              cloudinary_id: cloudinaryResult.public_id,
-              thumnail_id: defaultCloudinaryId
-          });
-      } else {
-          console.log('Content creation failed');
-          res.status(400).json({ error: 'Invalid content data' });
-      }
+        // Create content
+        const content = await contentSchema.create({
+            title,
+            category,
+            description,
+            credit,
+            thumbnail: thumbnailResult.secure_url,
+            video: videoResult.secure_url,
+            cloudinary_video_id: videoResult.public_id,
+            cloudinary_thumbnail_id: thumbnailResult.public_id
+        });
 
-      console.log('Content creation completed');
+        res.status(201).json({
+            _id: content._id,
+            title: content.title,
+            category: content.category,
+            description: content.description,
+            thumbnail: content.thumbnail,
+            video: content.video,
+            credit: content.credit,
+            cloudinary_id: content.cloudinary_video_id,
+            thumbnail_id: content.cloudinary_thumbnail_id
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Server error' });
+    }
+})
 
-  } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: 'Server error' });
-  }
-});
+
 
 // @desc Post Content
 // @route POST /api/content/:id
@@ -153,36 +151,35 @@ const updateContent = asyncHandler(async (req, res) => {
 
 // @desc Delete content
 // @route DELETE /api/content/:id
-const deleteContent = asyncHandler(async (req, res) => {
-    const contentId = req.params.id;
 
+const deleteContent = async (req, res) => {
     try {
-        // Fetch the content details from MongoDB
-        const content = await contentSchema.findById(contentId);
-        console.log(content)
+        const { id } = req.params;
+
+        // Find content by id
+        const content = await contentSchema.findById(id);
         if (!content) {
             return res.status(404).json({ error: 'Content not found' });
         }
 
-        // Delete the video from Cloudinary
-        const publicId = content.video && content.cloudinary_id;
-
-        if (publicId) {
-            await cloudinary.uploader.destroy(publicId);
-
+        // Check if public_ids exist
+        if (!content.cloudinary_video_id || !content.cloudinary_thumbnail_id) {
+            return res.status(400).json({ error: 'Missing cloudinary public_ids' });
         }
 
-        // Delete the content from MongoDB
-        await content.deleteOne();
+        // Delete content from MongoDB
+        await contentSchema.findByIdAndDelete(id);
 
-        // console.log('Content deleted:', content);
+        // Delete thumbnail and video from Cloudinary
+        await cloudinary.uploader.destroy(content.cloudinary_video_id);
+        await cloudinary.uploader.destroy(content.cloudinary_thumbnail_id);
 
         res.status(200).json({ message: 'Content deleted successfully' });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Server error' });
     }
-});
+};
 
 
  module.exports = {
