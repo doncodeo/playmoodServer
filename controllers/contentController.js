@@ -14,7 +14,7 @@ const Test = "Working Here"
 
 const getContent = asyncHandler(async (req, res) => {
     console.log('Fetching content...');
-    const content = await contentSchema.find();
+    const content = await contentSchema.find().populate('user', 'name');;
     // console.log('Fetched content:', content);
     res.status(200).json(content);
 });
@@ -25,10 +25,11 @@ const getContent = asyncHandler(async (req, res) => {
 
 const createContent = asyncHandler(async (req, res) => {
     try {
-        const { title, category, description, credit } = req.body;
+        const { title, category, description, credit, userId } = req.body;
+        // const userId = req.user._id;
 
         // Check if required fields are missing
-        if (!title || !category || !description || !credit) {
+        if (!title || !category || !description || !credit || !userId) {
             return res.status(400).json({ error: 'Important fields missing!' });
         }
 
@@ -53,6 +54,7 @@ const createContent = asyncHandler(async (req, res) => {
 
         // Create content
         const content = await contentSchema.create({
+            user: userId,
             title,
             category,
             description,
@@ -72,7 +74,8 @@ const createContent = asyncHandler(async (req, res) => {
             video: content.video,
             credit: content.credit,
             cloudinary_id: content.cloudinary_video_id,
-            thumbnail_id: content.cloudinary_thumbnail_id
+            thumbnail_id: content.cloudinary_thumbnail_id,
+            user: content.user
         });
     } catch (error) {
         console.error(error);

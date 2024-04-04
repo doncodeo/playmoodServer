@@ -271,6 +271,7 @@ const loginUser = asyncHandler(async (req, res) => {
              role: user.role,
             token: generateToken(user._id, user.role)
         });
+        res.json({data});
     }else {
         res.status(404).json({ error: 'User not found or invalid credentials' });
 
@@ -351,9 +352,8 @@ const unlikeContent = asyncHandler(async (req, res) => {
 // @route GET /api/user/getlike/:id
 
 const getLikedContents = asyncHandler(async (req, res) => {
-    const userId = req.body.userId;
-    
-    console.log(userId)
+    // const userId = req.body.userId; dont ever use this method to req from FE lol although it works for BE
+    const userId = req.params.id; // Access userId from URL parameter
 
     try {
         const user = await userData.findById(userId).populate('likes');

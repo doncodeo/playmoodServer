@@ -1,7 +1,13 @@
 const mongoose = require('mongoose');
-// const {ObjectId} = mongoose.Schema.Types
+const { ObjectId } = mongoose.Schema.Types;
 
 const contentSchema = new mongoose.Schema({
+
+    user: {
+        type: ObjectId,
+        ref: 'profiles', // Reference to the User model
+        required: true
+    },
     
     title: {
         type: String,
