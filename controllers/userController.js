@@ -263,12 +263,13 @@ const loginUser = asyncHandler(async (req, res) => {
 
 
     if(user && (await bcryptjs.compare(password, user.password))) {
-  console.log('User found during login:', user); // Add this log statement
+//   console.log('User found during login:', user); // Add this log statement
         res.json({
             _id: user._id,
             name: user.name,
             email: user.email,
-             role: user.role,
+            role: user.role,
+            like: user.likes,
             token: generateToken(user._id, user.role)
         });
         res.json({data});
