@@ -300,7 +300,9 @@ const getUserprofile = asyncHandler( async (req, res) => {
 const likeContent = asyncHandler(async (req, res) => {
     try {
         const contentId = req.body.contentId;
-        const userId = req.body.userId;
+        // const userId = req.body.userId;
+        const userId = req.params.id; // Access userId from URL parameter
+  
 
         // Check if the user has already liked the content
         const user = await userData.findOne({ _id: userId, likes: contentId });
@@ -325,10 +327,14 @@ const likeContent = asyncHandler(async (req, res) => {
 
 // @desc PUT Content
 // @route PUT /api/user/unlike/:id
+// @route PUT /api/user/unlike/id
+
 const unlikeContent = asyncHandler(async (req, res) => {
     try {
         const contentId = req.body.contentId;
-        const userId = req.body.userId;
+        const userId = req.params.id; // Access userId from URL parameter
+
+        // const userId = req.body.userId;
 
         // Find the user by ID and update the likes array to remove the contentId
         const updatedUser = await userData.findByIdAndUpdate(
@@ -338,18 +344,20 @@ const unlikeContent = asyncHandler(async (req, res) => {
         );
 
         if (!updatedUser) {
-            return res.status(404).json({ error: 'User not found' });
+            return res.status(404).json({ error: 'User not found'});
         }
 
-        res.status(200).json({ likes: updatedUser.likes });
+        res.status(200).json({ likes: updatedUser.likes, message: "user unliked content"  }); 
     } catch (error) {
         console.error(error);
-        res.status(500).json({ error: 'Server error', message: "user unliked content" });
+        res.status(500).json({ error: 'Server error'});
     }
 });
 
 // @desc GET Content
-// @route GET /api/user/getlike/:id
+// @route GET /api/user/getlike/:id for body
+// @route GET /api/user/getlike/id for params
+
 
 const getLikedContents = asyncHandler(async (req, res) => {
     // const userId = req.body.userId; dont ever use this method to req from FE lol although it works for BE

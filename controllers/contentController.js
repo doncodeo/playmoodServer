@@ -69,7 +69,7 @@ const createContent = asyncHandler(async (req, res) => {
             _id: content._id,
             title: content.title,
             category: content.category,
-            description: content.description,
+            description: content.description,   
             thumbnail: content.thumbnail,
             video: content.video,
             credit: content.credit,
