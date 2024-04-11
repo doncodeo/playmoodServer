@@ -319,7 +319,8 @@ const likeContent = asyncHandler(async (req, res) => {
             { new: true }
         );
 
-        res.status(200).json({ likes: updatedUser.likes, message: "User successfully like content" });
+        // res.status(200).json({ likes: updatedUser, message: "User successfully like content" });
+        res.status(200).json({ contentId: contentId, message: "User successfully liked content" });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Server error' });
@@ -348,12 +349,14 @@ const unlikeContent = asyncHandler(async (req, res) => {
             return res.status(404).json({ error: 'User not found'});
         }
 
-        res.status(200).json({ likes: updatedUser.likes, message: "user unliked content"  }); 
+        // res.status(200).json({ likes: updatedUser.likes, message: "user unliked content"  }); 
+        res.status(200).json({ contentId: contentId, message: "User unliked this content" });
+
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Server error'});
     }
-});
+});  
 
 // @desc GET Content
 // @route GET /api/user/getlike/:id for body
