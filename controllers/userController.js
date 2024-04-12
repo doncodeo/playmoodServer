@@ -270,6 +270,7 @@ const loginUser = asyncHandler(async (req, res) => {
             email: user.email,
             role: user.role,
             like: user.likes,
+            like: user.watchlist,
             token: generateToken(user._id, user.role)
         });
         res.json({data});
