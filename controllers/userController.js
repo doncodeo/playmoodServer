@@ -256,7 +256,7 @@ const createUser = asyncHandler(async (req, res) => {
 
 const loginUser = asyncHandler(async (req, res) => {
     const {email, password} = req.body;
-    console.log(email)
+    // console.log(email)
 
     // check for user email
     const user = await userData.findOne({email});
@@ -270,7 +270,7 @@ const loginUser = asyncHandler(async (req, res) => {
             email: user.email,
             role: user.role,
             like: user.likes,
-            like: user.watchlist,
+            watchlist: user.watchlist,
             token: generateToken(user._id, user.role)
         });
         res.json({data});
