@@ -377,18 +377,20 @@ const getLikedContents = asyncHandler(async (req, res) => {
 });
 
  // @desc PUT Content
-// @route PUT /api/content/watchlist/:id (user id) push the content id  {"contentId": "65a6fc7b72128447ad32024e", "userId": "65a8025e3af4e7929b379e7b"}
+// @route PUT /api/user/watchlist/:id (user id) push the content id  {"contentId": "65a6fc7b72128447ad32024e", "userId": "65a8025e3af4e7929b379e7b"}
 
 const addWatchlist = asyncHandler(async (req, res) => {
     try {
         const contentId = req.body.contentId;
-        const userId = req.body.userId;
+        // const userId = req.body.userId;
+        const userId = req.params.id;
+
 
         // Check if the user has already liked the content
         const user = await userData.findOne({ _id: userId, watchlist: contentId });
 
         if (user) {
-            return res.status(400).json({ error: 'This user already liked this content' });
+            return res.status(400).json({ error: 'This content already exist on users watchlist' });
         }
 
         // Find the user by ID and update the likes array
@@ -398,7 +400,7 @@ const addWatchlist = asyncHandler(async (req, res) => {
             { new: true }
         );
 
-        res.status(200).json({ likes: updatedUser.watchlist, message: "Content successfully added to Watchlist" });
+        res.status(200).json({ watchlist: updatedUser.watchlist, message: "Content successfully added to Watchlist" });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Server error' });
@@ -409,7 +411,9 @@ const addWatchlist = asyncHandler(async (req, res) => {
 // @route GET /api/user/getlike/:id
 
 const getWatchlist = asyncHandler(async (req, res) => {
-    const userId = req.body.userId;
+    // const userId = req.body.userId;
+    const userId = req.params.id;
+
     try {
         const user = await userData.findById(userId).populate('watchlist');
         res.status(200).json({ watchList: user.watchlist });
@@ -424,7 +428,9 @@ const getWatchlist = asyncHandler(async (req, res) => {
 const removeWatchlist = asyncHandler(async (req, res) => {
     try {
         const contentId = req.body.contentId;
-        const userId = req.body.userId;
+        // const userId = req.body.userId;
+        const userId = req.params.id;
+
 
         // Find the user by ID and update the likes array to remove the contentId
         const updatedUser = await userData.findByIdAndUpdate(
@@ -434,10 +440,10 @@ const removeWatchlist = asyncHandler(async (req, res) => {
         );
 
         if (!updatedUser) {
-            return res.status(404).json({ error: 'User not found' });
+            return res.status(404).json({ error: 'User/Content not found' });
         }
 
-        res.status(200).json({ watchlist: updatedUser.watchlist });
+        res.status(200).json({ watchlist: updatedUser.watchlist, message:"Content removed from watchlist!" });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Server error', message: "watchlist successfully removed!" });

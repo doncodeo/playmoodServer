@@ -29,8 +29,8 @@ const {getUser,
   router.route('/unlike/:id').put(unlikeContent);
   router.route('/getlike/:id').get(getLikedContents);
   router.route('/watchlist/:id').put(addWatchlist);
-  router.route('/getwatchlist/:id').get(getWatchlist);
-  router.route('/removelist/:id').put(removeWatchlist);
+  router.route('/watchlist/:id').get(getWatchlist);
+  router.route('/unwatch/:id').put(removeWatchlist);
   router.route('/history/:id').get(getUserHistory).put(saveContentToHistory);
 
 
