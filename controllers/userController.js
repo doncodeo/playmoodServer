@@ -401,7 +401,9 @@ const addWatchlist = asyncHandler(async (req, res) => {
             { new: true }
         );
 
-        res.status(200).json({ watchlist: updatedUser.watchlist, message: "Content successfully added to Watchlist" });
+        // res.status(200).json({ watchlist: updatedUser.watchlist, message: "Content successfully added to Watchlist" });
+        res.status(200).json({ contentId: contentId, message: "Content added to watchlist!" });
+
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Server error' });
@@ -444,7 +446,9 @@ const removeWatchlist = asyncHandler(async (req, res) => {
             return res.status(404).json({ error: 'User/Content not found' });
         }
 
-        res.status(200).json({ watchlist: updatedUser.watchlist, message:"Content removed from watchlist!" });
+        // res.status(200).json({ watchlist: updatedUser.watchlist, message:"Content removed from watchlist!" });
+        res.status(200).json({ contentId: contentId, message: "Content removed to watchlist!" });
+
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Server error', message: "watchlist successfully removed!" });
