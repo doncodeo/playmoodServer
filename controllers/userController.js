@@ -271,6 +271,7 @@ const loginUser = asyncHandler(async (req, res) => {
             role: user.role,
             like: user.likes,
             watchlist: user.watchlist,
+            profile: user.profileImage,
             token: generateToken(user._id, user.role)
         });
         res.json({data});
