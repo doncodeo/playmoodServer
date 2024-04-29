@@ -39,6 +39,9 @@ connectDB()
     app.use('/api/content', require('./Routes/contentRoute'));
     app.use('/api/user', require('./Routes/userRoute'));
 
+      // Handling Preflight OPTIONS requests
+      app.options('*', cors());
+
     // Serve login.html for /login route
     app.get('/login', (req, res) => {
       res.sendFile(path.join(__dirname, 'public', 'login.html'));
@@ -51,8 +54,8 @@ connectDB()
       }
     });
 
-    // Handling Preflight OPTIONS requests
-    app.options('*', cors());
+    // // Handling Preflight OPTIONS requests
+    // app.options('*', cors());
 
     // Start the server 
     app.listen(port, () => console.log(`Server started on port ${port}`));
