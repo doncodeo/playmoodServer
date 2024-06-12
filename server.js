@@ -39,6 +39,8 @@ connectDB()
     app.use('/api/content', require('./Routes/contentRoute'));
     app.use('/api/user', require('./Routes/userRoute'));
 
+    app.use(express.static(path.join(__dirname, 'public')));
+ 
     // Serve login.html for /login route
     app.get('/login', (req, res) => {
       res.sendFile(path.join(__dirname, 'public', 'login.html'));
