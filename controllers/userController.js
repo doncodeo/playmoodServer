@@ -9,8 +9,16 @@ const cloudinary = require('../config/cloudinary');
 const Token = require("../models/token");
 const crypto = require("crypto");
 const { verifyEmail } = require('../middleware/authmiddleware');
+const nodemailer = require('nodemailer');
 
 
+const transporter = nodemailer.createTransport({
+    service: 'Gmail',
+    auth: {
+      user: process.env.EMAIL_USERNAME,
+      pass: process.env.EMAIL_PASSWORD
+    }
+  });
 const generateToken = (id, role) => {
     return jwt.sign({ id, role }, process.env.JWT_SECRET, {
         expiresIn: '30d'
@@ -28,6 +36,7 @@ const getUser = asyncHandler(async (req, res) => {
 // @desc Register new users
 // @route post /api/users
 // @access Public
+
 
 const registerUser = asyncHandler(async (req, res) => {
     try {
@@ -68,22 +77,85 @@ const registerUser = asyncHandler(async (req, res) => {
             console.log('User created:', user.email);
             res.status(201).json({ user });
 
+            // Send registration confirmation email
+            const mailOptions = {
+                from: `"PlaymoodTV 📺" <${process.env.EMAIL_USERNAME}>`,
+                to: user.email,
+                subject: 'Registration Confirmation',
+                html: `
+                    <html>
+                        <head>
+                            <style>
+                                body {
+                                    font-family: Arial, sans-serif;
+                                    background-color: #f0f0f0;
+                                    color: #333;
+                                    padding: 20px;
+                                }
+                                .container {
+                                    max-width: 600px;
+                                    margin: 0 auto;
+                                    background-color: #ffffff;
+                                    padding: 20px;
+                                    border-radius: 8px;
+                                    box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+                                }
+                                .header {
+                                    background-color: tomato;
+                                    color: white;
+                                    padding: 10px;
+                                    text-align: center;
+                                    border-top-left-radius: 8px;
+                                    border-top-right-radius: 8px;
+                                }
+                                .content {
+                                    padding: 20px;
+                                }
+                                .login-button {
+                                    display: inline-block;
+                                    padding: 10px 20px;
+                                    background-color: tomato;
+                                    color: white;
+                                    text-decoration: none;
+                                    border-radius: 5px;
+                                }
+                                .footer {
+                                    margin-top: 20px;
+                                    text-align: center;
+                                    color: #666;
+                                    font-size: 12px;
+                                }
+                            </style>
+                        </head>
+                        <body>
+                            <div class="container">
+                                <div class="header">
+                                    <h2>Welcome to PlaymoodTV!</h2>
+                                </div>
+                                <div class="content">
+                                    <p>Dear ${user.name},</p>
+                                    <p>Thank you for registering with PlaymoodTV! We're excited to have you on board.</p>
+                                    <p>Please use the following button to log in to your account:</p>
+                                    <a class="login-button" href="http://localhost:3000/login" target="_blank">Login to Your Account</a>
+                                    <p>We look forward to providing you with the best entertainment experience.</p>
+                                </div>
+                                <div class="footer">
+                                    <p>Best regards,</p>
+                                    <p>The PlaymoodTV Team</p>
+                                </div>
+                            </div>
+                        </body>
+                    </html>
+                `
+            };
 
-            // node mailer configs 
-            // const token = new Token({
-            //     userId: user._id,
-            //     token: crypto.randomBytes(16).toString('hex')
-            // });
-            // await token.save();
-            // console.log(token)
-            
-            // // send mail
-            // const link = `http://localhost:5000/api/users/confirm/${token.token}`;
-            // await verifyEmail (useremail, link);
-            // res.status(200).send({
-            //     message: "Verification mail sent, kindly check your email"
-            // })
-
+            transporter.sendMail(mailOptions, (error, info) => {
+                if (error) {
+                    console.error("Error sending email:", error);
+                } else {
+                    console.log('Email sent:', info.response);
+                }
+            });
 
         } else {
             console.log('User creation failed');
@@ -91,7 +163,7 @@ const registerUser = asyncHandler(async (req, res) => {
             throw new Error('Invalid user data');
         }
 
-        console.log('User registration completed'); // Log exit     point
+        console.log('User registration completed'); // Log exit point
 
     } catch (error) {
         console.error(error); // Log any errors to the console for debugging
