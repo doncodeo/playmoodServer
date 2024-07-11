@@ -16,9 +16,10 @@ const {getUser,
     removeWatchlist,
     saveContentToHistory,
     getUserHistory,
+    markPrivacyPolicyAsRead,
   } = require('../controllers/userController');
   const {protect} = require('../middleware/authmiddleware');
-  
+   
 
   router.route('/').get(getUser).post( upload.single("image"), registerUser);
   router.route('/create').post(createUser)
@@ -32,7 +33,7 @@ const {getUser,
   router.route('/watchlist/:id').get(getWatchlist);
   router.route('/unwatch/:id').put(removeWatchlist);
   router.route('/history/:id').get(getUserHistory).put(saveContentToHistory);
-
+  router.route('/policy').post(protect, markPrivacyPolicyAsRead);
 
 
   router.route('/test-upload').post(upload.array('files', 2), (req, res) => {

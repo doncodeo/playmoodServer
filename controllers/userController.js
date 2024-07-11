@@ -529,7 +529,6 @@ const removeWatchlist = asyncHandler(async (req, res) => {
 });
 
 
-
 /**
  * @route   PUT /api/user/:userId/save-content/:contentId
  * @desc    Save a content to user's history
@@ -571,6 +570,31 @@ const getUserHistory = asyncHandler(async (req, res) => {
     }
 });
 
+const markPrivacyPolicyAsRead = asyncHandler(async (req, res) => {
+    const userId = req.user.id; // Assuming user is authenticated and user id is available in req.user
+
+    if (!userId) {
+        res.status(400).json({ message: 'User ID is required' });
+        return;
+    }
+
+    try {
+        const user = await userData.findById(userId);
+        
+
+        if (!user) {
+            res.status(404).json({ message: 'User not found' });
+            return;
+        }
+
+        user.hasReadPrivacyPolicy = true;
+        await user.save();
+        res.status(200).json({ message: 'Privacy policy marked as read' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
 
  module.exports = {
     getUser, 
@@ -588,4 +612,5 @@ const getUserHistory = asyncHandler(async (req, res) => {
     removeWatchlist,
     saveContentToHistory,
     getUserHistory,
+    markPrivacyPolicyAsRead 
  }

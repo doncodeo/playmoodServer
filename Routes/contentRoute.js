@@ -5,7 +5,8 @@ const {
     createContent, 
     updateContent, 
     deleteContent, 
-    getContentById 
+    getContentById, 
+    approveContent
 } = require('../controllers/contentController');
 const upload = require('../middleware/multer');
 
@@ -17,6 +18,10 @@ router.route('/:id')
     .get(getContentById)  // New route to get content by ID
     .put(upload.single('video'), updateContent)
     .delete(deleteContent);
+
+router.route('/approve/:id')
+    .put(approveContent)  // New route to get content by ID
+
 
 module.exports = router;
 
