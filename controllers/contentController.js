@@ -3,6 +3,7 @@ const contentSchema = require('../models/contentModel');
 const userSchema = require('../models/userModel');
 const cloudinary = require('../config/cloudinary');
 
+
 // @desc Get All Content
 // @route GET /api/content
 // @access Private
@@ -10,6 +11,19 @@ const getContent = asyncHandler(async (req, res) => {
     const content = await contentSchema.find({ isApproved: true }).populate('user', 'name');
     // const content = await contentSchema.find().populate('user', 'name');
     res.status(200).json(content);
+});
+
+// @desc Get All Unapproved Content
+// @route GET /api/content/unapproved
+// @access Private (Admin only)
+const getUnapprovedContent = asyncHandler(async (req, res) => {
+    try {
+        const content = await contentSchema.find({ isApproved: false }).populate('user', 'name');
+        res.status(200).json(content);
+    } catch (error) {
+        console.error(`Error fetching unapproved content: ${error.message}`);
+        res.status(500).json({ error: 'Server error, please try again later' });
+    }
 });
 
 // @desc Get Content by ID
@@ -110,47 +124,7 @@ const approveContent = asyncHandler(async (req, res) => {
 });
 
 
-// const createContent = asyncHandler(async (req, res) => {
-//     try {
-//         const { title, category, description, credit, userId } = req.body;
 
-//         if (!title || !category || !description || !credit || !userId) {
-//             return res.status(400).json({ error: 'Important fields missing!' });
-//         }
-
-//         if (!req.files || req.files.length !== 2) {
-//             return res.status(400).json({ error: 'Both video and thumbnail files are required!' });
-//         }
-
-//         const [videoFile, thumbnailFile] = req.files;
-
-//         const videoResult = await cloudinary.uploader.upload(videoFile.path, {
-//             resource_type: 'video',
-//             folder: "videos"
-//         });
-
-//         const thumbnailResult = await cloudinary.uploader.upload(thumbnailFile.path, {
-//             folder: "thumbnails"
-//         });
-
-//         const content = await contentSchema.create({
-//             user: userId,
-//             title,
-//             category,
-//             description,
-//             credit,
-//             thumbnail: thumbnailResult.secure_url,
-//             video: videoResult.secure_url,
-//             cloudinary_video_id: videoResult.public_id,
-//             cloudinary_thumbnail_id: thumbnailResult.public_id
-//         });
-
-//         res.status(201).json(content);
-//     } catch (error) {
-//         console.error(error);
-//         res.status(500).json({ error: 'Server error' });
-//     }
-// });
 
 // @desc Update Content
 // @route PUT /api/content/:id
@@ -226,6 +200,7 @@ module.exports = {
     createContent,
     updateContent,
     deleteContent,
-    approveContent
+    approveContent,
+    getUnapprovedContent
 };
 
