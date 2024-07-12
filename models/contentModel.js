@@ -41,6 +41,10 @@ const contentSchema = new mongoose.Schema({
     isApproved: {
         type: Boolean,
         default: false,
+    },
+    views: {
+        type: Number,
+        default: 0,
     }
 }, {
     timestamps: true,
