@@ -10,6 +10,8 @@ const Token = require("../models/token");
 const crypto = require("crypto");
 const { verifyEmail } = require('../middleware/authmiddleware');
 const nodemailer = require('nodemailer');
+const RoleChangeRequest = require('../models/roleChangeModel');
+
 
 
 const transporter = nodemailer.createTransport({
@@ -208,6 +210,8 @@ const deleteUser = asyncHandler(async (req, res) => {
 // @desc Update user
 // @route post /api/users/:id
 // @access Public
+
+
 const updateUser = asyncHandler(async (req, res) => {
     try {
         const userId = req.params.id; // Assuming the user ID is passed as a parameter
@@ -238,12 +242,32 @@ const updateUser = asyncHandler(async (req, res) => {
             user.cloudinary_id = updatedCloudinaryResult.public_id;
         }
 
-        // Update other user data in MongoDB (name, email, etc.)
-        user.name = req.body.name || user.name;
-        user.email = req.body.email || user.email;
+        // Store the previous role before updating
+        const previousRole = user.role;
+
+        // Update other user data in MongoDB using mapping method
+        const allowedFields = ['name', 'email', 'role', 'verified', 'hasReadPrivacyPolicy'];
+        allowedFields.forEach(field => {
+            if (req.body[field] !== undefined) {
+                user[field] = req.body[field];
+            }
+        });
 
         // Save the updated user in MongoDB
         const updatedUser = await user.save();
+
+        // If the role is updated, check and update the RoleChangeRequest table
+        if (req.body.role && req.body.role !== previousRole) {
+            const roleChangeRequest = await RoleChangeRequest.findOne({ user: userId });
+
+            if (req.body.role === 'creator' && roleChangeRequest && roleChangeRequest.status === 'pending') {
+                roleChangeRequest.status = 'approved';
+                await roleChangeRequest.save();
+            } else if (previousRole === 'creator' && roleChangeRequest && roleChangeRequest.status === 'approved') {
+                roleChangeRequest.status = 'pending';
+                await roleChangeRequest.save();
+            }
+        }
 
         res.status(200).json({
             message: 'User updated successfully',
@@ -251,8 +275,11 @@ const updateUser = asyncHandler(async (req, res) => {
                 _id: updatedUser._id,
                 name: updatedUser.name,
                 email: updatedUser.email,
+                role: updatedUser.role,
                 profileImage: updatedUser.profileImage,
                 cloudinary_id: updatedUser.cloudinary_id,
+                verified: updatedUser.verified,
+                hasReadPrivacyPolicy: updatedUser.hasReadPrivacyPolicy
             },
         });
     } catch (error) {
@@ -260,6 +287,62 @@ const updateUser = asyncHandler(async (req, res) => {
         res.status(500).json({ error: 'Server error' });
     }
 });
+
+
+
+
+// const updateUser = asyncHandler(async (req, res) => {
+//     try {
+//         const userId = req.params.id; // Assuming the user ID is passed as a parameter
+
+//         // Fetch the user from MongoDB
+//         const user = await userData.findById(userId);
+
+//         if (!user) {
+//             res.status(404).json({ error: 'User not found' });
+//             return;
+//         }
+
+//         // Check if a file is present in the request
+//         if (req.file) {
+//             // Update the user's profile image in Cloudinary
+//             const updatedCloudinaryResult = await cloudinary.uploader.upload(req.file.path, {
+//                 folder: 'user-uploads',
+//                 public_id: user._id, // Set public_id to a unique identifier like user._id
+//             });
+
+//             // If updating the profile image, delete the old image in Cloudinary
+//             if (user.cloudinary_id) {
+//                 await cloudinary.uploader.destroy(user.cloudinary_id);
+//             }
+
+//             // Update the user's profileImage and cloudinary_id
+//             user.profileImage = updatedCloudinaryResult.secure_url;
+//             user.cloudinary_id = updatedCloudinaryResult.public_id;
+//         }
+
+//         // Update other user data in MongoDB (name, email, etc.)
+//         user.name = req.body.name || user.name;
+//         user.email = req.body.email || user.email;
+
+//         // Save the updated user in MongoDB
+//         const updatedUser = await user.save();
+
+//         res.status(200).json({
+//             message: 'User updated successfully',
+//             user: {
+//                 _id: updatedUser._id,
+//                 name: updatedUser.name,
+//                 email: updatedUser.email,
+//                 profileImage: updatedUser.profileImage,
+//                 cloudinary_id: updatedUser.cloudinary_id,
+//             },
+//         });
+//     } catch (error) {
+//         console.error(error);
+//         res.status(500).json({ error: 'Server error' });
+//     }
+// });
 
 
 // @desc Admin create user

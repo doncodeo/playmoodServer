@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { requestRoleChange, getPendingRoleChangeRequests, handleRoleChangeRequest } = require('../controllers/roleChangeController');
+const { requestRoleChange, getPendingRoleChangeRequests, approveRoleChange } = require('../controllers/roleChangeController');
 const { protect, admin } = require('../middleware/authmiddleware');
 
 router.route('/')
@@ -8,7 +8,7 @@ router.route('/')
     .post(requestRoleChange)
 
 router.route('/:id')
-    .put(handleRoleChangeRequest)
+    .put(approveRoleChange)
 
 
 module.exports = router;
