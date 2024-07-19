@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const upload = require('../middleware/multer');
-const passport = require('../config/passportConfig'); // Ensure the correct path
+
 const {
     getUser,
     registerUser,
@@ -44,16 +44,16 @@ router.route('/test-upload').post(upload.array('files', 2), (req, res) => {
 });
 
 // Google OAuth routes
-router.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+// router.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 
-router.get(
-    '/auth/google/callback',
-    passport.authenticate('google', { failureRedirect: '/login' }),
-    (req, res) => {
-        // Successful authentication, redirect to the desired route
-        res.redirect('/dashboard');
-    }
-);
+// router.get(
+//     '/auth/google/callback',
+//     passport.authenticate('google', { failureRedirect: '/login' }),
+//     (req, res) => {
+//         // Successful authentication, redirect to the desired route
+//         res.redirect('/dashboard');
+//     }
+// );
 
 module.exports = router;
 
