@@ -697,7 +697,7 @@ const markPrivacyPolicyAsRead = asyncHandler(async (req, res) => {
         res.status(500).json({ message: 'Server error' });
     }
 });
-
+ 
  module.exports = {
     getUser, 
     registerUser,
