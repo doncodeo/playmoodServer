@@ -13,7 +13,6 @@ const transporter = nodemailer.createTransport({
     }
   });
 
-
 // @desc Get All Content
 // @route GET /api/content
 // @access Private
@@ -55,26 +54,9 @@ const getContentById = asyncHandler(async (req, res) => {
     res.status(200).json(content);
 });
 
-// const getContentById = asyncHandler(async (req, res) => {
-//     const { id } = req.params;
-//     const content = await contentSchema.findById(id).populate('user', 'name');
-
-//     if (!content) {
-//         return res.status(404).json({ error: 'Content not found' });
-//     }
-
-//     res.status(200).json(content);
-// });
-
-
-
-
-
 // @desc Create Content
 // @route POST /api/content
 // @access Private
-
-
 
 const createContent = asyncHandler(async (req, res) => {
     try {
@@ -216,145 +198,6 @@ const createContent = asyncHandler(async (req, res) => {
         res.status(500).json({ error: 'Server error' });
     }
 });
-
-
-
-// const createContent = asyncHandler(async (req, res) => {
-//     try {
-//         const { title, category, description, credit, userId } = req.body;
-
-//         if (!title || !category || !description || !credit || !userId) {
-//             return res.status(400).json({ error: 'Important fields missing!' });
-//         }
-
-//         if (!req.files || req.files.length !== 2) {
-//             return res.status(400).json({ error: 'Both video and thumbnail files are required!' });
-//         }
-
-//         const [videoFile, thumbnailFile] = req.files;
-
-//         const videoResult = await cloudinary.uploader.upload(videoFile.path, {
-//             resource_type: 'video',
-//             folder: "videos"
-//         });
-
-//         const thumbnailResult = await cloudinary.uploader.upload(thumbnailFile.path, {
-//             folder: "thumbnails"
-//         });
-
-//         // Fetch the user to check their role
-//         const user = await userSchema.findById(userId);
-
-//         // Set isApproved based on the user's role
-//         const isApproved = user.role === 'admin';
-
-//         const content = await contentSchema.create({
-//             user: userId,
-//             title,
-//             category,
-//             description,
-//             credit,
-//             thumbnail: thumbnailResult.secure_url,
-//             video: videoResult.secure_url,
-//             cloudinary_video_id: videoResult.public_id,
-//             cloudinary_thumbnail_id: thumbnailResult.public_id,
-//             isApproved
-//         });
-
-//         // If the user is not an admin, send an email to the admin for approval
-//         if (!isApproved) {
-//             // Fetch admin users
-//             const admins = await userSchema.find({ role: 'admin' });
-
-//             admins.forEach(admin => {
-//                 const mailOptions = {
-//                     from: `"PlaymoodTV 📺" <${process.env.EMAIL_USERNAME}>`,
-//                     to: admin.email,
-//                     subject: 'New Content Approval Request',
-//                     html: `
-//                         <html>
-//                             <head>
-//                                 <style>
-//                                     body {
-//                                         font-family: Arial, sans-serif;
-//                                         background-color: #f0f0f0;
-//                                         color: #333;
-//                                         padding: 20px;
-//                                     }
-//                                     .container {
-//                                         max-width: 600px;
-//                                         margin: 0 auto;
-//                                         background-color: #ffffff;
-//                                         padding: 20px;
-//                                         border-radius: 8px;
-//                                         box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
-//                                     }
-//                                     .header {
-//                                         background-color: tomato;
-//                                         color: white;
-//                                         padding: 10px;
-//                                         text-align: center;
-//                                         border-top-left-radius: 8px;
-//                                         border-top-right-radius: 8px;
-//                                     }
-//                                     .content {
-//                                         padding: 20px;
-//                                     }
-//                                     .approve-button {
-//                                         display: inline-block;
-//                                         padding: 10px 20px;
-//                                         background-color: tomato;
-//                                         color: white;
-//                                         text-decoration: none;
-//                                         border-radius: 5px;
-//                                     }
-//                                     .footer {
-//                                         margin-top: 20px;
-//                                         text-align: center;
-//                                         color: #666;
-//                                         font-size: 12px;
-//                                     }
-//                                 </style>
-//                             </head>
-//                             <body>
-//                                 <div class="container">
-//                                     <div class="header">
-//                                         <h2>New Content Approval Request</h2>
-//                                     </div>
-//                                     <div class="content">
-//                                         <p>Dear ${admin.name},</p>
-//                                         <p>A new content titled "${title}" has been created and requires your approval.</p>
-//                                         <p>Please use the following button to approve the content:</p>
-//                                         <a class="approve-button" href="http://localhost:3000/admin/approve-content/${content._id}" target="_blank">Approve Content</a>
-//                                         <p>Thank you for your attention.</p>
-//                                     </div>
-//                                     <div class="footer">
-//                                         <p>Best regards,</p>
-//                                         <p>The PlaymoodTV Team</p>
-//                                     </div>
-//                                 </div>
-//                             </body>
-//                         </html>
-//                     `
-//                 };
-
-//                 transporter.sendMail(mailOptions, (error, info) => {
-//                     if (error) {
-//                         console.error("Error sending email:", error);
-//                     } else {
-//                         console.log('Email sent:', info.response);
-//                     }
-//                 });
-//             });
-//         }
-
-//         res.status(201).json(content);
-//     } catch (error) {
-//         console.error(error);
-//         res.status(500).json({ error: 'Server error' });
-//     }
-// });
-
 
 // @desc Approve Content
 // @route PUT /api/content/approve/:id

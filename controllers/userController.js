@@ -12,8 +12,6 @@ const { verifyEmail } = require('../middleware/authmiddleware');
 const nodemailer = require('nodemailer');
 const RoleChangeRequest = require('../models/roleChangeModel');
 
-
-
 const transporter = nodemailer.createTransport({
     service: 'Gmail',
     auth: {
@@ -38,7 +36,6 @@ const getUser = asyncHandler(async (req, res) => {
 // @desc Register new users
 // @route post /api/users
 // @access Public
-
 
 const registerUser = asyncHandler(async (req, res) => {
     try {
@@ -211,7 +208,6 @@ const deleteUser = asyncHandler(async (req, res) => {
 // @route post /api/users/:id
 // @access Public
 
-
 const updateUser = asyncHandler(async (req, res) => {
     try {
         const userId = req.params.id; // Assuming the user ID is passed as a parameter
@@ -270,88 +266,6 @@ const updateUser = asyncHandler(async (req, res) => {
         res.status(500).json({ error: 'Server error' });
     }
 });
-
-
-
-// const updateUser = asyncHandler(async (req, res) => {
-//     try {
-//         const userId = req.params.id; // Assuming the user ID is passed as a parameter
-
-//         // Fetch the user from MongoDB
-//         const user = await userData.findById(userId);
-
-//         if (!user) {
-//             res.status(404).json({ error: 'User not found' });
-//             return;
-//         }
-
-//         // Check if a file is present in the request
-//         if (req.file) {
-//             // Update the user's profile image in Cloudinary
-//             const updatedCloudinaryResult = await cloudinary.uploader.upload(req.file.path, {
-//                 folder: 'user-uploads',
-//                 public_id: user._id, // Set public_id to a unique identifier like user._id
-//             });
-
-//             // If updating the profile image, delete the old image in Cloudinary
-//             if (user.cloudinary_id) {
-//                 await cloudinary.uploader.destroy(user.cloudinary_id);
-//             }
-
-//             // Update the user's profileImage and cloudinary_id
-//             user.profileImage = updatedCloudinaryResult.secure_url;
-//             user.cloudinary_id = updatedCloudinaryResult.public_id;
-//         }
-
-//         // Store the previous role before updating
-//         const previousRole = user.role;
-
-//         // Update other user data in MongoDB using mapping method
-//         const allowedFields = ['name', 'email', 'role', 'verified', 'hasReadPrivacyPolicy'];
-//         allowedFields.forEach(field => {
-//             if (req.body[field] !== undefined) {
-//                 user[field] = req.body[field];
-//             }
-//         });
-
-//         // Save the updated user in MongoDB
-//         const updatedUser = await user.save();
-
-//         // If the role is updated, check and update the RoleChangeRequest table
-//         if (req.body.role && req.body.role !== previousRole) {
-//             const roleChangeRequest = await RoleChangeRequest.findOne({ user: userId });
-
-//             if (req.body.role === 'creator' && roleChangeRequest && roleChangeRequest.status === 'pending') {
-//                 roleChangeRequest.status = 'approved';
-//                 await roleChangeRequest.save();
-//             } else if (previousRole === 'creator' && roleChangeRequest && roleChangeRequest.status === 'approved') {
-//                 roleChangeRequest.status = 'pending';
-//                 await roleChangeRequest.save();
-//             }
-//         }
-
-//         res.status(200).json({
-//             message: 'User updated successfully',
-//             user: {
-//                 _id: updatedUser._id,
-//                 name: updatedUser.name,
-//                 email: updatedUser.email,
-//                 role: updatedUser.role,
-//                 profileImage: updatedUser.profileImage,
-//                 cloudinary_id: updatedUser.cloudinary_id,
-//                 verified: updatedUser.verified,
-//                 hasReadPrivacyPolicy: updatedUser.hasReadPrivacyPolicy
-//             },
-//         });
-//     } catch (error) {
-//         console.error(error);
-//         res.status(500).json({ error: 'Server error' });
-//     }
-// });
-
-
-
-
 
 const createUser = asyncHandler(async (req, res) => {
     try {
@@ -439,7 +353,6 @@ const loginUser = asyncHandler(async (req, res) => {
     }
 });
 
-
 // @desc Get user profile 
 // @route GET/api/users/profile
 // @access Public
@@ -469,7 +382,6 @@ const getUserprofile = asyncHandler( async (req, res) => {
         res.status(500).json({ error: 'Server error' });
     }
 });
-
 
  // @desc PUT Content
 // @route PUT /api/user/like/:id (user id) push the content id  {"contentId": "65a6fc7b72128447ad32024e", "userId": "65a8025e3af4e7929b379e7b"}
@@ -503,10 +415,6 @@ const likeContent = asyncHandler(async (req, res) => {
     }
 });
 
-// @desc PUT Content
-// @route PUT /api/user/unlike/:id
-// @route PUT /api/user/unlike/id
-
 const unlikeContent = asyncHandler(async (req, res) => {
     try {
         const contentId = req.body.contentId;
@@ -537,7 +445,6 @@ const unlikeContent = asyncHandler(async (req, res) => {
 // @desc GET Content
 // @route GET /api/user/getlike/:id for body
 // @route GET /api/user/getlike/id for params
-
 
 const getLikedContents = asyncHandler(async (req, res) => {
     // const userId = req.body.userId; dont ever use this method to req from FE lol although it works for BE
@@ -629,7 +536,6 @@ const removeWatchlist = asyncHandler(async (req, res) => {
         res.status(500).json({ error: 'Server error', message: "watchlist successfully removed!" });
     }
 });
-
 
 /**
  * @route   PUT /api/user/:userId/save-content/:contentId

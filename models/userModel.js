@@ -40,7 +40,8 @@ const userSchema = new mongoose.Schema({
     hasReadPrivacyPolicy: {
         type: Boolean,
         default: false,
-    }
+    },
+    subscriptions: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Subscription' }]
 }, {
     timestamps: true,
 });
