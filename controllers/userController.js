@@ -357,16 +357,24 @@ const loginUser = asyncHandler(async (req, res) => {
 // @route GET/api/users/profile
 // @access Public
 
-const getUserprofile = asyncHandler( async (req, res) => {
-    const {_id, name, email, profileImage, role} = await userData.findById(req.user.id)
+const getUserprofile = asyncHandler(async (req, res) => {
+    const user = await userData.findById(req.user.id);
+
+    if (!user) {
+        res.status(404);
+        throw new Error('User not found');
+    }
+
     res.status(200).json({
-     id:_id,
-     name,
-     email,
-     role,
-     profileImage
-    })
- });
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        profileImage: user.profileImage,
+    });
+});
+
+
 
  const getCreators = asyncHandler(async (req, res) => {
     try {
