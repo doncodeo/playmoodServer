@@ -8,6 +8,7 @@ const {
     loginUser,
     deleteUser,
     updateUser,
+    updateProfileImage,
     getUserprofile, 
     getCreators,
     createUser,
@@ -29,9 +30,10 @@ router.route('/login').post(loginUser);
 router.get('/profile', protect, getUserprofile);
 router.route('/creators').get(getCreators);
 router.route('/:id').put(upload.single("image"), updateUser).delete(deleteUser);
-router.route('/like/:id').put(likeContent);
-router.route('/unlike/:id').put(unlikeContent);
-router.route('/getlike/:id').get(getLikedContents);
+router.route('/profile-image/:id').put(protect, upload.single("image"), updateProfileImage)
+router.route('/like/:id').put(likeContent); 
+router.route('/unlike/:id').put(unlikeContent); 
+router.route('/getlike/:id').get(getLikedContents); 
 router.route('/watchlist/:id').put(addWatchlist);
 router.route('/watchlist/:id').get(getWatchlist);
 router.route('/unwatch/:id').put(removeWatchlist);

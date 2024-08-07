@@ -24,7 +24,7 @@ const upload = multer({
     storage: storage,
     fileFilter: fileFilter
 });
-
+ 
 module.exports = {
     upload: upload,
     // array: (name, maxCount) => upload.array(name, maxCount)
