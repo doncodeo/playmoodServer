@@ -40,6 +40,10 @@ connectDB()
     app.use('/api/user', require('./Routes/userRoute'));
     app.use('/api/rolechange', require('./Routes/roleChangeRoute'));
     app.use('/api/subscribe', require('./Routes/subscribeRoute'));
+    app.use('/api/channel', require('./Routes/channelRoute'));
+    // below route not tested yet
+    app.use('/api/community', require('./Routes/communityPostRoute'));
+
 
 
     app.use(express.static(path.join(__dirname, 'public')));

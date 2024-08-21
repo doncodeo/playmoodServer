@@ -209,66 +209,7 @@ const deleteUser = asyncHandler(async (req, res) => {
 // @access Public
 
 
-// const updateUser = asyncHandler(async (req, res) => {
-//     try {
-//         const userId = req.params.id;
 
-//         // Fetch the user from MongoDB
-//         const user = await userData.findById(userId);
-
-//         if (!user) { 
-//             return res.status(404).json({ error: 'User not found' }); 
-//         }
-//         console.log("working 1")
-//         // Check if a file is present in the request
-//         if (req.file) {
-//             // Upload the new profile image to Cloudinary
-//             const updatedCloudinaryResult = await cloudinary.uploader.upload_stream({
-//                 folder: 'user-uploads',
-//                 public_id: user._id, // Ensure public_id is a string
-//             }, (error, result) => {
-//                 if (error) throw error;
-
-//                 // If updating the profile image, delete the old image in Cloudinary
-//                 if (user.cloudinary_id) {
-//                     cloudinary.uploader.destroy(user.cloudinary_id);
-//                 } 
-
-//                 // Update the user's profileImage and cloudinary_id 
-//                 user.profileImage = result.secure_url;
-//                 user.cloudinary_id = result.public_id;
-//             }).end(req.file.buffer);
-//         }
-
-//         // Update other user data in MongoDB using mapping method
-//         const allowedFields = ['name', 'email', 'role', 'verified', 'hasReadPrivacyPolicy'];
-//         allowedFields.forEach(field => {
-//             if (req.body[field] !== undefined) {
-//                 user[field] = req.body[field];
-//             }
-//         });
-
-//         // Save the updated user in MongoDB
-//         const updatedUser = await user.save();
-
-//         res.status(200).json({ 
-//             message: 'User updated successfully',
-//             user: {
-//                 _id: updatedUser._id,
-//                 name: updatedUser.name,
-//                 email: updatedUser.email,
-//                 role: updatedUser.role,
-//                 profileImage: updatedUser.profileImage,
-//                 cloudinary_id: updatedUser.cloudinary_id,
-//                 verified: updatedUser.verified,
-//                 hasReadPrivacyPolicy: updatedUser.hasReadPrivacyPolicy
-//             },
-//         });
-//     } catch (error) {
-//         console.error(error);
-//         res.status(500).json({ error: 'Server error' });
-//     }
-// });
 
 const updateProfileImage = asyncHandler(async (req, res) => {
     try {
@@ -310,7 +251,6 @@ const updateProfileImage = asyncHandler(async (req, res) => {
     }
 });
 
-
 const updateUser = asyncHandler(async (req, res) => {
     try {
         const userId = req.params.id; // Assuming the user ID is passed as a parameter
@@ -320,26 +260,6 @@ const updateUser = asyncHandler(async (req, res) => {
 
         if (!user) {
             return res.status(404).json({ error: 'User not found' });
-        }
-
-        // Check if a file is present in the request
-        if (req.file) {
-            // Upload the new profile image to Cloudinary
-            const updatedCloudinaryResult = await cloudinary.uploader.upload(req.file.path, {
-                folder: 'user-uploads',
-                public_id: user._id, // Set public_id to a unique identifier like user._id
-            });
-
-            console.log('Cloudinary Upload Result:', updatedCloudinaryResult);
-
-            // If updating the profile image, delete the old image in Cloudinary
-            if (user.cloudinary_id) {
-                await cloudinary.uploader.destroy(user.cloudinary_id);
-            }
-
-            // Update the user's profileImage and cloudinary_id
-            user.profileImage = updatedCloudinaryResult.secure_url;
-            user.cloudinary_id = updatedCloudinaryResult.public_id;
         }
 
         // Update other user data in MongoDB using mapping method
@@ -360,8 +280,8 @@ const updateUser = asyncHandler(async (req, res) => {
                 name: updatedUser.name,
                 email: updatedUser.email,
                 role: updatedUser.role,
-                profileImage: updatedUser.profileImage,
-                cloudinary_id: updatedUser.cloudinary_id,
+                profileImage: updatedUser.profileImage, // Retain current profile image
+                cloudinary_id: updatedUser.cloudinary_id, // Retain current cloudinary ID
                 verified: updatedUser.verified,
                 hasReadPrivacyPolicy: updatedUser.hasReadPrivacyPolicy
             },
@@ -371,7 +291,8 @@ const updateUser = asyncHandler(async (req, res) => {
         res.status(500).json({ error: 'Server error' });
     }
 });
- 
+
+
 const createUser = asyncHandler(async (req, res) => {
     try {
         const {name, email, password, role} = req.body
