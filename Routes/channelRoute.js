@@ -4,7 +4,7 @@ const upload = require('../middleware/multer');
 
 
 const {  
-    getChannelDetails,  
+    getChannelDetails,   
     updateChannelInfo,
     updateChannelBannerImage
 } = require('../controllers/channelController');

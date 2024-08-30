@@ -295,6 +295,54 @@ const deleteContent = asyncHandler(async (req, res) => {
     }
 });
 
+const saveVideoProgress = asyncHandler(async (req, res) => {
+    const userId = req.user._id;
+    const { contentId, progress } = req.body;
+
+    // Find the user
+    const user = await userSchema.findById(userId);
+
+    if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Check if progress for this content's video already exists
+    const progressRecord = user.videoProgress.find(record => record.contentId.toString() === contentId);
+
+    if (progressRecord) {
+        // Update existing progress
+        progressRecord.progress = progress;
+    } else {
+        // Add new progress record
+        user.videoProgress.push({ contentId, progress });
+    }
+
+    await user.save();
+    res.status(200).json({ message: 'Video progress saved successfully' });
+});
+
+const getVideoProgress = asyncHandler(async (req, res) => {
+    const userId = req.user._id;
+    const { contentId } = req.params;
+
+    // Find the user
+    const user = await userData.findById(userId).populate('videoProgress.contentId');
+
+    if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Find the progress for the specific content's video
+    const progressRecord = user.videoProgress.find(record => record.contentId._id.toString() === contentId);
+
+    if (!progressRecord) {
+        return res.status(404).json({ error: 'No progress found for this video' });
+    }
+
+    res.status(200).json({ progress: progressRecord.progress });
+});
+
+
 module.exports = {
     getContent,
     getContentById,
@@ -302,6 +350,8 @@ module.exports = {
     updateContent,
     deleteContent,
     approveContent,
-    getUnapprovedContent
+    getUnapprovedContent,
+    saveVideoProgress,
+    getVideoProgress
 };
 

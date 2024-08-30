@@ -7,7 +7,9 @@ const {
     deleteContent, 
     getContentById, 
     approveContent,
-    getUnapprovedContent
+    getUnapprovedContent,
+    saveVideoProgress,
+    getVideoProgress
 } = require('../controllers/contentController');
 const upload = require('../middleware/multer');
 
@@ -25,6 +27,10 @@ router.route('/:id')
 
 router.route('/approve/:id') 
     .put(approveContent)  // New route to get content by ID
+
+router.route('/progress/')
+    .get(getVideoProgress)
+    .post(saveVideoProgress);
 
 
 module.exports = router;
