@@ -28,7 +28,7 @@ const createCommunityPost = asyncHandler(async (req, res) => {
         await user.save();
 
         res.status(201).json(newPost);
-    } catch (error) {
+    } catch (error) { 
         res.status(500).json({ error: 'Server error: Unable to create post' });
     }
 });
@@ -139,7 +139,7 @@ const likeCommunityPost = asyncHandler(async (req, res) => {
             return res.status(400).json({ error: 'You have already liked this post' });
         }
 
-        post.likes.push(userId);
+        post.likes.push(userId); 
         await post.save();
 
         res.status(200).json({ message: 'Post liked successfully' });
