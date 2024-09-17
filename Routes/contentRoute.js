@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { 
     getContent, 
+    getRecentContent,
     createContent, 
     updateContent, 
     deleteContent, 
@@ -9,7 +10,7 @@ const {
     approveContent,
     getUnapprovedContent,
     saveVideoProgress,
-    getVideoProgress
+    getVideoProgress,
 } = require('../controllers/contentController');
 const upload = require('../middleware/multer');
 
@@ -17,7 +18,10 @@ router.route('/')
     .get(getContent)
     .post(upload.array('files', 2), createContent);
 
-router. route('/unapproved')
+    router.route('/new')
+    .get(getRecentContent)
+
+router. route('/unapproved') 
     .get(getUnapprovedContent);
 
 router.route('/:id')
@@ -28,8 +32,10 @@ router.route('/:id')
 router.route('/approve/:id') 
     .put(approveContent)  // New route to get content by ID
 
-router.route('/progress/')
+router.route('/progress/:id')
     .get(getVideoProgress)
+
+router.route('/progress/')
     .post(saveVideoProgress);
 
 

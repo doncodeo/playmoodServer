@@ -22,6 +22,21 @@ const getContent = asyncHandler(async (req, res) => {
     res.status(200).json(content);
 });
 
+const getRecentContent = asyncHandler(async (req, res) => {
+    try {
+        // Fetch the last 10 most recent contents, sorted by their creation timestamp
+        const recentContents = await contentSchema.find({ isApproved: true })
+            .sort({ createdAt: -1 }) // Sort by timestamp in descending order
+            .limit(10) // Limit the results to the last 10 contents
+            .populate('user', 'name'); // Populate user details for each content
+
+        res.status(200).json(recentContents);
+    } catch (error) {
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+
 // @desc Get All Unapproved Content
 // @route GET /api/content/unapproved
 // @access Private (Admin only)
@@ -39,20 +54,73 @@ const getUnapprovedContent = asyncHandler(async (req, res) => {
 // @route GET /api/content/:id
 // @access Private
 
+// const getContentById = asyncHandler(async (req, res) => {
+//     const { id } = req.params;
+//     // const userId = req.user ? req.user._id : null; // Check if the user is logged in
+//     const viewerIP = req.ip; // Get the IP address of the viewer
+
+//     console.log(id);
+
+//     const content = await contentSchema.findById(id).populate('user', 'name');
+
+//     if (!content) {
+//         return res.status(404).json({ error: 'Content not found' });
+//     }
+
+//     // Increment the view count
+//     // content.views += 1;
+
+//     // Check if the viewer is a logged-in user
+//     if (id && !content.viewers.includes(id)) {
+//         // Increment the view count and add the user to the viewers array
+//         content.views += 1;
+//         content.viewers.push(id);
+//     } 
+//     // If not a logged-in user, check the IP address
+//     else if (!userId && !content.viewerIPs.includes(viewerIP)) {
+//         // Increment the view count and add the IP address to the viewerIPs array
+//         content.views += 1;
+//         content.viewerIPs.push(viewerIP);
+//     }
+
+//     await content.save();
+
+//     res.status(200).json(content);
+// });
+
 const getContentById = asyncHandler(async (req, res) => {
     const { id } = req.params;
+    const userId = req.params;
+    const viewerIP = req.ip; // Get the IP address of the viewer
+
     const content = await contentSchema.findById(id).populate('user', 'name');
 
     if (!content) {
         return res.status(404).json({ error: 'Content not found' });
     }
 
-    // Increment the view count
-    content.views += 1;
-    await content.save();
+    // Check if the viewer is a logged-in user or an anonymous viewer
+    const hasViewed = (userId && content.viewers.includes(userId)) || content.viewerIPs.includes(viewerIP);
+    console.log(hasViewed)
+    if (!hasViewed) {
+        // Increment the view count
+        content.views += 1;
+
+        // Add userId to viewers array if logged in
+        if (userId) {
+            content.viewers.push(userId);
+        } 
+        // Otherwise, add the IP address to viewerIPs array
+        else {
+            content.viewerIPs.push(viewerIP);
+        }
+
+        await content.save();
+    }
 
     res.status(200).json(content);
 });
+
 
 // @desc Create Content
 // @route POST /api/content
@@ -345,6 +413,7 @@ const getVideoProgress = asyncHandler(async (req, res) => {
 
 module.exports = {
     getContent,
+    getRecentContent,
     getContentById,
     createContent,
     updateContent,

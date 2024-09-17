@@ -45,7 +45,10 @@ const contentSchema = new mongoose.Schema({
     views: {
         type: Number,
         default: 0,
-    }
+    },
+    viewers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'profiles' }], // Array for logged-in users
+    viewerIPs: [{ type: String }], // Array to track viewer IPs for non-logged-in users
+    likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'profiles' }]
 }, {
     timestamps: true,
 });

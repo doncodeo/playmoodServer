@@ -15,7 +15,6 @@ const { protect } = require('../middleware/authmiddleware');
 // @desc    Create a new community post
 // @route   POST /api/community-posts
 // @access  Private
-
 router.route('/create')
     .post(protect, createCommunityPost);  // Create a new community post
 

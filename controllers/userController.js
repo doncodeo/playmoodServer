@@ -423,31 +423,73 @@ const getUserprofile = asyncHandler(async (req, res) => {
 const likeContent = asyncHandler(async (req, res) => {
     try {
         const contentId = req.body.contentId;
-        // const userId = req.body.userId;
         const userId = req.params.id; // Access userId from URL parameter
-  
 
-        // Check if the user has already liked the content
+        // Check if the user has already liked the content (from the user's `likes` array)
         const user = await userData.findOne({ _id: userId, likes: contentId });
-
         if (user) {
             return res.status(400).json({ error: 'This user already liked this content' });
         }
 
-        // Find the user by ID and update the likes array
+        // Check if the content exists and if the user has already liked it (from the content's `likes` array)
+        const content = await contentSchema.findOne({ _id: contentId, likes: userId });
+        if (content) {
+            return res.status(400).json({ error: 'This content is already liked by the user' });
+        }
+
+        // Add the content to the user's likes array
         const updatedUser = await userData.findByIdAndUpdate(
             userId,
             { $push: { likes: contentId } },
             { new: true }
         );
 
-        // res.status(200).json({ likes: updatedUser, message: "User successfully like content" });
-        res.status(200).json({ contentId: contentId, message: "User successfully liked content" });
+        // Add the user to the content's likes array
+        const updatedContent = await contentSchema.findByIdAndUpdate(
+            contentId,
+            { $push: { likes: userId } },
+            { new: true }
+        );
+
+        res.status(200).json({ 
+            message: "User successfully liked content", 
+            userLikes: updatedUser.likes, 
+            contentLikes: updatedContent.likes 
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Server error' });
     }
 });
+
+// const likeContent = asyncHandler(async (req, res) => {
+//     try {
+//         const contentId = req.body.contentId;
+//         // const userId = req.body.userId;
+//         const userId = req.params.id; // Access userId from URL parameter
+  
+
+//         // Check if the user has already liked the content
+//         const user = await userData.findOne({ _id: userId, likes: contentId });
+
+//         if (user) {
+//             return res.status(400).json({ error: 'This user already liked this content' });
+//         }
+
+//         // Find the user by ID and update the likes array
+//         const updatedUser = await userData.findByIdAndUpdate(
+//             userId,
+//             { $push: { likes: contentId } },
+//             { new: true }
+//         );
+
+//         // res.status(200).json({ likes: updatedUser, message: "User successfully like content" });
+//         res.status(200).json({ contentId: contentId, message: "User successfully liked content" });
+//     } catch (error) {
+//         console.error(error);
+//         res.status(500).json({ error: 'Server error' });
+//     }
+// });
 
 const unlikeContent = asyncHandler(async (req, res) => {
     try {
