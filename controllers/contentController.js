@@ -88,9 +88,42 @@ const getUnapprovedContent = asyncHandler(async (req, res) => {
 //     res.status(200).json(content);
 // });
 
+// const getContentById = asyncHandler(async (req, res) => {
+//     const { id } = req.params;
+//     const userId = req.params;
+//     const viewerIP = req.ip; // Get the IP address of the viewer
+
+//     const content = await contentSchema.findById(id).populate('user', 'name');
+
+//     if (!content) {
+//         return res.status(404).json({ error: 'Content not found' });
+//     }
+
+//     // Check if the viewer is a logged-in user or an anonymous viewer
+//     const hasViewed = (userId && content.viewers.includes(userId)) || content.viewerIPs.includes(viewerIP);
+
+//     if (!hasViewed) {
+//         // Increment the view count
+//         content.views += 1;
+
+//         // Add userId to viewers array if logged in
+//         if (userId) {
+//             content.viewers.push(userId);
+//         } 
+//         // Otherwise, add the IP address to viewerIPs array
+//         else {
+//             content.viewerIPs.push(viewerIP);
+//         }
+
+//         await content.save();
+//     }
+
+//     res.status(200).json(content);
+// });
+
 const getContentById = asyncHandler(async (req, res) => {
-    const { id } = req.params;
-    const userId = req.params;
+    const { id } = req.params; // Content ID from URL
+    const userId = req.user ? req.user._id : null; // Get the logged-in user's ID (assuming you're using req.user)
     const viewerIP = req.ip; // Get the IP address of the viewer
 
     const content = await contentSchema.findById(id).populate('user', 'name');
@@ -100,7 +133,8 @@ const getContentById = asyncHandler(async (req, res) => {
     }
 
     // Check if the viewer is a logged-in user or an anonymous viewer
-    const hasViewed = (userId && content.viewers.includes(userId)) || content.viewerIPs.includes(viewerIP);
+    const hasViewed = (userId && content.viewers.some(viewer => viewer.toString() === userId.toString())) || 
+                      content.viewerIPs.includes(viewerIP);
 
     if (!hasViewed) {
         // Increment the view count
@@ -108,7 +142,7 @@ const getContentById = asyncHandler(async (req, res) => {
 
         // Add userId to viewers array if logged in
         if (userId) {
-            content.viewers.push(userId);
+            content.viewers.push(userId); // Push the ObjectId directly
         } 
         // Otherwise, add the IP address to viewerIPs array
         else {
@@ -120,6 +154,7 @@ const getContentById = asyncHandler(async (req, res) => {
 
     res.status(200).json(content);
 });
+
 
 
 // @desc Create Content
