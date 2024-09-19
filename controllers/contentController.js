@@ -101,7 +101,7 @@ const getContentById = asyncHandler(async (req, res) => {
 
     // Check if the viewer is a logged-in user or an anonymous viewer
     const hasViewed = (userId && content.viewers.includes(userId)) || content.viewerIPs.includes(viewerIP);
-    console.log(hasViewed)
+
     if (!hasViewed) {
         // Increment the view count
         content.views += 1;
