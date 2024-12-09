@@ -5,6 +5,8 @@ const upload = require('../middleware/multer');
 const {
     getUser,
     registerUser,
+    verifyEmail,
+    resendVerificationCode,
     loginUser,
     deleteUser,
     updateUser,
@@ -25,6 +27,8 @@ const {
 const { protect } = require('../middleware/authmiddleware');
 
 router.route('/').get(getUser).post(upload.single("image"), registerUser);
+router.post('/verify-email', verifyEmail);
+router.post('/reverify', resendVerificationCode);
 router.route('/create').post(createUser);
 router.route('/login').post(loginUser);
 router.get('/profile', protect, getUserprofile);

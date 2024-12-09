@@ -8,7 +8,7 @@ const bcryptjs = require("bcryptjs");
 const cloudinary = require('../config/cloudinary');
 const Token = require("../models/token");
 const crypto = require("crypto");
-const { verifyEmail } = require('../middleware/authmiddleware');
+// const { verifyEmail } = require('../middleware/authmiddleware');
 const nodemailer = require('nodemailer');
 const RoleChangeRequest = require('../models/roleChangeModel');
 
@@ -39,133 +39,169 @@ const getUser = asyncHandler(async (req, res) => {
 
 const registerUser = asyncHandler(async (req, res) => {
     try {
-        const { name, email, password } = req.body;
+        const { name, email, password, country } = req.body;
 
         if (!name || !email || !password) {
-            res.status(400).json({ error: 'Important fields missing!' });
-            return;
+            return res.status(400).json({ error: 'Important fields are missing!' });
         }
 
         // Check for existing user
         const userExist = await userData.findOne({ email });
-
         if (userExist) {
-            console.log("User already exists", email);
-            res.status(400);
-            throw new Error("User already exists!!!");
+            return res.status(400).json({ error: "User already exists!" });
         }
 
         // Hash password
         const salt = await bcryptjs.genSalt(10);
         const hashedPassword = await bcryptjs.hash(password, salt);
 
-        // Set default values for profileImage and cloudinary_id
-        const defaultProfileImage = 'https://t3.ftcdn.net/jpg/05/16/27/58/360_F_516275801_f3Fsp17x6HQK0xQgDQEELoTuERO4SsWV.jpg'; // Replace with your default image URL
-        const defaultCloudinaryId = 'user-uploads/qdayeocck7k6zzqqery15'; // Replace with your default cloudinary_id
+        // Generate email verification code and expiration
+        const emailVerificationCode = crypto.randomBytes(3).toString('hex').toUpperCase();
+        const emailVerificationExpires = Date.now() + 15 * 60 * 1000; // 15 minutes
 
-        // Create user with default profile image and cloudinary_id
+        const defaultProfileImage = 'https://t3.ftcdn.net/jpg/05/16/27/58/360_F_516275801_f3Fsp17x6HQK0xQgDQEELoTuERO4SsWV.jpg';
+        const defaultCloudinaryId = 'user-uploads/qdayeocck7k6zzqqery15';
+
         const user = await userData.create({
             name,
             email,
             password: hashedPassword,
+            country,
+            emailVerificationCode,
+            emailVerificationExpires,
             profileImage: defaultProfileImage,
             cloudinary_id: defaultCloudinaryId,
         });
 
         if (user) {
-            console.log('User created:', user.email);
-            res.status(201).json({ user });
-
-            // Send registration confirmation email
+            // Send verification email
             const mailOptions = {
                 from: `"PlaymoodTV 📺" <${process.env.EMAIL_USERNAME}>`,
                 to: user.email,
-                subject: 'Registration Confirmation',
+                subject: 'Email Verification Code',
                 html: `
                     <html>
-                        <head>
-                            <style>
-                                body {
-                                    font-family: Arial, sans-serif;
-                                    background-color: #f0f0f0;
-                                    color: #333;
-                                    padding: 20px;
-                                }
-                                .container {
-                                    max-width: 600px;
-                                    margin: 0 auto;
-                                    background-color: #ffffff;
-                                    padding: 20px;
-                                    border-radius: 8px;
-                                    box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
-                                }
-                                .header {
-                                    background-color: tomato;
-                                    color: white;
-                                    padding: 10px;
-                                    text-align: center;
-                                    border-top-left-radius: 8px;
-                                    border-top-right-radius: 8px;
-                                }
-                                .content {
-                                    padding: 20px;
-                                }
-                                .login-button {
-                                    display: inline-block;
-                                    padding: 10px 20px;
-                                    background-color: tomato;
-                                    color: white;
-                                    text-decoration: none;
-                                    border-radius: 5px;
-                                }
-                                .footer {
-                                    margin-top: 20px;
-                                    text-align: center;
-                                    color: #666;
-                                    font-size: 12px;
-                                }
-                            </style>
-                        </head>
                         <body>
-                            <div class="container">
-                                <div class="header">
-                                    <h2>Welcome to PlaymoodTV!</h2>
-                                </div>
-                                <div class="content">
-                                    <p>Dear ${user.name},</p>
-                                    <p>Thank you for registering with PlaymoodTV! We're excited to have you on board.</p>
-                                    <p>Please use the following button to log in to your account:</p>
-                                    <a class="login-button" href="http://localhost:3000/login" target="_blank">Login to Your Account</a>
-                                    <p>We look forward to providing you with the best entertainment experience.</p>
-                                </div>
-                                <div class="footer">
-                                    <p>Best regards,</p>
-                                    <p>The PlaymoodTV Team</p>
-                                </div>
-                            </div>
+                            <p>Hello ${user.name},</p>
+                            <p>Your verification code is: <strong>${emailVerificationCode}</strong></p>
+                            <p>This code will expire in 15 minutes.</p>
+                            <p>Best regards,</p>
+                            <p>The PlaymoodTV Team</p>
                         </body>
                     </html>
-                `
+                `,
             };
 
             transporter.sendMail(mailOptions, (error, info) => {
                 if (error) {
                     console.error("Error sending email:", error);
+                    return res.status(500).json({ error: 'Error sending email' });
                 } else {
-                    console.log('Email sent:', info.response);
+                    console.log('Verification email sent:', info.response);
+                    return res.status(201).json({ message: 'Verification code sent to email', userId: user._id });
                 }
             });
+        }
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
 
-        } else {
-            console.log('User creation failed');
-            res.status(400);
-            throw new Error('Invalid user data');
+// Verify email endpoint
+const verifyEmail = asyncHandler(async (req, res) => {
+    const { userId, verificationCode } = req.body;
+
+    if (!userId || !verificationCode) {
+        return res.status(400).json({ error: 'Missing user ID or verification code' });
+    }
+
+    try {
+        const user = await userData.findById(userId);
+
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
         }
 
-        console.log('User registration completed'); // Log exit point
+        if (user.isEmailVerified) {
+            return res.status(400).json({ error: 'Email is already verified' });
+        }
 
+        if (user.emailVerificationExpires < Date.now()) {
+            return res.status(400).json({ error: 'Verification code has expired' });
+        }
+
+        if (user.emailVerificationCode !== verificationCode) {
+            return res.status(400).json({ error: 'Invalid verification code' });
+        }
+
+        // Mark email as verified
+        user.isEmailVerified = true;
+        user.emailVerificationCode = null;
+        user.emailVerificationExpires = null;
+        await user.save();
+
+        return res.status(200).json({ message: 'Email verified successfully' });
     } catch (error) {
-        console.error(error); // Log any errors to the console for debugging
+        console.error(error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+const resendVerificationCode = asyncHandler(async (req, res) => {
+    const { email } = req.body;
+
+    if (!email) {
+        return res.status(400).json({ error: 'Email is required' });
+    }
+
+    try {
+        const user = await userData.findOne({ email });
+
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        if (user.isEmailVerified) {
+            return res.status(400).json({ error: 'Email is already verified' });
+        }
+
+        // Generate new verification code and expiration
+        const emailVerificationCode = crypto.randomBytes(3).toString('hex').toUpperCase();
+        const emailVerificationExpires = Date.now() + 15 * 60 * 1000;
+
+        user.emailVerificationCode = emailVerificationCode;
+        user.emailVerificationExpires = emailVerificationExpires;
+        await user.save();
+
+        // Send verification email
+        const mailOptions = {
+            from: `"PlaymoodTV 📺" <${process.env.EMAIL_USERNAME}>`,
+            to: user.email,
+            subject: 'Resent Verification Code',
+            html: `
+                <html>
+                    <body>
+                        <p>Hello ${user.name},</p>
+                        <p>Your new verification code is: <strong>${emailVerificationCode}</strong></p>
+                        <p>This code will expire in 15 minutes.</p>
+                        <p>Best regards,</p>
+                        <p>The PlaymoodTV Team</p>
+                    </body>
+                </html>
+            `,
+        };
+
+        transporter.sendMail(mailOptions, (error, info) => {
+            if (error) {
+                console.error("Error sending email:", error);
+                return res.status(500).json({ error: 'Error sending email' });
+            } else {
+                return res.status(200).json({ message: 'Verification code resent successfully' });
+            }
+        });
+    } catch (error) {
+        console.error(error);
         res.status(500).json({ error: 'Server error' });
     }
 });
@@ -683,6 +719,8 @@ const markPrivacyPolicyAsRead = asyncHandler(async (req, res) => {
  module.exports = {
     getUser, 
     registerUser,
+    verifyEmail,
+    resendVerificationCode,
     getCreators,
     createUser,
     loginUser,
