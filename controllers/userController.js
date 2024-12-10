@@ -141,12 +141,41 @@ const verifyEmail = asyncHandler(async (req, res) => {
         user.emailVerificationExpires = null;
         await user.save();
 
-        return res.status(200).json({ message: 'Email verified successfully' });
+        // Send confirmation email
+        const mailOptions = {
+            from: `"PlaymoodTV 📺" <${process.env.EMAIL_USERNAME}>`,
+            to: user.email,
+            subject: 'Email Verification Successful',
+            html: `
+                <html>
+                    <body>
+                        <p>Dear ${user.name},</p>
+                        <p>Congratulations! Your email has been successfully verified. You can now enjoy the full PlaymoodTV experience, including accessing our amazing content and engaging with the community.</p>
+                        <p>Click the button below to start exploring:</p>
+                        <a href="http://localhost:3000/" style="display: inline-block; padding: 10px 20px; background-color: tomato; color: white; text-decoration: none; border-radius: 5px;">Explore PlaymoodTV</a>
+                        <p>We’re thrilled to have you on board and look forward to providing you with the best entertainment experience possible.</p>
+                        <p>Best regards,</p>
+                        <p>The PlaymoodTV Team</p>
+                    </body>
+                </html>
+            `,
+        };
+
+        transporter.sendMail(mailOptions, (error, info) => {
+            if (error) {
+                console.error("Error sending email:", error);
+            } else {
+                console.log('Confirmation email sent:', info.response);
+            }
+        });
+
+        return res.status(200).json({ message: 'Email verified successfully and confirmation email sent.' });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Server error' });
     }
 });
+
 
 const resendVerificationCode = asyncHandler(async (req, res) => {
     const { email } = req.body;
