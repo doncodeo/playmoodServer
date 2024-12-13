@@ -39,9 +39,9 @@ const getUser = asyncHandler(async (req, res) => {
 
 const registerUser = asyncHandler(async (req, res) => {
     try {
-        const { name, email, password, country } = req.body;
+        const { name, email, password} = req.body;
 
-        if (!name || !email || !password || !country) {
+        if (!name || !email || !password) {
             return res.status(400).json({ error: 'Important fields are missing!' });
         }
 
