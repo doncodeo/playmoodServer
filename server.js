@@ -46,7 +46,6 @@ connectDB()
     app.use('/api/community', require('./Routes/communityPostRoute'));
 
 
-
     app.use(express.static(path.join(__dirname, 'public')));
  
     // Serve login.html for /login route
