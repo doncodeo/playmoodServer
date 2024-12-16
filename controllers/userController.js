@@ -39,7 +39,7 @@ const getUser = asyncHandler(async (req, res) => {
 
 const registerUser = asyncHandler(async (req, res) => {
     try {
-        const { name, email, password, country } = req.body;
+        const { name, email, password, country} = req.body;
 
         // Validate required fields
         if (!name || !email || !password) {
