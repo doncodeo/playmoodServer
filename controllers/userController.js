@@ -41,27 +41,30 @@ const registerUser = asyncHandler(async (req, res) => {
     try {
         const { name, email, password, country } = req.body;
 
+        // Validate required fields
         if (!name || !email || !password) {
             return res.status(400).json({ error: 'Important fields are missing!' });
         }
 
-        // Check for existing user
+        // Check if the user already exists
         const userExist = await userData.findOne({ email });
         if (userExist) {
             return res.status(400).json({ error: "User already exists!" });
         }
 
-        // Hash password
+        // Hash the user's password
         const salt = await bcryptjs.genSalt(10);
         const hashedPassword = await bcryptjs.hash(password, salt);
 
-        // Generate email verification code and expiration
+        // Generate email verification code and expiration time
         const emailVerificationCode = crypto.randomBytes(3).toString('hex').toUpperCase();
-        const emailVerificationExpires = Date.now() + 15 * 60 * 1000; // 15 minutes
+        const emailVerificationExpires = Date.now() + 15 * 60 * 1000; // Expires in 15 minutes
 
+        // Default profile image and Cloudinary ID
         const defaultProfileImage = 'https://t3.ftcdn.net/jpg/05/16/27/58/360_F_516275801_f3Fsp17x6HQK0xQgDQEELoTuERO4SsWV.jpg';
         const defaultCloudinaryId = 'user-uploads/qdayeocck7k6zzqqery15';
 
+        // Create the new user
         const user = await userData.create({
             name,
             email,
@@ -74,7 +77,7 @@ const registerUser = asyncHandler(async (req, res) => {
         });
 
         if (user) {
-            // Send verification email
+            // Send the verification email
             const mailOptions = {
                 from: `"PlaymoodTV 📺" <${process.env.EMAIL_USERNAME}>`,
                 to: user.email,
@@ -95,18 +98,99 @@ const registerUser = asyncHandler(async (req, res) => {
             transporter.sendMail(mailOptions, (error, info) => {
                 if (error) {
                     console.error("Error sending email:", error);
-                    return res.status(500).json({ error: 'Error sending email' });
+                    return res.status(500).json({ error: 'Failed to send the verification email.' });
                 } else {
                     console.log('Verification email sent:', info.response);
-                    return res.status(201).json({ message: 'Verification code sent to email', userId: user._id });
+
+                    // Success response with a clear message
+                    return res.status(201).json({
+                        message: 'User registered successfully. Verification code sent to email.',
+                        userId: user._id,
+                    });
                 }
             });
+        } else {
+            return res.status(500).json({ error: 'Failed to create user. Please try again.' });
         }
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Server error' });
+        console.error("Error in user registration:", error);
+        res.status(500).json({ error: 'Server error. Please try again later.' });
     }
 });
+
+
+
+
+// const registerUser = asyncHandler(async (req, res) => {
+//     try {
+//         const { name, email, password, country } = req.body;
+
+//         if (!name || !email || !password) {
+//             return res.status(400).json({ error: 'Important fields are missing!' });
+//         }
+
+//         // Check for existing user
+//         const userExist = await userData.findOne({ email });
+//         if (userExist) {
+//             return res.status(400).json({ error: "User already exists!" });
+//         }
+
+//         // Hash password
+//         const salt = await bcryptjs.genSalt(10);
+//         const hashedPassword = await bcryptjs.hash(password, salt);
+
+//         // Generate email verification code and expiration
+//         const emailVerificationCode = crypto.randomBytes(3).toString('hex').toUpperCase();
+//         const emailVerificationExpires = Date.now() + 15 * 60 * 1000; // 15 minutes
+
+//         const defaultProfileImage = 'https://t3.ftcdn.net/jpg/05/16/27/58/360_F_516275801_f3Fsp17x6HQK0xQgDQEELoTuERO4SsWV.jpg';
+//         const defaultCloudinaryId = 'user-uploads/qdayeocck7k6zzqqery15';
+
+//         const user = await userData.create({
+//             name,
+//             email,
+//             password: hashedPassword,
+//             country,
+//             emailVerificationCode,
+//             emailVerificationExpires,
+//             profileImage: defaultProfileImage,
+//             cloudinary_id: defaultCloudinaryId,
+//         });
+
+//         if (user) {
+//             // Send verification email
+//             const mailOptions = {
+//                 from: `"PlaymoodTV 📺" <${process.env.EMAIL_USERNAME}>`,
+//                 to: user.email,
+//                 subject: 'Email Verification Code',
+//                 html: `
+//                     <html>
+//                         <body>
+//                             <p>Hello ${user.name},</p>
+//                             <p>Your verification code is: <strong>${emailVerificationCode}</strong></p>
+//                             <p>This code will expire in 15 minutes.</p>
+//                             <p>Best regards,</p>
+//                             <p>The PlaymoodTV Team</p>
+//                         </body>
+//                     </html>
+//                 `,
+//             };
+
+//             transporter.sendMail(mailOptions, (error, info) => {
+//                 if (error) {
+//                     console.error("Error sending email:", error);
+//                     return res.status(500).json({ error: 'Error sending email' });
+//                 } else {
+//                     console.log('Verification email sent:', info.response);
+//                     return res.status(201).json({ message: 'Verification code sent to email', userId: user._id });
+//                 }
+//             });
+//         }
+//     } catch (error) {
+//         console.error(error);
+//         res.status(500).json({ error: 'Server error' });
+//     }
+// });
 
 // Verify email endpoint
 const verifyEmail = asyncHandler(async (req, res) => {
