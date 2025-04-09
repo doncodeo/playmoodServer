@@ -13,6 +13,7 @@ const {
     getVideoProgress,
 } = require('../controllers/contentController');
 const upload = require('../middleware/multer');
+const { protect } = require('../middleware/authmiddleware');
 
 router.route('/')
     .get(getContent)
@@ -33,10 +34,10 @@ router.route('/approve/:id')
     .put(approveContent)  // New route to get content by ID
 
 router.route('/progress/:id')
-    .get(getVideoProgress)
+    .get(protect, getVideoProgress)
 
 router.route('/progress/')
-    .post(saveVideoProgress);
+    .post(protect, saveVideoProgress);
 
 
 module.exports = router;

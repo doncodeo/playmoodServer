@@ -399,18 +399,30 @@ const deleteContent = asyncHandler(async (req, res) => {
 });
 
 const saveVideoProgress = asyncHandler(async (req, res) => {
-    const userId = req.user._id;
+    const userId = req.user._id; // From auth middleware
     const { contentId, progress } = req.body;
+
+    // Validate input
+    if (!contentId || progress === undefined || progress < 0) {
+        return res.status(400).json({ error: 'Content ID and valid progress are required' });
+    }
+
+    // Check if content exists
+    const content = await contentSchema.findById(contentId);
+    if (!content) {
+        return res.status(404).json({ error: 'Content not found' });
+    }
 
     // Find the user
     const user = await userSchema.findById(userId);
-
     if (!user) {
         return res.status(404).json({ error: 'User not found' });
     }
 
-    // Check if progress for this content's video already exists
-    const progressRecord = user.videoProgress.find(record => record.contentId.toString() === contentId);
+    // Check if progress for this content already exists
+    const progressRecord = user.videoProgress.find(
+        record => record.contentId.toString() === contentId.toString()
+    );
 
     if (progressRecord) {
         // Update existing progress
@@ -421,25 +433,35 @@ const saveVideoProgress = asyncHandler(async (req, res) => {
     }
 
     await user.save();
-    res.status(200).json({ message: 'Video progress saved successfully' });
+    res.status(200).json({ 
+        message: 'Video progress saved successfully', 
+        contentId, 
+        progress 
+    });
 });
 
 const getVideoProgress = asyncHandler(async (req, res) => {
-    const userId = req.user._id;
+    const userId = req.user._id; // From auth middleware
     const { contentId } = req.params;
 
-    // Find the user
-    const user = await userData.findById(userId).populate('videoProgress.contentId');
+    // Validate input
+    if (!contentId) {
+        return res.status(400).json({ error: 'Content ID is required' });
+    }
 
+    // Find the user and populate videoProgress
+    const user = await userSchema.findById(userId).populate('videoProgress.contentId');
     if (!user) {
         return res.status(404).json({ error: 'User not found' });
     }
 
-    // Find the progress for the specific content's video
-    const progressRecord = user.videoProgress.find(record => record.contentId._id.toString() === contentId);
+    // Find the progress for the specific content
+    const progressRecord = user.videoProgress.find(
+        record => record.contentId._id.toString() === contentId.toString()
+    );
 
     if (!progressRecord) {
-        return res.status(404).json({ error: 'No progress found for this video' });
+        return res.status(200).json({ progress: 0 }); // Default to 0 if no progress exists
     }
 
     res.status(200).json({ progress: progressRecord.progress });
