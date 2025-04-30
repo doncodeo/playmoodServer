@@ -89,7 +89,7 @@ const { protect } = require('../middleware/authmiddleware');
 
 /**
  * @swagger
- * /:
+ * /api/users:
  *   get:
  *     summary: Get all users
  *     description: Retrieves a list of all users in the system.
@@ -110,7 +110,7 @@ router.route('/').get(getUser);
 
 /**
  * @swagger
- * /:
+ * /api/users:
  *   post:
  *     summary: Register a new user
  *     description: Registers a new user and sends a verification email with a code.
@@ -160,7 +160,7 @@ router.route('/').post(upload.single('image'), registerUser);
 
 /**
  * @swagger
- * /verify-email:
+ * /api/users/verify-email:
  *   post:
  *     summary: Verify user email
  *     description: Verifies a user's email using the provided verification code.
@@ -181,6 +181,14 @@ router.route('/').post(upload.single('image'), registerUser);
  *     responses:
  *       200:
  *         description: Email verified successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Email verified successfully
  *       400:
  *         description: Invalid or expired verification code
  *       404:
@@ -192,7 +200,7 @@ router.post('/verify-email', verifyEmail);
 
 /**
  * @swagger
- * /reverify:
+ * /api/users/reverify:
  *   post:
  *     summary: Resend verification code
  *     description: Resends a new verification code to the user's email.
@@ -210,6 +218,14 @@ router.post('/verify-email', verifyEmail);
  *     responses:
  *       200:
  *         description: Verification code resent successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Verification code resent successfully
  *       400:
  *         description: Email already verified or missing
  *       404:
@@ -221,7 +237,7 @@ router.post('/reverify', resendVerificationCode);
 
 /**
  * @swagger
- * /create:
+ * /api/users/create:
  *   post:
  *     summary: Create a new user
  *     description: Creates a new user with the specified role.
@@ -261,7 +277,7 @@ router.route('/create').post(createUser);
 
 /**
  * @swagger
- * /login:
+ * /api/users/login:
  *   post:
  *     summary: Authenticate a user
  *     description: Logs in a user and returns a JWT token.
@@ -297,7 +313,7 @@ router.route('/create').post(createUser);
  *                   type: string
  *                 token:
  *                   type: string
- *       404:
+ *       400:
  *         description: Invalid credentials
  *       500:
  *         description: Server error
@@ -306,7 +322,7 @@ router.route('/login').post(loginUser);
 
 /**
  * @swagger
- * /profile:
+ * /api/users/profile:
  *   get:
  *     summary: Get user profile
  *     description: Retrieves the profile of the authenticated user.
@@ -320,6 +336,8 @@ router.route('/login').post(loginUser);
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/User'
+ *       401:
+ *         description: Unauthorized
  *       404:
  *         description: User not found
  *       500:
@@ -329,7 +347,7 @@ router.get('/profile', protect, getUserprofile);
 
 /**
  * @swagger
- * /creators:
+ * /api/users/creators:
  *   get:
  *     summary: Get all creators
  *     description: Retrieves a list of users with the 'creator' role.
@@ -352,11 +370,13 @@ router.route('/creators').get(getCreators);
 
 /**
  * @swagger
- * /{id}:
+ * /api/users/{id}:
  *   put:
  *     summary: Update user
  *     description: Updates user information such as name, email, or role.
  *     tags: [Users]
+ *     security:
+ *       - BearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -373,14 +393,19 @@ router.route('/creators').get(getCreators);
  *             properties:
  *               name:
  *                 type: string
+ *                 example: Jane Doe
  *               email:
  *                 type: string
+ *                 example: jane@example.com
  *               role:
  *                 type: string
+ *                 example: user
  *               verified:
  *                 type: boolean
+ *                 example: true
  *               hasReadPrivacyPolicy:
  *                 type: boolean
+ *                 example: true
  *               image:
  *                 type: string
  *                 format: binary
@@ -391,6 +416,8 @@ router.route('/creators').get(getCreators);
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/User'
+ *       401:
+ *         description: Unauthorized
  *       404:
  *         description: User not found
  *       500:
@@ -400,11 +427,13 @@ router.route('/:id').put(upload.single('image'), updateUser);
 
 /**
  * @swagger
- * /{id}:
+ * /api/users/{id}:
  *   delete:
  *     summary: Delete user
  *     description: Deletes a user and their associated profile image from Cloudinary.
  *     tags: [Users]
+ *     security:
+ *       - BearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -415,6 +444,16 @@ router.route('/:id').put(upload.single('image'), updateUser);
  *     responses:
  *       200:
  *         description: User deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: User deleted successfully
+ *       401:
+ *         description: Unauthorized
  *       404:
  *         description: User not found
  *       500:
@@ -424,7 +463,7 @@ router.route('/:id').delete(deleteUser);
 
 /**
  * @swagger
- * /profile-image/{id}:
+ * /api/users/profile-image/{id}:
  *   put:
  *     summary: Update user profile image
  *     description: Updates the user's profile image by uploading a new image to Cloudinary.
@@ -451,8 +490,16 @@ router.route('/:id').delete(deleteUser);
  *     responses:
  *       200:
  *         description: Profile image updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/User'
  *       400:
  *         description: No file uploaded
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: User not found
  *       500:
  *         description: Server error
  */
@@ -460,11 +507,13 @@ router.route('/profile-image/:id').put(protect, upload.single('image'), updatePr
 
 /**
  * @swagger
- * /like/{id}:
+ * /api/users/like/{id}:
  *   put:
  *     summary: Like content
  *     description: Adds a content ID to the user's likes array and the user ID to the content's likes array.
  *     tags: [Users]
+ *     security:
+ *       - BearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -492,6 +541,7 @@ router.route('/profile-image/:id').put(protect, upload.single('image'), updatePr
  *               properties:
  *                 message:
  *                   type: string
+ *                   example: Content liked successfully
  *                 userLikes:
  *                   type: array
  *                   items:
@@ -502,6 +552,10 @@ router.route('/profile-image/:id').put(protect, upload.single('image'), updatePr
  *                     type: string
  *       400:
  *         description: Content already liked
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: User or content not found
  *       500:
  *         description: Server error
  */
@@ -509,11 +563,13 @@ router.route('/like/:id').put(likeContent);
 
 /**
  * @swagger
- * /unlike/{id}:
+ * /api/users/unlike/{id}:
  *   put:
  *     summary: Unlike content
  *     description: Removes a content ID from the user's likes array.
  *     tags: [Users]
+ *     security:
+ *       - BearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -534,8 +590,22 @@ router.route('/like/:id').put(likeContent);
  *     responses:
  *       200:
  *         description: Content unliked successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Content unliked successfully
+ *                 userLikes:
+ *                   type: array
+ *                   items:
+ *                     type: string
+ *       401:
+ *         description: Unauthorized
  *       404:
- *         description: User not found
+ *         description: User or content not found
  *       500:
  *         description: Server error
  */
@@ -543,13 +613,14 @@ router.route('/unlike/:id').put(unlikeContent);
 
 /**
  * @swagger
- * /getlike/{id}:
+ * /api/users/getlike/{id}:
  *   get:
  *     summary: Get liked content
  *     description: Retrieves the list of content liked by the user.
  *     tags: [Users]
+ *     security:
+ *       - BearerAuth: []
  *     parameters:
- *      .Spacing issue resolved in the original code.
  *       - in: path
  *         name: id
  *         required: true
@@ -568,6 +639,10 @@ router.route('/unlike/:id').put(unlikeContent);
  *                   type: array
  *                   items:
  *                     $ref: '#/components/schemas/Content'
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: User not found
  *       500:
  *         description: Server error
  */
@@ -575,11 +650,13 @@ router.route('/getlike/:id').get(getLikedContents);
 
 /**
  * @swagger
- * /watchlist/{id}:
+ * /api/users/watchlist/{id}:
  *   put:
  *     summary: Add content to watchlist
  *     description: Adds a content ID to the user's watchlist.
  *     tags: [Users]
+ *     security:
+ *       - BearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -600,8 +677,24 @@ router.route('/getlike/:id').get(getLikedContents);
  *     responses:
  *       200:
  *         description: Content added to watchlist
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Content added to watchlist
+ *                 watchlist:
+ *                   type: array
+ *                   items:
+ *                     type: string
  *       400:
  *         description: Content already in watchlist
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: User or content not found
  *       500:
  *         description: Server error
  */
@@ -609,11 +702,13 @@ router.route('/watchlist/:id').put(addWatchlist);
 
 /**
  * @swagger
- * /watchlist/{id}:
+ * /api/users/watchlist/{id}:
  *   get:
  *     summary: Get watchlist
  *     description: Retrieves the user's watchlist.
  *     tags: [Users]
+ *     security:
+ *       - BearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -633,6 +728,10 @@ router.route('/watchlist/:id').put(addWatchlist);
  *                   type: array
  *                   items:
  *                     $ref: '#/components/schemas/Content'
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: User not found
  *       500:
  *         description: Server error
  */
@@ -640,11 +739,13 @@ router.route('/watchlist/:id').get(getWatchlist);
 
 /**
  * @swagger
- * /unwatch/{id}:
+ * /api/users/unwatch/{id}:
  *   put:
  *     summary: Remove content from watchlist
  *     description: Removes a content ID from the user's watchlist.
  *     tags: [Users]
+ *     security:
+ *       - BearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -665,6 +766,20 @@ router.route('/watchlist/:id').get(getWatchlist);
  *     responses:
  *       200:
  *         description: Content removed from watchlist
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Content removed from watchlist
+ *                 watchlist:
+ *                   type: array
+ *                   items:
+ *                     type: string
+ *       401:
+ *         description: Unauthorized
  *       404:
  *         description: User or content not found
  *       500:
@@ -674,11 +789,13 @@ router.route('/unwatch/:id').put(removeWatchlist);
 
 /**
  * @swagger
- * /history/{id}:
+ * /api/users/history/{id}:
  *   put:
  *     summary: Save content to history
  *     description: Adds a content ID to the user's viewing history.
  *     tags: [Users]
+ *     security:
+ *       - BearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -707,10 +824,17 @@ router.route('/unwatch/:id').put(removeWatchlist);
  *             schema:
  *               type: object
  *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Content added to history
  *                 history:
  *                   type: array
  *                   items:
  *                     type: string
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: User or content not found
  *       500:
  *         description: Server error
  */
@@ -718,11 +842,13 @@ router.route('/history/:id').put(saveContentToHistory);
 
 /**
  * @swagger
- * /history/{id}:
+ * /api/users/history/{id}:
  *   get:
  *     summary: Get user history
  *     description: Retrieves the user's content viewing history.
  *     tags: [Users]
+ *     security:
+ *       - BearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -730,16 +856,6 @@ router.route('/history/:id').put(saveContentToHistory);
  *         schema:
  *           type: string
  *         description: User ID
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               userId:
- *                 type: string
- *                 example: 65a8025e3af4e7929b379e7b
  *     responses:
  *       200:
  *         description: User's viewing history
@@ -752,6 +868,10 @@ router.route('/history/:id').put(saveContentToHistory);
  *                   type: array
  *                   items:
  *                     $ref: '#/components/schemas/Content'
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: User not found
  *       500:
  *         description: Server error
  */
@@ -759,7 +879,7 @@ router.route('/history/:id').get(getUserHistory);
 
 /**
  * @swagger
- * /policy:
+ * /api/users/policy:
  *   post:
  *     summary: Mark privacy policy as read
  *     description: Marks the privacy policy as read for the authenticated user.
@@ -769,8 +889,18 @@ router.route('/history/:id').get(getUserHistory);
  *     responses:
  *       200:
  *         description: Privacy policy marked as read
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Privacy policy marked as read
  *       400:
  *         description: User ID required
+ *       401:
+ *         description: Unauthorized
  *       404:
  *         description: User not found
  *       500:
@@ -780,7 +910,7 @@ router.route('/policy').post(protect, markPrivacyPolicyAsRead);
 
 /**
  * @swagger
- * /test-upload:
+ * /api/users/test-upload:
  *   post:
  *     summary: Test file upload
  *     description: Endpoint for testing file uploads (up to 2 files).
@@ -800,6 +930,16 @@ router.route('/policy').post(protect, markPrivacyPolicyAsRead);
  *     responses:
  *       200:
  *         description: Files received successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Received files!
+ *       400:
+ *         description: No files uploaded
  *       500:
  *         description: Server error
  */
@@ -808,8 +948,7 @@ router.route('/test-upload').post(upload.array('files', 2), (req, res) => {
   res.status(200).send('Received files!');
 });
 
-module.exports = router;
-
+module.exports = router; 
 
 
 
