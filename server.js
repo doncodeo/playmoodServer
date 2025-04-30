@@ -5,6 +5,8 @@ const dotenv = require('dotenv').config();
 const connectDB = require('./config/db');
 const { MongoClient } = require('mongodb');
 const path = require('path');
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpec = require('./swagger');
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -29,6 +31,9 @@ connectDB()
     app.use(cors({
       origin: allowedOrigins,
     }));
+
+    // Serve Swagger UI at /api-docs
+    app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
     // Middleware for JSON and URL-encoded data
     app.use(express.json());
