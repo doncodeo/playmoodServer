@@ -9,14 +9,14 @@ const swaggerDefinition = {
     description: 'API documentation for the PlaymoodTV platform, including user management, content interaction, and more.',
   },
   servers: [
-    {
-      url: 'http://localhost:5000',
-      description: 'Development server',
-    },
+    // {
+    //   url: 'http://localhost:5000',
+    //   description: 'Development server',
+    // },
     {
       url: 'https://playmoodserver-stg-0fb54b955e6b.herokuapp.com',
       description: 'Live server',
-    },
+    }
   ],
   components: {
     securitySchemes: {
