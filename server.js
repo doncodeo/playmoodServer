@@ -49,12 +49,12 @@ connectDB()
       })
     );
 
+    // Serve Swagger UI at /api-docs
+    app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
     // Middleware for JSON and URL-encoded data
     app.use(express.json());
     app.use(express.urlencoded({ extended: false }));
-
-    // Serve Swagger UI at /api-docs
-    app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
     // Routes
     app.use('/api/content', require('./routes/contentRoute'));
