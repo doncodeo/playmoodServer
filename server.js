@@ -42,13 +42,12 @@ connectDB()
     app.use(bodyParser.urlencoded({ extended: true }));
 
     // Routes 
-    app.use('/api/content', require('./Routes/contentRoute'));
-    app.use('/api/user', require('./Routes/userRoute'));
-    app.use('/api/rolechange', require('./Routes/roleChangeRoute'));
-    app.use('/api/subscribe', require('./Routes/subscribeRoute'));
-    app.use('/api/channel', require('./Routes/channelRoute'));
-    // below route not tested yet
-    app.use('/api/community', require('./Routes/communityPostRoute'));
+    app.use('/api/content', require('./routes/contentRoute'));
+  app.use('/api/user', require('./routes/userRoute'));
+  app.use('/api/rolechange', require('./routes/roleChangeRoute'));
+  app.use('/api/subscribe', require('./routes/subscribeRoute'));
+  app.use('/api/channel', require('./routes/channelRoute'));
+  app.use('/api/community', require('./routes/communityPostRoute'));
 
 
     app.use(express.static(path.join(__dirname, 'public')));
