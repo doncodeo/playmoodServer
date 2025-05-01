@@ -43,7 +43,7 @@ connectDB()
 
     // Routes 
     app.use('/api/content', require('./Routes/contentRoute'));
-    app.use('/api/user', require('./Routes/userRoute'));
+    app.use('/api/users', require('./Routes/userRoute'));
     app.use('/api/rolechange', require('./Routes/roleChangeRoute'));
     app.use('/api/subscribe', require('./Routes/subscribeRoute'));
     app.use('/api/channel', require('./Routes/channelRoute'));
