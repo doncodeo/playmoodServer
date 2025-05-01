@@ -1,5 +1,4 @@
 const swaggerJSDoc = require('swagger-jsdoc');
-const glob = require('glob');
 const path = require('path');
 
 const swaggerDefinition = {
@@ -11,8 +10,10 @@ const swaggerDefinition = {
   },
   servers: [
     {
-      url: 'https://playmoodserver-stg-0fb54b955e6b.herokuapp.com',
-      description: 'Live server',
+      url: process.env.NODE_ENV === 'production'
+        ? 'https://playmoodserver-stg-0fb54b955e6b.herokuapp.com'
+        : 'http://localhost:5000',
+      description: process.env.NODE_ENV === 'production' ? 'Live server' : 'Development server',
     },
   ],
   components: {
@@ -26,30 +27,38 @@ const swaggerDefinition = {
   },
 };
 
-// Use absolute path for reliability
-const routesPath = path.join(__dirname, 'routes', '*.js');
-console.log('Swagger routes path:', routesPath);
+// Explicitly list route files with absolute paths
+const routeFiles = [
+  'userRoute.js',
+  'contentRoute.js',
+  'roleChangeRoute.js',
+  'subscribeRoute.js',
+  'channelRoute.js',
+  'communityPostRoute.js',
+].map(file => path.join(__dirname, 'routes', file));
 
-// Log scanned files for debugging
-const routeFiles = glob.sync(routesPath, { absolute: true });
-console.log('Swagger scanned files:', routeFiles);
+console.log('Swagger route files:', routeFiles);
 
-if (!routeFiles.length) {
-  console.error('No route files found! Check the routes directory and glob pattern.');
-}
+// Verify that the files exist
+const fs = require('fs');
+routeFiles.forEach(file => {
+  if (!fs.existsSync(file)) {
+    console.error(`Route file not found: ${file}`);
+  } else {
+    console.log(`Route file found: ${file}`);
+  }
+});
 
 const options = {
   swaggerDefinition,
-  apis: routeFiles.length ? routeFiles : [routesPath],
+  apis: routeFiles,
 };
 
 const swaggerSpec = swaggerJSDoc(options);
 
-// Log the generated spec for debugging
 console.log('Generated Swagger Spec:', JSON.stringify(swaggerSpec, null, 2));
 
 module.exports = swaggerSpec;
-
 
 
 
