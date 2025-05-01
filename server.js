@@ -45,7 +45,7 @@ app.use(
 // Routes
 app.use('/api/content', require('./Routes/contentRoute'));
 app.use('/api/users', require('./Routes/userRoute'));
-app.use('/api/rolechange', require('./Routes/roleChangeRoute'));
+app.use('/api/rolechange', require('./Routes/roleChangeRoute')); 
 app.use('/api/subscribe', require('./Routes/subscribeRoute'));
 app.use('/api/channel', require('./Routes/channelRoute'));
 app.use('/api/community', require('./Routes/communityPostRoute'));
