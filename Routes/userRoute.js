@@ -92,8 +92,10 @@ const { protect } = require('../middleware/authmiddleware');
  * /api/users:
  *   get:
  *     summary: Get all users
- *     description: Retrieves a list of all users in the system.
+ *     description: Retrieves a list of all users in the system. Requires authentication.
  *     tags: [Users]
+ *     security:
+ *       - BearerAuth: []
  *     responses:
  *       200:
  *         description: List of users
@@ -103,10 +105,12 @@ const { protect } = require('../middleware/authmiddleware');
  *               type: array
  *               items:
  *                 $ref: '#/components/schemas/User'
+ *       401:
+ *         description: Unauthorized
  *       500:
  *         description: Server error
  */
-router.route('/').get(getUser);
+router.route('/').get(protect, getUser);
 
 /**
  * @swagger
@@ -121,6 +125,11 @@ router.route('/').get(getUser);
  *         multipart/form-data:
  *           schema:
  *             type: object
+ *             required:
+ *               - name
+ *               - email
+ *               - password
+ *               - country
  *             properties:
  *               name:
  *                 type: string
@@ -137,6 +146,7 @@ router.route('/').get(getUser);
  *               image:
  *                 type: string
  *                 format: binary
+ *                 description: Optional profile image
  *     responses:
  *       201:
  *         description: User registered successfully
@@ -171,6 +181,9 @@ router.route('/').post(upload.single('image'), registerUser);
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - userId
+ *               - verificationCode
  *             properties:
  *               userId:
  *                 type: string
@@ -211,6 +224,8 @@ router.post('/verify-email', verifyEmail);
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - email
  *             properties:
  *               email:
  *                 type: string
@@ -239,15 +254,22 @@ router.post('/reverify', resendVerificationCode);
  * @swagger
  * /api/users/create:
  *   post:
- *     summary: Create a new user
- *     description: Creates a new user with the specified role.
+ *     summary: Create a new user (admin)
+ *     description: Creates a new user with the specified role. Requires admin authentication.
  *     tags: [Users]
+ *     security:
+ *       - BearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - name
+ *               - email
+ *               - password
+ *               - role
  *             properties:
  *               name:
  *                 type: string
@@ -270,10 +292,12 @@ router.post('/reverify', resendVerificationCode);
  *               $ref: '#/components/schemas/User'
  *       400:
  *         description: Missing fields or user already exists
+ *       401:
+ *         description: Unauthorized
  *       500:
  *         description: Server error
  */
-router.route('/create').post(createUser);
+router.route('/create').post(protect, createUser);
 
 /**
  * @swagger
@@ -288,6 +312,9 @@ router.route('/create').post(createUser);
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - email
+ *               - password
  *             properties:
  *               email:
  *                 type: string
@@ -370,7 +397,7 @@ router.route('/creators').get(getCreators);
 
 /**
  * @swagger
- * /api/users/{id}:
+ * /api/users/{userId}:
  *   put:
  *     summary: Update user
  *     description: Updates user information such as name, email, or role.
@@ -379,14 +406,13 @@ router.route('/creators').get(getCreators);
  *       - BearerAuth: []
  *     parameters:
  *       - in: path
- *         name: id
+ *         name: userId
  *         required: true
  *         schema:
  *           type: string
  *         description: User ID
  *     requestBody:
- *       required: true
- *       content:
+ *       required  content:
  *         multipart/form-data:
  *           schema:
  *             type: object
@@ -423,11 +449,11 @@ router.route('/creators').get(getCreators);
  *       500:
  *         description: Server error
  */
-router.route('/:id').put(upload.single('image'), updateUser);
+router.route('/:userId').put(upload.single('image'), protect, updateUser);
 
 /**
  * @swagger
- * /api/users/{id}:
+ * /api/users/{userId}:
  *   delete:
  *     summary: Delete user
  *     description: Deletes a user and their associated profile image from Cloudinary.
@@ -436,7 +462,7 @@ router.route('/:id').put(upload.single('image'), updateUser);
  *       - BearerAuth: []
  *     parameters:
  *       - in: path
- *         name: id
+ *         name: userId
  *         required: true
  *         schema:
  *           type: string
@@ -459,11 +485,11 @@ router.route('/:id').put(upload.single('image'), updateUser);
  *       500:
  *         description: Server error
  */
-router.route('/:id').delete(deleteUser);
+router.route('/:userId').delete(protect, deleteUser);
 
 /**
  * @swagger
- * /api/users/profile-image/{id}:
+ * /api/users/profile-image/{userId}:
  *   put:
  *     summary: Update user profile image
  *     description: Updates the user's profile image by uploading a new image to Cloudinary.
@@ -472,7 +498,7 @@ router.route('/:id').delete(deleteUser);
  *       - BearerAuth: []
  *     parameters:
  *       - in: path
- *         name: id
+ *         name: userId
  *         required: true
  *         schema:
  *           type: string
@@ -483,10 +509,13 @@ router.route('/:id').delete(deleteUser);
  *         multipart/form-data:
  *           schema:
  *             type: object
+ *             required:
+ *               - image
  *             properties:
  *               image:
  *                 type: string
  *                 format: binary
+ *                 description: New profile image
  *     responses:
  *       200:
  *         description: Profile image updated successfully
@@ -503,12 +532,12 @@ router.route('/:id').delete(deleteUser);
  *       500:
  *         description: Server error
  */
-router.route('/profile-image/:id').put(protect, upload.single('image'), updateProfileImage);
+router.route('/profile-image/:userId').put(protect, upload.single('image'), updateProfileImage);
 
 /**
  * @swagger
- * /api/users/like/{id}:
- *   put:
+ * /api/users/like/{userId}:
+ *   post:
  *     summary: Like content
  *     description: Adds a content ID to the user's likes array and the user ID to the content's likes array.
  *     tags: [Users]
@@ -516,7 +545,7 @@ router.route('/profile-image/:id').put(protect, upload.single('image'), updatePr
  *       - BearerAuth: []
  *     parameters:
  *       - in: path
- *         name: id
+ *         name: userId
  *         required: true
  *         schema:
  *           type: string
@@ -527,6 +556,8 @@ router.route('/profile-image/:id').put(protect, upload.single('image'), updatePr
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - contentId
  *             properties:
  *               contentId:
  *                 type: string
@@ -542,14 +573,10 @@ router.route('/profile-image/:id').put(protect, upload.single('image'), updatePr
  *                 message:
  *                   type: string
  *                   example: Content liked successfully
- *                 userLikes:
- *                   type: array
- *                   items:
- *                     type: string
- *                 contentLikes:
- *                   type: array
- *                   items:
- *                     type: string
+ *                 user:
+ *                   $ref: '#/components/schemas/User'
+ *                 content:
+ *                   $ref: '#/components/schemas/Content'
  *       400:
  *         description: Content already liked
  *       401:
@@ -559,12 +586,12 @@ router.route('/profile-image/:id').put(protect, upload.single('image'), updatePr
  *       500:
  *         description: Server error
  */
-router.route('/like/:id').put(likeContent);
+router.route('/like/:userId').post(protect, likeContent);
 
 /**
  * @swagger
- * /api/users/unlike/{id}:
- *   put:
+ * /api/users/unlike/{userId}:
+ *   post:
  *     summary: Unlike content
  *     description: Removes a content ID from the user's likes array.
  *     tags: [Users]
@@ -572,7 +599,7 @@ router.route('/like/:id').put(likeContent);
  *       - BearerAuth: []
  *     parameters:
  *       - in: path
- *         name: id
+ *         name: userId
  *         required: true
  *         schema:
  *           type: string
@@ -583,6 +610,8 @@ router.route('/like/:id').put(likeContent);
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - contentId
  *             properties:
  *               contentId:
  *                 type: string
@@ -598,10 +627,8 @@ router.route('/like/:id').put(likeContent);
  *                 message:
  *                   type: string
  *                   example: Content unliked successfully
- *                 userLikes:
- *                   type: array
- *                   items:
- *                     type: string
+ *                 user:
+ *                   $ref: '#/components/schemas/User'
  *       401:
  *         description: Unauthorized
  *       404:
@@ -609,11 +636,11 @@ router.route('/like/:id').put(likeContent);
  *       500:
  *         description: Server error
  */
-router.route('/unlike/:id').put(unlikeContent);
+router.route('/unlike/:userId').post(protect, unlikeContent);
 
 /**
  * @swagger
- * /api/users/getlike/{id}:
+ * /api/users/likes/{userId}:
  *   get:
  *     summary: Get liked content
  *     description: Retrieves the list of content liked by the user.
@@ -622,7 +649,7 @@ router.route('/unlike/:id').put(unlikeContent);
  *       - BearerAuth: []
  *     parameters:
  *       - in: path
- *         name: id
+ *         name: userId
  *         required: true
  *         schema:
  *           type: string
@@ -646,12 +673,12 @@ router.route('/unlike/:id').put(unlikeContent);
  *       500:
  *         description: Server error
  */
-router.route('/getlike/:id').get(getLikedContents);
+router.route('/likes/:userId').get(protect, getLikedContents);
 
 /**
  * @swagger
- * /api/users/watchlist/{id}:
- *   put:
+ * /api/users/watchlist/{userId}:
+ *   post:
  *     summary: Add content to watchlist
  *     description: Adds a content ID to the user's watchlist.
  *     tags: [Users]
@@ -659,7 +686,7 @@ router.route('/getlike/:id').get(getLikedContents);
  *       - BearerAuth: []
  *     parameters:
  *       - in: path
- *         name: id
+ *         name: userId
  *         required: true
  *         schema:
  *           type: string
@@ -670,6 +697,8 @@ router.route('/getlike/:id').get(getLikedContents);
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - contentId
  *             properties:
  *               contentId:
  *                 type: string
@@ -685,10 +714,8 @@ router.route('/getlike/:id').get(getLikedContents);
  *                 message:
  *                   type: string
  *                   example: Content added to watchlist
- *                 watchlist:
- *                   type: array
- *                   items:
- *                     type: string
+ *                 user:
+ *                   $ref: '#/components/schemas/User'
  *       400:
  *         description: Content already in watchlist
  *       401:
@@ -698,11 +725,11 @@ router.route('/getlike/:id').get(getLikedContents);
  *       500:
  *         description: Server error
  */
-router.route('/watchlist/:id').put(addWatchlist);
+router.route('/watchlist/:userId').post(protect, addWatchlist);
 
 /**
  * @swagger
- * /api/users/watchlist/{id}:
+ * /api/users/watchlist/{userId}:
  *   get:
  *     summary: Get watchlist
  *     description: Retrieves the user's watchlist.
@@ -711,7 +738,7 @@ router.route('/watchlist/:id').put(addWatchlist);
  *       - BearerAuth: []
  *     parameters:
  *       - in: path
- *         name: id
+ *         name: userId
  *         required: true
  *         schema:
  *           type: string
@@ -724,7 +751,7 @@ router.route('/watchlist/:id').put(addWatchlist);
  *             schema:
  *               type: object
  *               properties:
- *                 watchList:
+ *                 watchlist:
  *                   type: array
  *                   items:
  *                     $ref: '#/components/schemas/Content'
@@ -735,12 +762,12 @@ router.route('/watchlist/:id').put(addWatchlist);
  *       500:
  *         description: Server error
  */
-router.route('/watchlist/:id').get(getWatchlist);
+router.route('/watchlist/:userId').get(protect, getWatchlist);
 
 /**
  * @swagger
- * /api/users/unwatch/{id}:
- *   put:
+ * /api/users/watchlist/{userId}/remove:
+ *   post:
  *     summary: Remove content from watchlist
  *     description: Removes a content ID from the user's watchlist.
  *     tags: [Users]
@@ -748,7 +775,7 @@ router.route('/watchlist/:id').get(getWatchlist);
  *       - BearerAuth: []
  *     parameters:
  *       - in: path
- *         name: id
+ *         name: userId
  *         required: true
  *         schema:
  *           type: string
@@ -759,6 +786,8 @@ router.route('/watchlist/:id').get(getWatchlist);
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - contentId
  *             properties:
  *               contentId:
  *                 type: string
@@ -770,14 +799,13 @@ router.route('/watchlist/:id').get(getWatchlist);
  *           application/json:
  *             schema:
  *               type: object
+ны
  *               properties:
  *                 message:
  *                   type: string
  *                   example: Content removed from watchlist
- *                 watchlist:
- *                   type: array
- *                   items:
- *                     type: string
+ *                 user:
+ *                   $ref: '#/components/schemas/User'
  *       401:
  *         description: Unauthorized
  *       404:
@@ -785,12 +813,12 @@ router.route('/watchlist/:id').get(getWatchlist);
  *       500:
  *         description: Server error
  */
-router.route('/unwatch/:id').put(removeWatchlist);
+router.route('/watchlist/:userId/remove').post(protect, removeWatchlist);
 
 /**
  * @swagger
- * /api/users/history/{id}:
- *   put:
+ * /api/users/history/{userId}:
+ *   post:
  *     summary: Save content to history
  *     description: Adds a content ID to the user's viewing history.
  *     tags: [Users]
@@ -798,7 +826,7 @@ router.route('/unwatch/:id').put(removeWatchlist);
  *       - BearerAuth: []
  *     parameters:
  *       - in: path
- *         name: id
+ *         name: userId
  *         required: true
  *         schema:
  *           type: string
@@ -809,10 +837,9 @@ router.route('/unwatch/:id').put(removeWatchlist);
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - contentId
  *             properties:
- *               userId:
- *                 type: string
- *                 example: 65a8025e3af4e7929b379e7b
  *               contentId:
  *                 type: string
  *                 example: 65a6fc7b72128447ad32024e
@@ -827,10 +854,8 @@ router.route('/unwatch/:id').put(removeWatchlist);
  *                 message:
  *                   type: string
  *                   example: Content added to history
- *                 history:
- *                   type: array
- *                   items:
- *                     type: string
+ *                 user:
+ *                   $ref: '#/components/schemas/User'
  *       401:
  *         description: Unauthorized
  *       404:
@@ -838,11 +863,11 @@ router.route('/unwatch/:id').put(removeWatchlist);
  *       500:
  *         description: Server error
  */
-router.route('/history/:id').put(saveContentToHistory);
+router.route('/history/:userId').post(protect, saveContentToHistory);
 
 /**
  * @swagger
- * /api/users/history/{id}:
+ * /api/users/history/{userId}:
  *   get:
  *     summary: Get user history
  *     description: Retrieves the user's content viewing history.
@@ -851,7 +876,7 @@ router.route('/history/:id').put(saveContentToHistory);
  *       - BearerAuth: []
  *     parameters:
  *       - in: path
- *         name: id
+ *         name: userId
  *         required: true
  *         schema:
  *           type: string
@@ -875,17 +900,24 @@ router.route('/history/:id').put(saveContentToHistory);
  *       500:
  *         description: Server error
  */
-router.route('/history/:id').get(getUserHistory);
+router.route('/history/:userId').get(protect, getUserHistory);
 
 /**
  * @swagger
- * /api/users/policy:
- *   post:
+ * /api/users/policy/{userId}:
+ *   patch:
  *     summary: Mark privacy policy as read
  *     description: Marks the privacy policy as read for the authenticated user.
  *     tags: [Users]
  *     security:
  *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User ID
  *     responses:
  *       200:
  *         description: Privacy policy marked as read
@@ -897,8 +929,8 @@ router.route('/history/:id').get(getUserHistory);
  *                 message:
  *                   type: string
  *                   example: Privacy policy marked as read
- *       400:
- *         description: User ID required
+ *                 user:
+ *                   $ref: '#/components/schemas/User'
  *       401:
  *         description: Unauthorized
  *       404:
@@ -906,47 +938,6 @@ router.route('/history/:id').get(getUserHistory);
  *       500:
  *         description: Server error
  */
-router.route('/policy').post(protect, markPrivacyPolicyAsRead);
+router.route('/policy/:userId').patch(protect, markPrivacyPolicyAsRead);
 
-/**
- * @swagger
- * /api/users/test-upload:
- *   post:
- *     summary: Test file upload
- *     description: Endpoint for testing file uploads (up to 2 files).
- *     tags: [Users]
- *     requestBody:
- *       required: true
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *             properties:
- *               files:
- *                 type: array
- *                 items:
- *                   type: string
- *                   format: binary
- *     responses:
- *       200:
- *         description: Files received successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: Received files!
- *       400:
- *         description: No files uploaded
- *       500:
- *         description: Server error
- */
-router.route('/test-upload').post(upload.array('files', 2), (req, res) => {
-  console.log(req.files);
-  res.status(200).send('Received files!');
-});
-
-module.exports = router; 
-
+module.exports = router;

@@ -11,13 +11,13 @@ const swaggerDefinition = {
   },
   servers: [
     {
+      url: 'http://localhost:5000',
+      description: 'Development server',
+    },
+    {
       url: 'https://playmoodserver-stg-0fb54b955e6b.herokuapp.com',
       description: 'Live server',
     },
-    {
-      url: 'http://localhost:5000',
-      description: 'Development server',
-    }
   ],
   components: {
     securitySchemes: {
@@ -28,27 +28,40 @@ const swaggerDefinition = {
       },
     },
   },
-  // Add basePath to ensure all routes are properly prefixed
-  basePath: '/api',
-  // Add tags for better organization
   tags: [
     {
       name: 'Users',
-      description: 'Endpoints for user management'
+      description: 'Endpoints for user management',
     },
     {
       name: 'Content',
-      description: 'Endpoints for content management'
+      description: 'Endpoints for content management',
     },
     {
       name: 'Authentication',
-      description: 'Endpoints for user authentication'
-    }
-  ]
+      description: 'Endpoints for user authentication',
+    },
+    {
+      name: 'Channels',
+      description: 'Endpoints for channel management',
+    },
+    {
+      name: 'Subscriptions',
+      description: 'Endpoints for subscription management',
+    },
+    {
+      name: 'Community',
+      description: 'Endpoints for community posts',
+    },
+    {
+      name: 'Role Changes',
+      description: 'Endpoints for user role changes',
+    },
+  ],
 };
 
-// Use absolute path for reliability across environments
-const routesPath = path.join(__dirname, 'routes', '*.js');
+// Use absolute path for route files, matching the capitalized 'Routes' directory
+const routesPath = path.join(__dirname, 'Routes', '*.js');
 console.log('Swagger routes path:', routesPath);
 
 // Get all route files with absolute paths
@@ -56,46 +69,52 @@ const routeFiles = glob.sync(routesPath, { absolute: true });
 
 // Fallback to explicit file list if glob doesn't work
 const apiFiles = routeFiles.length > 0 ? routeFiles : [
-  path.join(__dirname, 'routes', 'userRoute.js'),
-  path.join(__dirname, 'routes', 'contentRoute.js'),
-  path.join(__dirname, 'routes', 'roleChangeRoute.js'),
-  path.join(__dirname, 'routes', 'subscribeRoute.js'),
-  path.join(__dirname, 'routes', 'channelRoute.js'),
-  path.join(__dirname, 'routes', 'communityPostRoute.js')
-];
+  path.join(__dirname, 'Routes', 'userRoute.js'),
+  path.join(__dirname, 'Routes', 'contentRoute.js'),
+  path.join(__dirname, 'Routes', 'roleChangeRoute.js'),
+  path.join(__dirname, 'Routes', 'subscribeRoute.js'),
+  path.join(__dirname, 'Routes', 'channelRoute.js'),
+  path.join(__dirname, 'Routes', 'communityPostRoute.js'),
+].filter((file) => {
+  const exists = require('fs').existsSync(file);
+  if (!exists) console.warn(`Warning: Route file not found: ${file}`);
+  return exists;
+});
+
+if (!apiFiles.length) {
+  console.error('Error: No valid route files found for Swagger documentation!');
+  console.error('Check the Routes directory and ensure route files exist.');
+}
 
 console.log('Swagger will scan these files:', apiFiles);
 
 const options = {
   swaggerDefinition,
   apis: apiFiles,
-  // Enable better parsing of JSDoc comments
-  explorer: true,
-  swaggerOptions: {
-    validatorUrl: null, // Disable validator if not needed
-    docExpansion: 'list', // Control how operations are shown
-    defaultModelsExpandDepth: -1 // Hide schemas by default
-  }
 };
 
-// Generate the Swagger specification
-const swaggerSpec = swaggerJSDoc(options);
+// Generate the Swagger specification with error handling
+let swaggerSpec;
+try {
+  swaggerSpec = swaggerJSDoc(options);
 
-// Validate that paths were found
-if (!swaggerSpec.paths || Object.keys(swaggerSpec.paths).length === 0) {
-  console.error('Warning: No API paths found in the generated Swagger spec!');
-  console.error('Possible causes:');
-  console.error('- Route files not found in', routesPath);
-  console.error('- Incorrect JSDoc comments in route files');
-  console.error('- Path prefix mismatch between routes and Swagger docs');
-} else {
-  console.log('Swagger spec generated successfully with paths:');
-  console.log(Object.keys(swaggerSpec.paths));
+  // Validate that paths were found
+  if (!swaggerSpec.paths || Object.keys(swaggerSpec.paths).length === 0) {
+    console.error('Warning: No API paths found in the generated Swagger spec!');
+    console.error('Possible causes:');
+    console.error('- Route files not found in', routesPath);
+    console.error('- Missing or incorrect JSDoc comments in route files');
+    console.error('- Path prefix mismatch (e.g., /api prefix) in route definitions');
+  } else if (process.env.NODE_ENV !== 'production') {
+    console.log('Swagger spec generated successfully with paths:');
+    console.log(Object.keys(swaggerSpec.paths));
+  }
+} catch (error) {
+  console.error('Error generating Swagger spec:', error.message);
+  swaggerSpec = { openapi: '3.0.0', info: { title: 'Error', version: '1.0.0' }, paths: {} };
 }
 
 module.exports = swaggerSpec;
-
-
 
 
 
