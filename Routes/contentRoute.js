@@ -121,7 +121,7 @@ const { protect } = require('../middleware/authmiddleware');
  *       500:
  *         description: Server error
  */
-router.route('/').get(protect, getContent);
+router.route('/').get(getContent);
 
 /**
  * @swagger
