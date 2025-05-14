@@ -7,16 +7,76 @@ const { protect } = require('../middleware/authmiddleware');
 /**
  * @swagger
  * tags:
- *   - name: Channels
- *     description: Endpoints for channel management
+ *   name: Channels
+ *   description: Endpoints for channel management
  */
 
 /**
  * @swagger
- * /api/channel/{userId}:
+ * components:
+ *   schemas:
+ *     Content:
+ *       type: object
+ *       properties:
+ *         _id:
+ *           type: string
+ *           example: 65a8025e3af4e7929b379e7b
+ *         user:
+ *           type: string
+ *           example: 65a8025e3af4e7929b379e7a
+ *         title:
+ *           type: string
+ *           example: My Awesome Video
+ *         category:
+ *           type: string
+ *           example: Entertainment
+ *         description:
+ *           type: string
+ *           example: A fun video about...
+ *         thumbnail:
+ *           type: string
+ *           example: https://res.cloudinary.com/.../thumbnail.jpg
+ *         video:
+ *           type: string
+ *           example: https://res.cloudinary.com/.../video.mp4
+ *         views:
+ *           type: number
+ *           example: 100
+ *         likes:
+ *           type: array
+ *           items:
+ *             type: string
+ *             example: 65a8025e3af4e7929b379e7c
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *           example: 2025-05-14T22:52:00.000Z
+ *       required:
+ *         - user
+ *         - title
+ *         - category
+ *         - description
+ *         - video
+ *     CommunityPost:
+ *       type: object
+ *       properties:
+ *         _id:
+ *           type: string
+ *           example: 65a8025e3af4e7929b379e7d
+ *         title:
+ *           type: string
+ *           example: Community Post Title
+ *         content:
+ *           type: string
+ *           example: This is a community post.
+ */
+
+/**
+ * @swagger
+ * /{userId}:
  *   get:
  *     summary: Get a creator's channel details
- *     description: Retrieves details of a creator's channel, including name, profile image, about section, banner image, subscriber count, content, and community posts. Requires authentication.
+ *     description: Retrieves details of a creator's channel, including name, profile image, about section, banner image, subscriber count, and all content created by the creator. Requires authentication.
  *     tags: [Channels]
  *     security:
  *       - BearerAuth: []
@@ -26,7 +86,7 @@ const { protect } = require('../middleware/authmiddleware');
  *         required: true
  *         schema:
  *           type: string
- *         description: ID of the creator (user with role 'creator')
+ *         description: MongoDB ObjectId of the creator
  *     responses:
  *       200:
  *         description: Creator channel details retrieved successfully
@@ -57,14 +117,9 @@ const { protect } = require('../middleware/authmiddleware');
  *                 communityPosts:
  *                   type: array
  *                   items:
- *                     type: object
- *                     properties:
- *                       title:
- *                         type: string
- *                         example: Community Post Title
- *                       content:
- *                         type: string
- *                         example: This is a community post.
+ *                     $ref: '#/components/schemas/CommunityPost'
+ *       400:
+ *         description: Invalid or missing user ID
  *       401:
  *         description: Unauthorized - Missing or invalid JWT token
  *       404:
@@ -76,10 +131,10 @@ router.route('/:userId').get(protect, getChannelDetails);
 
 /**
  * @swagger
- * /api/channel/{userId}:
+ * /{userId}:
  *   put:
  *     summary: Update creator channel information
- *     description: Updates the creator's channel information (e.g., about section). Only the authenticated creator can update their own channel.
+ *     description: Updates the creator's channel information (e.g., about, name, profile image). Only the authenticated creator can update their own channel.
  *     tags: [Channels]
  *     security:
  *       - BearerAuth: []
@@ -89,7 +144,7 @@ router.route('/:userId').get(protect, getChannelDetails);
  *         required: true
  *         schema:
  *           type: string
- *         description: ID of the creator
+ *         description: MongoDB ObjectId of the creator
  *     requestBody:
  *       required: true
  *       content:
@@ -100,7 +155,13 @@ router.route('/:userId').get(protect, getChannelDetails);
  *               about:
  *                 type: string
  *                 example: Updated channel description
- *             additionalProperties: true
+ *               name:
+ *                 type: string
+ *                 example: Jane Doe
+ *               profileImage:
+ *                 type: string
+ *                 example: https://res.cloudinary.com/.../new-image.jpg
+ *             additionalProperties: false
  *     responses:
  *       200:
  *         description: Channel information updated successfully
@@ -115,6 +176,8 @@ router.route('/:userId').get(protect, getChannelDetails);
  *                 about:
  *                   type: string
  *                   example: Updated channel description
+ *       400:
+ *         description: Invalid or missing user ID
  *       401:
  *         description: Unauthorized - Missing or invalid JWT token
  *       403:
@@ -128,7 +191,7 @@ router.route('/:userId').put(protect, updateChannelInfo);
 
 /**
  * @swagger
- * /api/channel/{userId}/banner:
+ * /{userId}/banner:
  *   put:
  *     summary: Update creator channel banner image
  *     description: Updates the creator's channel banner image by uploading a new image to Cloudinary. Only the authenticated creator can update their own channel.
@@ -141,7 +204,7 @@ router.route('/:userId').put(protect, updateChannelInfo);
  *         required: true
  *         schema:
  *           type: string
- *         description: ID of the creator
+ *         description: MongoDB ObjectId of the creator
  *     requestBody:
  *       required: true
  *       content:
@@ -170,7 +233,7 @@ router.route('/:userId').put(protect, updateChannelInfo);
  *                   type: string
  *                   example: https://res.cloudinary.com/.../banner.jpg
  *       400:
- *         description: No file uploaded
+ *         description: No file uploaded or invalid user ID
  *       401:
  *         description: Unauthorized - Missing or invalid JWT token
  *       403:
@@ -182,7 +245,4 @@ router.route('/:userId').put(protect, updateChannelInfo);
  */
 router.route('/:userId/banner').put(protect, upload.single('image'), updateChannelBannerImage);
 
-module.exports = router; 
-
-
-
+module.exports = router;

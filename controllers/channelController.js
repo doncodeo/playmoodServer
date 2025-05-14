@@ -5,27 +5,34 @@ const cloudinary = require('../config/cloudinary');
 const fs = require('fs').promises;
 
 // @desc Get a creator's channel details
-// @route GET /api/channel/:id
+// @route GET /api/channel/:userId
 // @access Private (authenticated)
 const getChannelDetails = asyncHandler(async (req, res) => {
-  const { id } = req.params; // Use id to match route parameter
+  const { userId } = req.params; // Use userId to match route parameter
 
-  // Validate userId format (assuming MongoDB ObjectId)
-  if (!id.match(/^[0-9a-fA-F]{24}$/)) {
+  // Check if userId is provided
+  if (!userId) {
+    return res.status(400).json({ error: 'User ID is required' });
+  }
+
+  // Validate userId format (MongoDB ObjectId)
+  if (!userId.match(/^[0-9a-fA-F]{24}$/)) {
     return res.status(400).json({ error: 'Invalid user ID' });
   }
 
   // Fetch the user and ensure they are a creator
-  const creator = await User.findOne({ _id: id, role: 'creator' })
+  const creator = await User.findOne({ _id: userId, role: 'creator' })
     .populate('subscriptions', 'name profileImage')
-    // .populate('communityPosts', 'title content'); // Uncomment when communityPosts is implemented
+    // .populate('communityPosts', 'title content'); // Uncomment when CommunityPost model is implemented
 
   if (!creator) {
     return res.status(404).json({ error: 'Creator not found' });
   }
 
-  // Fetch content posted by the creator
-  const content = await Content.find({ user: creator._id });
+  // Fetch all content posted by the creator
+  const content = await Content.find({ user: creator._id }).select(
+    'title category description thumbnail video views likes createdAt'
+  );
 
   // Respond with the channel details
   res.status(200).json({
@@ -35,16 +42,21 @@ const getChannelDetails = asyncHandler(async (req, res) => {
     bannerImage: creator.bannerImage,
     subscribers: creator.subscriptions.length,
     content, // All content uploaded by the creator
-    communityPosts: creator.communityPosts || [], // Fallback to empty array if not implemented
+    communityPosts: creator.communityPosts || [], // Fallback to empty array
   });
 });
 
 // @desc Update creator channel information
-// @route PUT /api/channel/:id
+// @route PUT /api/channel/:userId
 // @access Private (authenticated, creator only)
 const updateChannelInfo = asyncHandler(async (req, res) => {
-  const userId = req.params.id;
+  const { userId } = req.params;
   const updates = req.body;
+
+  // Check if userId is provided
+  if (!userId) {
+    return res.status(400).json({ error: 'User ID is required' });
+  }
 
   // Validate userId format
   if (!userId.match(/^[0-9a-fA-F]{24}$/)) {
@@ -64,7 +76,7 @@ const updateChannelInfo = asyncHandler(async (req, res) => {
   }
 
   // Update only allowed fields
-  const allowedFields = ['about']; // Add other fields as needed
+  const allowedFields = ['about', 'name', 'profileImage']; // Added name, profileImage
   Object.keys(updates).forEach((key) => {
     if (allowedFields.includes(key)) {
       user[key] = updates[key];
@@ -78,13 +90,10 @@ const updateChannelInfo = asyncHandler(async (req, res) => {
 });
 
 // @desc Update creator channel banner image
-// @route PUT /api/channel/:id/banner
-// @access Private (authenticated, creator only)
-// @desc Update creator channel banner image
 // @route PUT /api/channel/:userId/banner
 // @access Private (authenticated, creator only)
 const updateChannelBannerImage = asyncHandler(async (req, res) => {
-  const userId = req.params.userId; // Use userId to match route parameter
+  const { userId } = req.params; // Use userId to match route parameter
 
   // Check if userId is provided
   if (!userId) {
@@ -95,7 +104,7 @@ const updateChannelBannerImage = asyncHandler(async (req, res) => {
   if (!userId.match(/^[0-9a-fA-F]{24}$/)) {
     return res.status(400).json({ error: 'Invalid user ID' });
   }
- 
+
   // Find the user by ID and ensure they are a creator
   const user = await User.findById(userId);
 
@@ -146,5 +155,5 @@ const updateChannelBannerImage = asyncHandler(async (req, res) => {
 module.exports = {
   getChannelDetails,
   updateChannelInfo,
-  updateChannelBannerImage,    
+  updateChannelBannerImage,
 };
