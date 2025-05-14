@@ -13,7 +13,7 @@ const { protect } = require('../middleware/authmiddleware');
 
 /**
  * @swagger
- * /channel/{userId}:
+ * /api/channel/{userId}:
  *   get:
  *     summary: Get a creator's channel details
  *     description: Retrieves details of a creator's channel, including name, profile image, about section, banner image, subscriber count, content, and community posts. Requires authentication.
@@ -76,7 +76,7 @@ router.route('/:userId').get(protect, getChannelDetails);
 
 /**
  * @swagger
- * /channel/{userId}:
+ * /api/channel/{userId}:
  *   put:
  *     summary: Update creator channel information
  *     description: Updates the creator's channel information (e.g., about section). Only the authenticated creator can update their own channel.
@@ -128,7 +128,7 @@ router.route('/:userId').put(protect, updateChannelInfo);
 
 /**
  * @swagger
- * /channel/{userId}/banner:
+ * /api/channel/{userId}/banner:
  *   put:
  *     summary: Update creator channel banner image
  *     description: Updates the creator's channel banner image by uploading a new image to Cloudinary. Only the authenticated creator can update their own channel.
