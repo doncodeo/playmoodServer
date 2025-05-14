@@ -11,6 +11,8 @@ const {
     getUnapprovedContent,
     saveVideoProgress,
     getVideoProgress,
+    getWatchlist,
+    addToWatchlist
 } = require('../controllers/contentController');
 const upload = require('../middleware/multer');
 const { protect } = require('../middleware/authmiddleware');
@@ -91,7 +93,7 @@ const { protect } = require('../middleware/authmiddleware');
 
 /**
  * @swagger
- * /api/content:
+ * /:
  *   get:
  *     summary: Get all approved content
  *     description: Retrieves a list of all approved content, populated with the creator's name. Includes caching with ETag.
@@ -118,14 +120,16 @@ const { protect } = require('../middleware/authmiddleware');
  *                 $ref: '#/components/schemas/Content'
  *       304:
  *         description: Not Modified (ETag match)
+ *       401:
+ *         description: Unauthorized - Missing or invalid JWT token
  *       500:
  *         description: Server error
  */
-router.route('/').get(getContent);     
+router.route('/').get(protect, getContent);     
 
 /**
  * @swagger
- * /api/content:
+ * /:
  *   post:
  *     summary: Create new content
  *     description: Creates a new content item with video and thumbnail uploads. Sends approval email to admins if created by a non-admin.
@@ -169,6 +173,8 @@ router.route('/').get(getContent);
  *               $ref: '#/components/schemas/Content'
  *       400:
  *         description: Missing fields or incorrect number of files
+ *       401:
+ *         description: Unauthorized - Missing or invalid JWT token
  *       403:
  *         description: Unauthorized to create content
  *       500:
@@ -178,7 +184,7 @@ router.route('/').post(protect, upload.array('files', 2), createContent);
 
 /**
  * @swagger
- * /api/content/new:
+ * /new:
  *   get:
  *     summary: Get recent content
  *     description: Retrieves the 10 most recently created approved content items, sorted by creation date. Includes caching with ETag.
@@ -205,6 +211,8 @@ router.route('/').post(protect, upload.array('files', 2), createContent);
  *                 $ref: '#/components/schemas/Content'
  *       304:
  *         description: Not Modified (ETag match)
+ *       401:
+ *         description: Unauthorized - Missing or invalid JWT token
  *       500:
  *         description: Server error
  */
@@ -212,7 +220,7 @@ router.route('/new').get(protect, getRecentContent);
 
 /**
  * @swagger
- * /api/content/unapproved:
+ * /unapproved:
  *   get:
  *     summary: Get unapproved content
  *     description: Retrieves a list of unapproved content items (admin only). Includes caching with ETag.
@@ -239,6 +247,10 @@ router.route('/new').get(protect, getRecentContent);
  *                 $ref: '#/components/schemas/Content'
  *       304:
  *         description: Not Modified (ETag match)
+ *       401:
+ *         description: Unauthorized - Missing or invalid JWT token
+ *       403:
+ *         description: Forbidden - Admin access required
  *       500:
  *         description: Server error
  */
@@ -246,7 +258,7 @@ router.route('/unapproved').get(protect, getUnapprovedContent);
 
 /**
  * @swagger
- * /api/content/{id}:
+ * /{id}:
  *   get:
  *     summary: Get content by ID
  *     description: Retrieves a specific content item by ID, increments view count if not previously viewed by the user or IP. Includes caching with ETag.
@@ -259,7 +271,7 @@ router.route('/unapproved').get(protect, getUnapprovedContent);
  *         required: true
  *         schema:
  *           type: string
- *         description: Content ID
+ *         description: MongoDB ObjectId of the content
  *     responses:
  *       200:
  *         description: Content retrieved successfully
@@ -278,6 +290,8 @@ router.route('/unapproved').get(protect, getUnapprovedContent);
  *               $ref: '#/components/schemas/Content'
  *       304:
  *         description: Not Modified (ETag match)
+ *       401:
+ *         description: Unauthorized - Missing or invalid JWT token
  *       404:
  *         description: Content not found
  *       500:
@@ -287,7 +301,7 @@ router.route('/:id').get(protect, getContentById);
 
 /**
  * @swagger
- * /api/content/{id}:
+ * /{id}:
  *   put:
  *     summary: Update content
  *     description: Updates a specific content item by ID, optionally replacing the thumbnail. Only the thumbnail can be updated as a file; other fields are updated via JSON.
@@ -300,7 +314,7 @@ router.route('/:id').get(protect, getContentById);
  *         required: true
  *         schema:
  *           type: string
- *         description: Content ID
+ *         description: MongoDB ObjectId of the content
  *     requestBody:
  *       required: false
  *       content:
@@ -340,6 +354,8 @@ router.route('/:id').get(protect, getContentById);
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/Content'
+ *       401:
+ *         description: Unauthorized - Missing or invalid JWT token
  *       404:
  *         description: Content not found
  *       500:
@@ -349,7 +365,7 @@ router.route('/:id').put(protect, upload.single('thumbnail'), updateContent);
 
 /**
  * @swagger
- * /api/content/{id}:
+ * /{id}:
  *   delete:
  *     summary: Delete content
  *     description: Deletes a specific content item by ID, including its video and thumbnail from Cloudinary.
@@ -362,7 +378,7 @@ router.route('/:id').put(protect, upload.single('thumbnail'), updateContent);
  *         required: true
  *         schema:
  *           type: string
- *         description: Content ID
+ *         description: MongoDB ObjectId of the content
  *     responses:
  *       200:
  *         description: Content deleted successfully
@@ -374,6 +390,8 @@ router.route('/:id').put(protect, upload.single('thumbnail'), updateContent);
  *                 message:
  *                   type: string
  *                   example: Content deleted successfully
+ *       401:
+ *         description: Unauthorized - Missing or invalid JWT token
  *       404:
  *         description: Content not found
  *       500:
@@ -383,7 +401,7 @@ router.route('/:id').delete(protect, deleteContent);
 
 /**
  * @swagger
- * /api/content/approve/{id}:
+ * /approve/{id}:
  *   put:
  *     summary: Approve content
  *     description: Approves a specific content item by ID (admin only).
@@ -396,7 +414,7 @@ router.route('/:id').delete(protect, deleteContent);
  *         required: true
  *         schema:
  *           type: string
- *         description: Content ID
+ *         description: MongoDB ObjectId of the content
  *     responses:
  *       200:
  *         description: Content approved successfully
@@ -410,6 +428,10 @@ router.route('/:id').delete(protect, deleteContent);
  *                   example: Content approved successfully
  *                 content:
  *                   $ref: '#/components/schemas/Content'
+ *       401:
+ *         description: Unauthorized - Missing or invalid JWT token
+ *       403:
+ *         description: Forbidden - Admin access required
  *       404:
  *         description: Content not found
  *       500:
@@ -419,7 +441,7 @@ router.route('/approve/:id').put(protect, approveContent);
 
 /**
  * @swagger
- * /api/content/progress:
+ * /progress:
  *   post:
  *     summary: Save video progress
  *     description: Saves the playback progress for a specific content item for the authenticated user.
@@ -457,16 +479,18 @@ router.route('/approve/:id').put(protect, approveContent);
  *                   type: number
  *       400:
  *         description: Missing or invalid fields
+ *       401:
+ *         description: Unauthorized - Missing or invalid JWT token
  *       404:
  *         description: Content or user not found
  *       500:
  *         description: Server error
  */
-router.route('/progress/').post(protect, saveVideoProgress);
+router.route('/progress').post(protect, saveVideoProgress);
 
 /**
  * @swagger
- * /api/content/progress/{contentId}:
+ * /progress/{contentId}:
  *   get:
  *     summary: Get video progress
  *     description: Retrieves the playback progress for a specific content item for the authenticated user. Includes caching with ETag.
@@ -479,7 +503,7 @@ router.route('/progress/').post(protect, saveVideoProgress);
  *         required: true
  *         schema:
  *           type: string
- *         description: Content ID
+ *         description: MongoDB ObjectId of the content
  *     responses:
  *       200:
  *         description: Video progress retrieved successfully
@@ -504,6 +528,8 @@ router.route('/progress/').post(protect, saveVideoProgress);
  *         description: Not Modified (ETag match)
  *       400:
  *         description: Content ID required
+ *       401:
+ *         description: Unauthorized - Missing or invalid JWT token
  *       404:
  *         description: User not found
  *       500:
@@ -511,57 +537,93 @@ router.route('/progress/').post(protect, saveVideoProgress);
  */
 router.route('/progress/:contentId').get(protect, getVideoProgress);
 
+/**
+ * @swagger
+ * /watchlist:
+ *   get:
+ *     summary: Get all saved videos in user's watchlist
+ *     description: Retrieves all approved content items in the authenticated user's watchlist, including full content details and playback progress. Includes caching with ETag.
+ *     tags: [Content]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of saved videos with progress
+ *         headers:
+ *           Cache-Control:
+ *             schema:
+ *               type: string
+ *               example: private, max-age=300
+ *           ETag:
+ *             schema:
+ *               type: string
+ *               example: "watchlist-65a8025e3af4e7929b379e7b-5-1697059200000-120.5"
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 allOf:
+ *                   - $ref: '#/components/schemas/Content'
+ *                   - type: object
+ *                     properties:
+ *                       progress:
+ *                         type: number
+ *                         example: 120.5
+ *                         description: Playback progress in seconds
+ *       304:
+ *         description: Not Modified (ETag match)
+ *       401:
+ *         description: Unauthorized - Missing or invalid JWT token
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: Server error
+ */
+router.route('/watchlist').get(protect, getWatchlist);
+
+/**
+ * @swagger
+ * /watchlist:
+ *   post:
+ *     summary: Add video to user's watchlist
+ *     description: Adds a specific approved content item to the authenticated user's watchlist.
+ *     tags: [Content]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               contentId:
+ *                 type: string
+ *                 example: 65a6fc7b72128447ad32024e
+ *                 description: MongoDB ObjectId of the content
+ *     responses:
+ *       200:
+ *         description: Video added to watchlist
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Video added to watchlist
+ *                 contentId:
+ *                   type: string
+ *       400:
+ *         description: Missing content ID or content already in watchlist
+ *       401:
+ *         description: Unauthorized - Missing or invalid JWT token
+ *       404:
+ *         description: Content or user not found
+ *       500:
+ *         description: Server error
+ */
+router.route('/watchlist').post(protect, addToWatchlist);
+
 module.exports = router;
-
-
-
-
-
-
-
-
-// const express = require('express');
-// const router = express.Router();
-// const { 
-//     getContent, 
-//     getRecentContent,
-//     createContent, 
-//     updateContent, 
-//     deleteContent, 
-//     getContentById, 
-//     approveContent,
-//     getUnapprovedContent,
-//     saveVideoProgress,
-//     getVideoProgress,
-// } = require('../controllers/contentController');
-// const upload = require('../middleware/multer');
-// const { protect } = require('../middleware/authmiddleware');
-
-// router.route('/')
-//     .get(getContent)
-//     .post(upload.array('files', 2), createContent);
-
-//     router.route('/new')
-//     .get(getRecentContent)
-
-// router. route('/unapproved') 
-//     .get(getUnapprovedContent);
-
-// router.route('/:id')
-//     .get(getContentById)  // New route to get content by ID
-//     .put(upload.single('video'), updateContent)
-//     .delete(deleteContent);
-
-// router.route('/approve/:id') 
-//     .put(approveContent)  // New route to get content by ID
-
-// router.route('/progress/:id')
-//     .get(protect, getVideoProgress)
-
-// router.route('/progress/')
-//     .post(protect, saveVideoProgress);
-
-
-// module.exports = router;
-
-

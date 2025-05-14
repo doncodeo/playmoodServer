@@ -404,6 +404,89 @@ const getVideoProgress = asyncHandler(async (req, res) => {
     res.status(200).json({ progress });
 });
 
+// @desc Get all saved videos in user's watchlist with progress
+// @route GET /api/content/watchlist
+// @access Private
+const getWatchlist = asyncHandler(async (req, res) => {
+    const userId = req.user._id;
+
+    // Fetch the user and populate watchlist
+    const user = await userSchema.findById(userId)
+        .populate({
+            path: 'watchlist',
+            match: { isApproved: true },
+            select: 'title category description thumbnail video views likes createdAt',
+        })
+        .select('watchlist videoProgress');
+
+    if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+    }
+
+    const watchlist = user.watchlist || [];
+
+    // Map watchlist to include progress
+    const watchlistWithProgress = watchlist.map(content => {
+        const progressRecord = user.videoProgress.find(
+            record => record.contentId.toString() === content._id.toString()
+        );
+        return {
+            ...content.toObject(),
+            progress: progressRecord ? progressRecord.progress : 0
+        };
+    });
+
+    // Generate an ETag
+    const lastUpdated = watchlist.length > 0 ? Math.max(...watchlist.map(c => c.updatedAt.getTime())) : 0;
+    const progressUpdated = user.videoProgress.length > 0 
+        ? Math.max(...user.videoProgress.map(p => p.progress))
+        : 0;
+    const etag = `"watchlist-${userId}-${watchlist.length}-${lastUpdated}-${progressUpdated}"`;
+
+    if (req.get('If-None-Match') === etag) {
+        return res.status(304).end();
+    }
+
+    res.set({
+        'Cache-Control': 'private, max-age=300',
+        'ETag': etag,
+    });
+
+    res.status(200).json(watchlistWithProgress);
+});
+
+// @desc Add video to user's watchlist
+// @route POST /api/content/watchlist
+// @access Private
+const addToWatchlist = asyncHandler(async (req, res) => {
+    const userId = req.user._id;
+    const { contentId } = req.body;
+
+    if (!contentId) {
+        return res.status(400).json({ error: 'Content ID is required' });
+    }
+
+    const content = await contentSchema.findById(contentId);
+    if (!content || !content.isApproved) {
+        return res.status(404).json({ error: 'Approved content not found' });
+    }
+
+    const user = await userSchema.findById(userId);
+    if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (user.watchlist.includes(contentId)) {
+        return res.status(400).json({ error: 'Content already in watchlist' });
+    }
+
+    user.watchlist.push(contentId);
+    await user.save();
+
+    res.status(200).json({ message: 'Video added to watchlist', contentId });
+});
+
+
 module.exports = {
     getContent,
     getRecentContent,
@@ -414,6 +497,8 @@ module.exports = {
     approveContent,
     getUnapprovedContent,
     saveVideoProgress,
-    getVideoProgress
+    getVideoProgress,
+    getWatchlist,
+    addToWatchlist
 };
 
