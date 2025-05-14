@@ -29,7 +29,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Serve Swagger UI at /api-docs
 // Serve Swagger UI at /api-docs with custom options
-app.use(
+app.use( 
   '/api-docs',
   swaggerUi.serve,
   swaggerUi.setup(swaggerSpec, {

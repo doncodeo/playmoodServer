@@ -80,7 +80,7 @@ const { protect, admin } = require('../middleware/authmiddleware');
  *       500:
  *         description: Server error
  */
-router.route('/').post(protect, requestRoleChange);
+router.route('/').post(protect, requestRoleChange); 
 
 /**
  * @swagger
