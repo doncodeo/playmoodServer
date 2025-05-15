@@ -324,46 +324,147 @@ const updateProfileImage = asyncHandler(async (req, res) => {
     }
 });
 
+
+// @desc Update user profile
+// @route PUT /api/users/:id
+// @access Private (authenticated, user or admin)
 const updateUser = asyncHandler(async (req, res) => {
-    try {
-        const userId = req.params.id; // Assuming the user ID is passed as a parameter
+    const userId = req.params.id;
 
-        // Fetch the user from MongoDB
-        const user = await userData.findById(userId);
-
-        if (!user) {
-            return res.status(404).json({ error: 'User not found' });
-        }
-
-        // Update other user data in MongoDB using mapping method
-        const allowedFields = ['name', 'email', 'role', 'verified', 'hasReadPrivacyPolicy'];
-        allowedFields.forEach(field => {
-            if (req.body[field] !== undefined) {
-                user[field] = req.body[field];
-            }
-        });
-
-        // Save the updated user in MongoDB
-        const updatedUser = await user.save();
-
-        res.status(200).json({
-            message: 'User updated successfully',
-            user: {
-                _id: updatedUser._id,
-                name: updatedUser.name,
-                email: updatedUser.email,
-                role: updatedUser.role,
-                profileImage: updatedUser.profileImage, // Retain current profile image
-                cloudinary_id: updatedUser.cloudinary_id, // Retain current cloudinary ID
-                verified: updatedUser.verified,
-                hasReadPrivacyPolicy: updatedUser.hasReadPrivacyPolicy
-            },
-        });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Server error' });
+    // Validate userId format (MongoDB ObjectId)
+    if (!userId.match(/^[0-9a-fA-F]{24}$/)) {
+        return res.status(400).json({ error: 'Invalid user ID' });
     }
+
+    // Fetch the user
+    const user = await userData.findById(userId);
+    if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Check authorization: User can update their own profile, admin can update any
+    if (user._id.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'Not authorized to update this user' });
+    }
+
+    // Define allowed fields for update (exclude sensitive fields)
+    const allowedFields = [
+        'name',
+        'email',
+        'country',
+        'about',
+        'hasReadPrivacyPolicy',
+        'instagram',
+        'tiktok',
+        'linkedin',
+        'twitter'
+    ];
+
+    // Admin-only fields
+    if (req.user.role === 'admin') {
+        allowedFields.push('role', 'isEmailVerified');
+    }
+
+    // Update fields from req.body
+    allowedFields.forEach(field => {
+        if (req.body[field] !== undefined) {
+            user[field] = req.body[field];
+        }
+    });
+
+    // Handle profile image upload
+    if (req.file) {
+        try {
+            // Upload new image to Cloudinary
+            const result = await cloudinary.uploader.upload(req.file.path, {
+                folder: 'profile-images',
+                public_id: `${userId}-${Date.now()}`,
+            });
+
+            // Delete old image from Cloudinary if it exists
+            if (user.cloudinary_id) {
+                await cloudinary.uploader.destroy(user.cloudinary_id);
+            }
+
+            // Update profile image and Cloudinary ID
+            user.profileImage = result.secure_url;
+            user.cloudinary_id = result.public_id;
+
+            // Delete local file
+            await fs.unlink(req.file.path);
+        } catch (error) {
+            console.warn(`Failed to process profile image: ${error.message}`);
+            return res.status(500).json({ error: 'Failed to upload profile image' });
+        }
+    }
+
+    // Save the updated user
+    const updatedUser = await user.save();
+
+    // Prepare response
+    res.status(200).json({
+        message: 'User updated successfully',
+        user: {
+            _id: updatedUser._id,
+            name: updatedUser.name,
+            email: updatedUser.email,
+            role: updatedUser.role,
+            profileImage: updatedUser.profileImage,
+            cloudinary_id: updatedUser.cloudinary_id,
+            country: updatedUser.country,
+            isEmailVerified: updatedUser.isEmailVerified,
+            hasReadPrivacyPolicy: updatedUser.hasReadPrivacyPolicy,
+            about: updatedUser.about,
+            instagram: updatedUser.instagram,
+            tiktok: updatedUser.tiktok,
+            linkedin: updatedUser.linkedin,
+            twitter: updatedUser.twitter
+        }
+    });
 });
+
+
+
+// const updateUser = asyncHandler(async (req, res) => {
+//     try {
+//         const userId = req.params.id; // Assuming the user ID is passed as a parameter
+
+//         // Fetch the user from MongoDB
+//         const user = await userData.findById(userId);
+
+//         if (!user) {
+//             return res.status(404).json({ error: 'User not found' });
+//         }
+
+//         // Update other user data in MongoDB using mapping method
+//         const allowedFields = ['name', 'email', 'role', 'verified', 'hasReadPrivacyPolicy'];
+//         allowedFields.forEach(field => {
+//             if (req.body[field] !== undefined) {
+//                 user[field] = req.body[field];
+//             }
+//         });
+
+//         // Save the updated user in MongoDB
+//         const updatedUser = await user.save();
+
+//         res.status(200).json({
+//             message: 'User updated successfully',
+//             user: {
+//                 _id: updatedUser._id,
+//                 name: updatedUser.name,
+//                 email: updatedUser.email,
+//                 role: updatedUser.role,
+//                 profileImage: updatedUser.profileImage, // Retain current profile image
+//                 cloudinary_id: updatedUser.cloudinary_id, // Retain current cloudinary ID
+//                 verified: updatedUser.verified,
+//                 hasReadPrivacyPolicy: updatedUser.hasReadPrivacyPolicy
+//             },
+//         });
+//     } catch (error) {
+//         console.error(error);
+//         res.status(500).json({ error: 'Server error' });
+//     }
+// });
 
 
 const createUser = asyncHandler(async (req, res) => {

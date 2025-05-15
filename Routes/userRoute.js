@@ -741,7 +741,7 @@ router.route('/watchlist/:userId').post(protect, addWatchlist);
  *         name: userId
  *         required: true
  *         schema:
- *           type: string
+ *           type: string 
  *         description: User ID
  *     responses:
  *       200:
