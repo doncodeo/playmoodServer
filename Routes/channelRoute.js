@@ -76,7 +76,7 @@ const { protect } = require('../middleware/authmiddleware');
  * /{userId}:
  *   get:
  *     summary: Get a creator's channel details
- *     description: Retrieves details of a creator's channel, including name, profile image, about section, banner image, subscriber count, and all content created by the creator. Requires authentication.
+ *     description: Retrieves details of a creator's channel, including name, profile image, about section, banner image, subscriber count, social media links, and all content created by the creator. Requires authentication.
  *     tags: [Channels]
  *     security:
  *       - BearerAuth: []
@@ -118,6 +118,18 @@ const { protect } = require('../middleware/authmiddleware');
  *                   type: array
  *                   items:
  *                     $ref: '#/components/schemas/CommunityPost'
+ *                 instagram:
+ *                   type: string
+ *                   example: https://instagram.com/johndoe
+ *                 tiktok:
+ *                   type: string
+ *                   example: https://tiktok.com/@johndoe
+ *                 linkedin:
+ *                   type: string
+ *                   example: https://linkedin.com/in/johndoe
+ *                 twitter:
+ *                   type: string
+ *                   example: https://twitter.com/johndoe
  *       400:
  *         description: Invalid or missing user ID
  *       401:
@@ -134,7 +146,7 @@ router.route('/:userId').get(protect, getChannelDetails);
  * /{userId}:
  *   put:
  *     summary: Update creator channel information
- *     description: Updates the creator's channel information (e.g., about, name, profile image). Only the authenticated creator can update their own channel.
+ *     description: Updates the creator's channel information (e.g., about, name, profile image, social media links). Only the authenticated creator can update their own channel.
  *     tags: [Channels]
  *     security:
  *       - BearerAuth: []
@@ -161,6 +173,18 @@ router.route('/:userId').get(protect, getChannelDetails);
  *               profileImage:
  *                 type: string
  *                 example: https://res.cloudinary.com/.../new-image.jpg
+ *               instagram:
+ *                 type: string
+ *                 example: https://instagram.com/janedoe
+ *               tiktok:
+ *                 type: string
+ *                 example: https://tiktok.com/@janedoe
+ *               linkedin:
+ *                 type: string
+ *                 example: https://linkedin.com/in/janedoe
+ *               twitter:
+ *                 type: string
+ *                 example: https://twitter.com/janedoe
  *             additionalProperties: false
  *     responses:
  *       200:
@@ -173,9 +197,27 @@ router.route('/:userId').get(protect, getChannelDetails);
  *                 message:
  *                   type: string
  *                   example: Channel information updated successfully
+ *                 name:
+ *                   type: string
+ *                   example: Jane Doe
  *                 about:
  *                   type: string
  *                   example: Updated channel description
+ *                 profileImage:
+ *                   type: string
+ *                   example: https://res.cloudinary.com/.../new-image.jpg
+ *                 instagram:
+ *                   type: string
+ *                   example: https://instagram.com/janedoe
+ *                 tiktok:
+ *                   type: string
+ *                   example: https://tiktok.com/@janedoe
+ *                 linkedin:
+ *                   type: string
+ *                   example: https://linkedin.com/in/janedoe
+ *                 twitter:
+ *                   type: string
+ *                   example: https://twitter.com/janedoe
  *       400:
  *         description: Invalid or missing user ID
  *       401:

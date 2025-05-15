@@ -29,7 +29,6 @@ const userSchema = new mongoose.Schema({
     },
     country: {
         type: String,
-        // required: [true, "Please enter your country"]
     },
     emailVerificationCode: {
         type: String,
@@ -41,15 +40,36 @@ const userSchema = new mongoose.Schema({
         type: Boolean,
         default: false,
     },
-    likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Contents' }],
-    watchlist: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Contents' }],
-    history: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Contents' }],
+    likes: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Contents',
+        validate: {
+            validator: mongoose.Types.ObjectId.isValid,
+            message: 'Invalid content ID in likes'
+        }
+    }],
+    watchlist: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Contents',
+        validate: {
+            validator: mongoose.Types.ObjectId.isValid,
+            message: 'Invalid content ID in watchlist'
+        }
+    }],
+    history: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Contents',
+        validate: {
+            validator: mongoose.Types.ObjectId.isValid,
+            message: 'Invalid content ID in history'
+        }
+    }],
     hasReadPrivacyPolicy: {
         type: Boolean,
         default: false,
     },
-    subscriptions: [{ type: mongoose.Schema.Types.ObjectId, ref: 'profiles' }], // Users subscribed to other creators
-    subscribers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'profiles' }],  // Users who subscribed to this 
+    subscriptions: [{ type: mongoose.Schema.Types.ObjectId, ref: 'profiles' }],
+    subscribers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'profiles' }],
     about: {
         type: String,
         default: "This is my channel!"
@@ -63,12 +83,38 @@ const userSchema = new mongoose.Schema({
         ref: 'CommunityPost'
     }],
     videoProgress: [{
-        contentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Contents' },
+        contentId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Contents',
+            validate: {
+                validator: mongoose.Types.ObjectId.isValid,
+                message: 'Invalid content ID in videoProgress'
+            }
+        },
         progress: { type: Number, default: 0 },
     }],
+    instagram: {
+        type: String,
+        default: "",
+        trim: true
+    },
+    tiktok: {
+        type: String,
+        default: "",
+        trim: true
+    },
+    linkedin: {
+        type: String,
+        default: "",
+        trim: true
+    },
+    twitter: {
+        type: String,
+        default: "",
+        trim: true
+    }
 }, {
     timestamps: true,
 });
 
 module.exports = mongoose.model('profiles', userSchema);
-

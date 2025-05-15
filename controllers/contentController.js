@@ -3,6 +3,7 @@ const contentSchema = require('../models/contentModel');
 const userSchema = require('../models/userModel');
 const cloudinary = require('../config/cloudinary');
 const nodemailer = require('nodemailer');
+const mongoose = require('mongoose'); // Add mongoose import
 
 const transporter = nodemailer.createTransport({
     service: 'Gmail',
@@ -13,15 +14,15 @@ const transporter = nodemailer.createTransport({
 });
 
 // @desc Get All Content
-// @route GET /api/content
+// @route GET /api/content 
 // @access Private
 const getContent = asyncHandler(async (req, res) => {
-    const content = await contentSchema.find({ isApproved: true }).populate('user', 'name');
+    const content = await contentSchema.find({ isApproved: true }).populate('user', 'name'); 
 
     // Generate an ETag based on content length and last update
-    const lastUpdated = content.length > 0 ? Math.max(...content.map(c => c.updatedAt.getTime())) : 0;
+    const lastUpdated = content.length > 0 ? Math.max(...content.map(c => c.updatedAt.getTime())) : 0; 
     const etag = `"all-${content.length}-${lastUpdated}"`;
-
+ 
     // Check if the client’s ETag matches
     if (req.get('If-None-Match') === etag) {
         return res.status(304).end(); // Not Modified
@@ -407,8 +408,10 @@ const getVideoProgress = asyncHandler(async (req, res) => {
 // @desc Get all saved videos in user's watchlist with progress
 // @route GET /api/content/watchlist
 // @access Private
+
 const getWatchlist = asyncHandler(async (req, res) => {
     const userId = req.user._id;
+    console.log(userId);
 
     // Fetch the user and populate watchlist
     const user = await userSchema.findById(userId)
@@ -455,6 +458,7 @@ const getWatchlist = asyncHandler(async (req, res) => {
     res.status(200).json(watchlistWithProgress);
 });
 
+
 // @desc Add video to user's watchlist
 // @route POST /api/content/watchlist
 // @access Private
@@ -464,6 +468,11 @@ const addToWatchlist = asyncHandler(async (req, res) => {
 
     if (!contentId) {
         return res.status(400).json({ error: 'Content ID is required' });
+    }
+
+    // Validate contentId is a valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(contentId)) {
+        return res.status(400).json({ error: 'Invalid content ID format' });
     }
 
     const content = await contentSchema.findById(contentId);

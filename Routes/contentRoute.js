@@ -125,7 +125,7 @@ const { protect } = require('../middleware/authmiddleware');
  *       500:
  *         description: Server error
  */
-router.route('/').get(protect, getContent);     
+router.route('/').get(getContent);     
 
 /**
  * @swagger
@@ -216,7 +216,7 @@ router.route('/').post(protect, upload.array('files', 2), createContent);
  *       500:
  *         description: Server error
  */
-router.route('/new').get(protect, getRecentContent);
+router.route('/new').get(getRecentContent);
 
 /**
  * @swagger
@@ -590,7 +590,7 @@ router.route('/watchlist').get(protect, getWatchlist);
  *     description: Adds a specific approved content item to the authenticated user's watchlist.
  *     tags: [Content]
  *     security:
- *       - BearerAuth: []
+ *       - BearerAuth: [] 
  *     requestBody:
  *       required: true
  *       content:
