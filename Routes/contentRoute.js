@@ -11,8 +11,7 @@ const {
     getUnapprovedContent,
     saveVideoProgress,
     getVideoProgress,
-    getWatchlist,
-    addToWatchlist
+    ContinueWatching
 } = require('../controllers/contentController');
 const upload = require('../middleware/multer');
 const { protect } = require('../middleware/authmiddleware');
@@ -536,6 +535,87 @@ router.route('/progress').post(protect, saveVideoProgress);
  *         description: Server error
  */
 router.route('/progress/:contentId').get(protect, getVideoProgress);
+
+/**
+ * @swagger
+ * /continue-watching:
+ *   get:
+ *     summary: Get continue watching list
+ *     description: Retrieves all videos the authenticated user has started watching, including video details and playback progress. Includes caching with ETag.
+ *     tags: [Content]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Continue watching list retrieved successfully
+ *         headers:
+ *           Cache-Control:
+ *             schema:
+ *               type: string
+ *               example: private, max-age=300
+ *           ETag:
+ *             schema:
+ *               type: string
+ *               example: "continue-watching-65a8025e3af4e7929b379e7b-[...]"
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Continue watching list retrieved successfully
+ *                 continueWatching:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       contentId:
+ *                         type: string
+ *                         example: 65a6fc7b72128447ad32024e
+ *                       title:
+ *                         type: string
+ *                         example: My Awesome Video
+ *                       category:
+ *                         type: string
+ *                         example: Entertainment
+ *                       description:
+ *                         type: string
+ *                         example: A fun video about...
+ *                       thumbnail:
+ *                         type: string
+ *                         example: https://res.cloudinary.com/.../thumbnail.jpg
+ *                       video:
+ *                         type: string
+ *                         example: https://res.cloudinary.com/.../video.mp4
+ *                       views:
+ *                         type: number
+ *                         example: 100
+ *                       likes:
+ *                         type: array
+ *                         items:
+ *                           type: string
+ *                           example: 65a8025e3af4e7929b379e7c
+ *                       createdAt:
+ *                         type: string
+ *                         format: date-time
+ *                         example: 2025-05-14T22:52:00.000Z
+ *                       progress:
+ *                         type: number
+ *                         example: 120.5
+ *       304:
+ *         description: Not Modified (ETag match)
+ *       401:
+ *         description: Unauthorized - Missing or invalid JWT token
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: Server error
+ */
+router.route('/continue-watching').get(protect, ContinueWatching);
+
+
+
 
 
 module.exports = router;

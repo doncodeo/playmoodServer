@@ -405,6 +405,58 @@ const getVideoProgress = asyncHandler(async (req, res) => {
     res.status(200).json({ progress });
 });
 
+// @desc Get all videos in user's continue watching list
+// @route GET /api/content/continue-watching
+// @access Private
+const ContinueWatching = asyncHandler(async (req, res) => {
+    const userId = req.user._id;
+
+    // Fetch user with populated videoProgress
+    const user = await userSchema.findById(userId).populate({
+        path: 'videoProgress.contentId',
+        select: 'title category description thumbnail video views likes createdAt',
+    });
+
+    if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Filter videos with progress > 0 and valid content
+    const continueWatching = user.videoProgress
+        .filter(record => record.progress > 0 && record.contentId) // Exclude zero progress or deleted content
+        .map(record => ({
+            contentId: record.contentId._id,
+            title: record.contentId.title,
+            category: record.contentId.category,
+            description: record.contentId.description,
+            thumbnail: record.contentId.thumbnail,
+            video: record.contentId.video,
+            views: record.contentId.views,
+            likes: record.contentId.likes,
+            createdAt: record.contentId.createdAt,
+            progress: record.progress,
+        }))
+        .sort((a, b) => b.createdAt - a.createdAt); // Sort by content creation date (newest first)
+
+    // Generate ETag based on userId and videoProgress
+    const etag = `"continue-watching-${userId}-${JSON.stringify(continueWatching.map(v => `${v.contentId}-${v.progress}`))}"`;
+
+    if (req.get('If-None-Match') === etag) {
+        return res.status(304).end();
+    }
+
+    res.set({
+        'Cache-Control': 'private, max-age=300', // Cache for 5 minutes
+        'ETag': etag,
+    });
+
+    res.status(200).json({
+        message: 'Continue watching list retrieved successfully',
+        continueWatching,
+    });
+});
+
+
 
 
 
@@ -419,5 +471,6 @@ module.exports = {
     getUnapprovedContent,
     saveVideoProgress,
     getVideoProgress,
+    ContinueWatching,
 };
 
