@@ -280,58 +280,19 @@ const deleteUser = asyncHandler(async (req, res) => {
   }
 });
 
-// @desc Update user
-// @route post /api/users/:id
-// @access Public
-
-const updateProfileImage = asyncHandler(async (req, res) => {
-    try {
-        // const userId = req.user.id; // Assuming you're using some authentication middleware that sets req.user
-        const userId = req.params.id; // Assuming the user ID is passed as a parameter
-        const file = req.file;
-
-        // Get the user's current profile image details
-        const user = await userData.findById(userId);
-
-        if (!file) {
-            return res.status(400).json({ error: 'No file uploaded' });
-        }
-
-        // Upload image to Cloudinary
-        const result = await cloudinary.uploader.upload(file.path, {
-            folder: 'user-uploads', // Optional folder
-            // public_id: user._id, // Set public_id to a unique identifier like user._id
-            public_id: `${userId}-${Date.now()}` // Unique ID for the image
-        });
-
- 
-
-        // Delete the old profile image from Cloudinary if it exists
-        if (user.cloudinary_id) {
-            await cloudinary.uploader.destroy(user.cloudinary_id);
-        }
-
-        // Update user profile with new image URL and Cloudinary ID
-        user.profileImage = result.secure_url;
-        user.cloudinary_id = result.public_id;
-        await user.save();
-
-        res.status(200).json({ message: 'Profile image updated successfully', profileImage: user.profileImage });
-
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Server error' });
-    }
-});
-
 
 // @desc Update user profile
 // @route PUT /api/users/:id
 // @access Private (authenticated, user or admin)
 const updateUser = asyncHandler(async (req, res) => {
-    const userId = req.params.id;
+    const userId = req.params.id; // Get userId from URL
 
-    // Validate userId format (MongoDB ObjectId)
+    // Validate userId presence
+    if (!userId) {
+        return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    // Validate userId format
     if (!userId.match(/^[0-9a-fA-F]{24}$/)) {
         return res.status(400).json({ error: 'Invalid user ID' });
     }
@@ -343,11 +304,16 @@ const updateUser = asyncHandler(async (req, res) => {
     }
 
     // Check authorization: User can update their own profile, admin can update any
-    if (user._id.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+    if (user._id.toString() !== req.user.id && req.user.role !== 'admin') {
         return res.status(403).json({ error: 'Not authorized to update this user' });
     }
 
-    // Define allowed fields for update (exclude sensitive fields)
+    // Check if at least one field is provided
+    if (!req.file && Object.keys(req.body).length === 0) {
+        return res.status(400).json({ error: 'At least one field must be provided for update' });
+    }
+
+    // Define allowed fields for update
     const allowedFields = [
         'name',
         'email',
@@ -363,6 +329,14 @@ const updateUser = asyncHandler(async (req, res) => {
     // Admin-only fields
     if (req.user.role === 'admin') {
         allowedFields.push('role', 'isEmailVerified');
+    }
+
+    // Check email uniqueness if email is updated
+    if (req.body.email && req.body.email !== user.email) {
+        const emailExists = await userData.findOne({ email: req.body.email });
+        if (emailExists) {
+            return res.status(400).json({ error: 'Email already in use' });
+        }
     }
 
     // Update fields from req.body
@@ -391,9 +365,13 @@ const updateUser = asyncHandler(async (req, res) => {
             user.cloudinary_id = result.public_id;
 
             // Delete local file
-            await fs.unlink(req.file.path);
+            try {
+                await fs.unlink(req.file.path);
+            } catch (error) {
+                console.warn(`Failed to delete local file ${req.file.path}: ${error.message}`);
+            }
         } catch (error) {
-            console.warn(`Failed to process profile image: ${error.message}`);
+            console.error('Error uploading profile image:', error.message);
             return res.status(500).json({ error: 'Failed to upload profile image' });
         }
     }
@@ -422,6 +400,8 @@ const updateUser = asyncHandler(async (req, res) => {
         }
     });
 });
+
+
 
 
 
@@ -864,7 +844,6 @@ const markPrivacyPolicyAsRead = asyncHandler(async (req, res) => {
     loginUser,
     getUserprofile,
     updateUser,
-    updateProfileImage,
     deleteUser,
     likeContent,
     unlikeContent,

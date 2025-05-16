@@ -139,7 +139,7 @@ const { protect } = require('../middleware/authmiddleware');
  *       500:
  *         description: Server error
  */
-router.route('/:userId').get(protect, getChannelDetails);
+router.route('/:userId').get(getChannelDetails);
 
 /**
  * @swagger

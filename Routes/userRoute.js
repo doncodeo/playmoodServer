@@ -9,7 +9,6 @@ const {
   loginUser,
   deleteUser,
   updateUser,
-  updateProfileImage,
   getUserprofile,
   getCreators,
   createUser,
@@ -449,7 +448,7 @@ router.route('/creators').get(getCreators);
  *       500:
  *         description: Server error
  */
-router.route('/:userId').put(upload.single('image'), protect, updateUser);
+router.route('/:id').put(protect, upload.single('profileImage'), updateUser); 
 
 /**
  * @swagger
@@ -486,53 +485,6 @@ router.route('/:userId').put(upload.single('image'), protect, updateUser);
  *         description: Server error
  */
 router.route('/:userId').delete(protect, deleteUser);
-
-/**
- * @swagger
- * /api/users/profile-image/{userId}:
- *   put:
- *     summary: Update user profile image
- *     description: Updates the user's profile image by uploading a new image to Cloudinary.
- *     tags: [Users]
- *     security:
- *       - BearerAuth: []
- *     parameters:
- *       - in: path
- *         name: userId
- *         required: true
- *         schema:
- *           type: string
- *         description: User ID
- *     requestBody:
- *       required: true
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *             required:
- *               - image
- *             properties:
- *               image:
- *                 type: string
- *                 format: binary
- *                 description: New profile image
- *     responses:
- *       200:
- *         description: Profile image updated successfully
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/User'
- *       400:
- *         description: No file uploaded
- *       401:
- *         description: Unauthorized
- *       404:
- *         description: User not found
- *       500:
- *         description: Server error
- */
-router.route('/profile-image/:userId').put(protect, upload.single('image'), updateProfileImage);
 
 /**
  * @swagger
