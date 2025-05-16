@@ -72,7 +72,7 @@ const { protect } = require('../middleware/authmiddleware');
 
 /**
  * @swagger
- * /api/community-posts/create:
+ * /api/community/create:
  *   post:
  *     summary: Create a new community post
  *     description: Creates a new community post for the authenticated user and adds it to their profile.
@@ -108,7 +108,7 @@ router.route('/create').post(protect, createCommunityPost);
 
 /**
  * @swagger
- * /api/community-posts/{userId}:
+ * /api/community/{userId}:
  *   get:
  *     summary: Get all community posts for a user
  *     description: Retrieves all community posts for a specified user, populated with user details (name and profile image).
@@ -138,7 +138,7 @@ router.get('/:userId', getCommunityPosts);
 
 /**
  * @swagger
- * /api/community-posts/{postId}:
+ * /api/community/{postId}:
  *   put:
  *     summary: Update a community post
  *     description: Updates the content of a community post. Only the post's creator can update it.
@@ -183,7 +183,7 @@ router.route('/:postId').put(protect, updateCommunityPost);
 
 /**
  * @swagger
- * /api/community-posts/{postId}:
+ * /api/community/{postId}:
  *   delete:
  *     summary: Delete a community post
  *     description: Deletes a community post and removes it from the user's profile. Only the post's creator can delete it.
@@ -219,7 +219,7 @@ router.route('/:postId').delete(protect, deleteCommunityPost);
 
 /**
  * @swagger
- * /api/community-posts/{postId}/like:
+ * /api/community/{postId}/like:
  *   put:
  *     summary: Like a community post
  *     description: Adds the authenticated user's ID to the likes array of a community post.
@@ -255,7 +255,7 @@ router.put('/:postId/like', protect, likeCommunityPost);
 
 /**
  * @swagger
- * /api/community-posts/{postId}/unlike:
+ * /api/community/{postId}/unlike:
  *   put:
  *     summary: Unlike a community post
  *     description: Removes the authenticated user's ID from the likes array of a community post.
@@ -291,7 +291,7 @@ router.put('/:postId/unlike', protect, unlikeCommunityPost);
 
 /**
  * @swagger
- * /api/community-posts/{postId}/comment:
+ * /api/community/{postId}/comment:
  *   post:
  *     summary: Add a comment to a community post
  *     description: Adds a comment by the authenticated user to a community post.
@@ -348,7 +348,7 @@ router.post('/:postId/comment', protect, commentOnCommunityPost);
 
 /**
  * @swagger
- * /api/community-posts/{postId}/comment/{commentId}:
+ * /api/community/{postId}/comment/{commentId}:
  *   delete:
  *     summary: Delete a comment from a community post
  *     description: Deletes a comment from a community post. Only the comment's creator can delete it.
