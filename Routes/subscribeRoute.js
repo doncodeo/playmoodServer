@@ -47,7 +47,7 @@ const { protect } = require('../middleware/authmiddleware');
 
 /**
  * @swagger
- * /api/subscriptions:
+ * /api/subscribe:
  *   post:
  *     summary: Subscribe to a creator
  *     description: Subscribes the authenticated user to a creator, updating both user profiles with subscription details.
@@ -81,11 +81,11 @@ const { protect } = require('../middleware/authmiddleware');
  *       500:
  *         description: Server error
  */
-router.route('/').post(protect, subscribe);
+router.route('/').post(protect, subscribe); 
 
 /**
  * @swagger
- * /api/subscriptions:
+ * /api/subscribe:
  *   put:
  *     summary: Unsubscribe from a creator
  *     description: Unsubscribes the authenticated user from a creator, updating both user profiles.
@@ -123,7 +123,7 @@ router.route('/').put(protect, unsubscribe);
 
 /**
  * @swagger
- * /api/subscriptions/content:
+ * /api/subscribe/content:
  *   get:
  *     summary: Get content from subscribed creators
  *     description: Retrieves all content created by creators the authenticated user is subscribed to.
@@ -148,7 +148,7 @@ router.route('/content').get(protect, getSubscribedContent);
 
 /**
  * @swagger
- * /api/subscriptions/subscribers:
+ * /api/subscribe/subscribers:
  *   get:
  *     summary: Get all subscribers of a creator
  *     description: Retrieves a list of subscribers for the authenticated creator, including their name, email, and profile image.
