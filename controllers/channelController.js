@@ -4,45 +4,51 @@ const Content = require('../models/contentModel');
 const cloudinary = require('../config/cloudinary');
 const fs = require('fs').promises;
 
-// @desc Get a creator's channel details
-// @route GET /api/channel/:userId
-// @access Private (authenticated)
+
+// @desc Get creator channel details
+// @route GET /api/creators/:userId
+// @access Public
 const getChannelDetails = asyncHandler(async (req, res) => {
-  const { userId } = req.params;
+    const { userId } = req.params;
 
-  if (!userId) {
-    return res.status(400).json({ error: 'User ID is required' });
-  }
+    // Validate userId presence
+    if (!userId) {
+        return res.status(400).json({ error: 'User ID is required' });
+    }
 
-  if (!userId.match(/^[0-9a-fA-F]{24}$/)) {
-    return res.status(400).json({ error: 'Invalid user ID' });
-  }
+    // Validate userId format (MongoDB ObjectId)
+    if (!userId.match(/^[0-9a-fA-F]{24}$/)) {
+        return res.status(400).json({ error: 'Invalid user ID' });
+    }
 
-  const creator = await User.findOne({ _id: userId, role: 'creator' })
-    .populate('subscriptions', 'name profileImage')
-    // .populate('communityPosts', 'title content');
+    // Fetch creator with populated subscribers and communityPosts
+    const creator = await User.findOne({ _id: userId, role: 'creator' })
+        .populate('subscribers', 'name profileImage') // Populate subscribers to get their details
+        .populate('communityPosts', 'title content'); // Uncommented to populate community posts
 
-  if (!creator) {
-    return res.status(404).json({ error: 'Creator not found' });
-  }
+    if (!creator) {
+        return res.status(404).json({ error: 'Creator not found' });
+    }
 
-  const content = await Content.find({ user: creator._id }).select(
-    'title category description thumbnail video views likes createdAt'
-  );
+    // Fetch creator's content
+    const content = await Content.find({ user: creator._id }).select(
+        'title category description thumbnail video views likes createdAt'
+    );
 
-  res.status(200).json({
-    name: creator.name,
-    profileImage: creator.profileImage,
-    about: creator.about,
-    bannerImage: creator.bannerImage,
-    subscribers: creator.subscriptions.length,
-    content,
-    communityPosts: creator.communityPosts || [],
-    instagram: creator.instagram || "",
-    tiktok: creator.tiktok || "",
-    linkedin: creator.linkedin || "",
-    twitter: creator.twitter || ""
-  });
+    res.status(200).json({
+        name: creator.name,
+        profileImage: creator.profileImage,
+        about: creator.about,
+        bannerImage: creator.bannerImage,
+        subscribers: creator.subscribers.length, // Correct field: subscribers, not subscriptions
+        subscriberDetails: creator.subscribers, // Optional: Include subscriber details
+        content,
+        communityPosts: creator.communityPosts || [],
+        instagram: creator.instagram || "",
+        tiktok: creator.tiktok || "",
+        linkedin: creator.linkedin || "",
+        twitter: creator.twitter || ""
+    });
 });
 
 // @desc Update creator channel information

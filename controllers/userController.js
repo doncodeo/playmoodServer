@@ -281,36 +281,151 @@ const deleteUser = asyncHandler(async (req, res) => {
 });
 
 
+
+// Utility function to format timestamps for logging
+
 // @desc Update user profile
 // @route PUT /api/users/:id
 // @access Private (authenticated, user or admin)
+const getTimestamp = () => new Date().toISOString();
+
 const updateUser = asyncHandler(async (req, res) => {
-    const userId = req.params.id; // Get userId from URL
+    const userId = req.params.id;
+
+    // Log request start
+    console.log(
+        `[${getTimestamp()}] INFO: Update user request started - userId: ${userId}, requesterId: ${
+            req.user?.id
+        }, ip: ${req.ip}, method: ${req.method}, url: ${req.originalUrl}`
+    );
+
+    // Validate req.user (from protect middleware)
+    if (!req.user || !req.user.id) {
+        console.log(
+            `[${getTimestamp()}] WARN: Authenticated user not found in request - userId: ${userId}`
+        );
+        return res.status(401).json({
+            status: 'error',
+            error: 'Unauthorized',
+            details: 'Authenticated user not found. Please log in again.',
+        });
+    }
 
     // Validate userId presence
     if (!userId) {
-        return res.status(400).json({ error: 'User ID is required' });
+        console.log(
+            `[${getTimestamp()}] WARN: User ID missing in request - requesterId: ${req.user.id}`
+        );
+        return res.status(400).json({
+            status: 'error',
+            error: 'Bad Request',
+            details: 'User ID is required in the URL path.',
+        });
     }
 
     // Validate userId format
     if (!userId.match(/^[0-9a-fA-F]{24}$/)) {
-        return res.status(400).json({ error: 'Invalid user ID' });
+        console.log(
+            `[${getTimestamp()}] WARN: Invalid user ID format - userId: ${userId}, requesterId: ${
+                req.user.id
+            }`
+        );
+        return res.status(400).json({
+            status: 'error',
+            error: 'Bad Request',
+            details: 'Invalid user ID format. Must be a 24-character hexadecimal string.',
+        });
     }
 
     // Fetch the user
-    const user = await userData.findById(userId);
+    let user;
+    try {
+        user = await userData.findById(userId);
+    } catch (error) {
+        console.error(
+            `[${getTimestamp()}] ERROR: Failed to fetch user from database - userId: ${userId}, requesterId: ${
+                req.user.id
+            }, error: ${error.message}, stack: ${error.stack}`
+        );
+        return res.status(500).json({
+            status: 'error',
+            error: 'Database Error',
+            details: 'Failed to fetch user due to a database error. Please try again later.',
+        });
+    }
+
     if (!user) {
-        return res.status(404).json({ error: 'User not found' });
+        console.log(
+            `[${getTimestamp()}] WARN: User not found - userId: ${userId}, requesterId: ${req.user.id}`
+        );
+        return res.status(404).json({
+            status: 'error',
+            error: 'Not Found',
+            details: 'User not found with the provided ID.',
+        });
     }
 
     // Check authorization: User can update their own profile, admin can update any
     if (user._id.toString() !== req.user.id && req.user.role !== 'admin') {
-        return res.status(403).json({ error: 'Not authorized to update this user' });
+        console.log(
+            `[${getTimestamp()}] WARN: Unauthorized update attempt - userId: ${userId}, requesterId: ${
+                req.user.id
+            }, requesterRole: ${req.user.role}`
+        );
+        return res.status(403).json({
+            status: 'error',
+            error: 'Forbidden',
+            details: 'You are not authorized to update this user’s profile.',
+        });
     }
 
     // Check if at least one field is provided
     if (!req.file && Object.keys(req.body).length === 0) {
-        return res.status(400).json({ error: 'At least one field must be provided for update' });
+        console.log(
+            `[${getTimestamp()}] WARN: No fields provided for update - userId: ${userId}, requesterId: ${
+                req.user.id
+            }`
+        );
+        return res.status(400).json({
+            status: 'error',
+            error: 'Bad Request',
+            details: 'At least one field must be provided to update the user profile.',
+        });
+    }
+
+    // Validate social media URLs if provided
+    const socialFields = ['instagram', 'tiktok', 'linkedin', 'twitter'];
+    const urlRegex = /^(https?:\/\/)?([\w-]+\.)+[\w-]+(\/[\w- ./?%&=]*)?$/;
+    for (const field of socialFields) {
+        if (req.body[field] && !urlRegex.test(req.body[field])) {
+            console.log(
+                `[${getTimestamp()}] WARN: Invalid social media URL - userId: ${userId}, field: ${field}, value: ${
+                    req.body[field]
+                }`
+            );
+            return res.status(400).json({
+                status: 'error',
+                error: 'Bad Request',
+                details: `Invalid ${field} URL. Must be a valid URL.`,
+            });
+        }
+    }
+
+    // Validate email format if provided
+    if (req.body.email) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(req.body.email)) {
+            console.log(
+                `[${getTimestamp()}] WARN: Invalid email format - userId: ${userId}, email: ${
+                    req.body.email
+                }`
+            );
+            return res.status(400).json({
+                status: 'error',
+                error: 'Bad Request',
+                details: 'Invalid email format.',
+            });
+        }
     }
 
     // Define allowed fields for update
@@ -323,7 +438,7 @@ const updateUser = asyncHandler(async (req, res) => {
         'instagram',
         'tiktok',
         'linkedin',
-        'twitter'
+        'twitter',
     ];
 
     // Admin-only fields
@@ -331,11 +446,49 @@ const updateUser = asyncHandler(async (req, res) => {
         allowedFields.push('role', 'isEmailVerified');
     }
 
+    // Validate allowed fields in req.body
+    const providedFields = Object.keys(req.body);
+    const invalidFields = providedFields.filter(field => !allowedFields.includes(field));
+    if (invalidFields.length > 0) {
+        console.log(
+            `[${getTimestamp()}] WARN: Attempt to update restricted fields - userId: ${userId}, invalidFields: ${invalidFields.join(
+                ', '
+            )}`
+        );
+        return res.status(400).json({
+            status: 'error',
+            error: 'Bad Request',
+            details: `Cannot update restricted fields: ${invalidFields.join(', ')}.`,
+        });
+    }
+
     // Check email uniqueness if email is updated
     if (req.body.email && req.body.email !== user.email) {
-        const emailExists = await userData.findOne({ email: req.body.email });
-        if (emailExists) {
-            return res.status(400).json({ error: 'Email already in use' });
+        try {
+            const emailExists = await userData.findOne({ email: req.body.email });
+            if (emailExists) {
+                console.log(
+                    `[${getTimestamp()}] WARN: Email already in use - userId: ${userId}, email: ${
+                        req.body.email
+                    }`
+                );
+                return res.status(400).json({
+                    status: 'error',
+                    error: 'Bad Request',
+                    details: 'Email is already in use by another user.',
+                });
+            }
+        } catch (error) {
+            console.error(
+                `[${getTimestamp()}] ERROR: Failed to check email uniqueness - userId: ${userId}, email: ${
+                    req.body.email
+                }, error: ${error.message}, stack: ${error.stack}`
+            );
+            return res.status(500).json({
+                status: 'error',
+                error: 'Database Error',
+                details: 'Failed to check email uniqueness due to a database error.',
+            });
         }
     }
 
@@ -349,6 +502,28 @@ const updateUser = asyncHandler(async (req, res) => {
     // Handle profile image upload
     if (req.file) {
         try {
+            // Validate file type
+            const allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
+            if (!allowedTypes.includes(req.file.mimetype)) {
+                await fs.unlink(req.file.path).catch(err =>
+                    console.log(
+                        `[${getTimestamp()}] WARN: Failed to delete invalid file - path: ${
+                            req.file.path
+                        }, error: ${err.message}`
+                    )
+                );
+                console.log(
+                    `[${getTimestamp()}] WARN: Invalid file type for profile image - userId: ${userId}, mimetype: ${
+                        req.file.mimetype
+                    }`
+                );
+                return res.status(400).json({
+                    status: 'error',
+                    error: 'Bad Request',
+                    details: 'Profile image must be a JPEG, PNG, or GIF file.',
+                });
+            }
+
             // Upload new image to Cloudinary
             const result = await cloudinary.uploader.upload(req.file.path, {
                 folder: 'profile-images',
@@ -357,7 +532,20 @@ const updateUser = asyncHandler(async (req, res) => {
 
             // Delete old image from Cloudinary if it exists
             if (user.cloudinary_id) {
-                await cloudinary.uploader.destroy(user.cloudinary_id);
+                try {
+                    await cloudinary.uploader.destroy(user.cloudinary_id);
+                    console.log(
+                        `[${getTimestamp()}] INFO: Old Cloudinary image deleted - userId: ${userId}, cloudinaryId: ${
+                            user.cloudinary_id
+                        }`
+                    );
+                } catch (error) {
+                    console.log(
+                        `[${getTimestamp()}] WARN: Failed to delete old Cloudinary image - userId: ${userId}, cloudinaryId: ${
+                            user.cloudinary_id
+                        }, error: ${error.message}`
+                    );
+                }
             }
 
             // Update profile image and Cloudinary ID
@@ -367,17 +555,75 @@ const updateUser = asyncHandler(async (req, res) => {
             // Delete local file
             try {
                 await fs.unlink(req.file.path);
+                console.log(
+                    `[${getTimestamp()}] INFO: Local file deleted after upload - path: ${req.file.path}`
+                );
             } catch (error) {
-                console.warn(`Failed to delete local file ${req.file.path}: ${error.message}`);
+                console.log(
+                    `[${getTimestamp()}] WARN: Failed to delete local file after upload - path: ${
+                        req.file.path
+                    }, error: ${error.message}`
+                );
             }
         } catch (error) {
-            console.error('Error uploading profile image:', error.message);
-            return res.status(500).json({ error: 'Failed to upload profile image' });
+            // Handle specific Cloudinary errors
+            let errorMessage = 'Failed to upload profile image.';
+            if (error.http_code === 429) {
+                errorMessage = 'Cloudinary rate limit exceeded. Please try again later.';
+            } else if (error.http_code === 400) {
+                errorMessage = 'Invalid image file provided to Cloudinary.';
+            }
+
+            // Clean up local file on error
+            try {
+                await fs.unlink(req.file.path);
+                console.log(
+                    `[${getTimestamp()}] INFO: Local file deleted after Cloudinary error - path: ${
+                        req.file.path
+                    }`
+                );
+            } catch (unlinkError) {
+                console.log(
+                    `[${getTimestamp()}] WARN: Failed to delete local file after Cloudinary error - path: ${
+                        req.file.path
+                    }, error: ${unlinkError.message}`
+                );
+            }
+
+            console.error(
+                `[${getTimestamp()}] ERROR: Cloudinary upload failed - userId: ${userId}, error: ${
+                    error.message
+                }, stack: ${error.stack}`
+            );
+            return res.status(500).json({
+                status: 'error',
+                error: 'Upload Error',
+                details: errorMessage,
+            });
         }
     }
 
     // Save the updated user
-    const updatedUser = await user.save();
+    let updatedUser;
+    try {
+        updatedUser = await user.save();
+        console.log(
+            `[${getTimestamp()}] INFO: User updated successfully - userId: ${userId}, updatedFields: ${Object.keys(
+                req.body
+            ).join(', ')}${req.file ? ', profileImage' : ''}`
+        );
+    } catch (error) {
+        console.error(
+            `[${getTimestamp()}] ERROR: Failed to save user updates - userId: ${userId}, error: ${
+                error.message
+            }, stack: ${error.stack}`
+        );
+        return res.status(500).json({
+            status: 'error',
+            error: 'Database Error',
+            details: 'Failed to save user updates due to a database error.',
+        });
+    }
 
     // Prepare response
     res.status(200).json({
@@ -396,12 +642,10 @@ const updateUser = asyncHandler(async (req, res) => {
             instagram: updatedUser.instagram,
             tiktok: updatedUser.tiktok,
             linkedin: updatedUser.linkedin,
-            twitter: updatedUser.twitter
-        }
+            twitter: updatedUser.twitter,
+        },
     });
 });
-
-
 
 
 
