@@ -146,7 +146,7 @@ router.route('/').get(protect, admin, getPendingRoleChangeRequests);
  *         description: Role change request not found
  *       500:
  *         description: Server error
- */
+ */ 
 router.route('/:id').put(protect, admin, approveRoleChange);
 
 module.exports = router; 

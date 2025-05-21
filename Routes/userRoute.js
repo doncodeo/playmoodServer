@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+
 const upload = require('../middleware/multer');
 const {
   getUser,
@@ -488,20 +489,13 @@ router.route('/:userId').delete(protect, deleteUser);
 
 /**
  * @swagger
- * /api/users/like/{userId}:
+ * /api/users/like:
  *   post:
  *     summary: Like content
- *     description: Adds a content ID to the user's likes array and the user ID to the content's likes array.
+ *     description: Adds a content ID to the authenticated user's likes array and the user ID to the content's likes array.
  *     tags: [Users]
  *     security:
  *       - BearerAuth: []
- *     parameters:
- *       - in: path
- *         name: userId
- *         required: true
- *         schema:
- *           type: string
- *         description: User ID
  *     requestBody:
  *       required: true
  *       content:
@@ -525,12 +519,16 @@ router.route('/:userId').delete(protect, deleteUser);
  *                 message:
  *                   type: string
  *                   example: Content liked successfully
- *                 user:
- *                   $ref: '#/components/schemas/User'
- *                 content:
- *                   $ref: '#/components/schemas/Content'
+ *                 userLikes:
+ *                   type: array
+ *                   items:
+ *                     type: string
+ *                 contentLikes:
+ *                   type: array
+ *                   items:
+ *                     type: string
  *       400:
- *         description: Content already liked
+ *         description: Content already liked or invalid ID
  *       401:
  *         description: Unauthorized
  *       404:
@@ -538,24 +536,17 @@ router.route('/:userId').delete(protect, deleteUser);
  *       500:
  *         description: Server error
  */
-router.route('/like/:userId').post(protect, likeContent);
+router.route('/like').post(protect, likeContent);
 
 /**
  * @swagger
- * /api/users/unlike/{userId}:
+ * /api/users/unlike:
  *   post:
  *     summary: Unlike content
- *     description: Removes a content ID from the user's likes array.
+ *     description: Removes a content ID from the authenticated user's likes array and the user ID from the content's likes array.
  *     tags: [Users]
  *     security:
  *       - BearerAuth: []
- *     parameters:
- *       - in: path
- *         name: userId
- *         required: true
- *         schema:
- *           type: string
- *         description: User ID
  *     requestBody:
  *       required: true
  *       content:
@@ -581,6 +572,11 @@ router.route('/like/:userId').post(protect, likeContent);
  *                   example: Content unliked successfully
  *                 user:
  *                   $ref: '#/components/schemas/User'
+ *                 contentId:
+ *                   type: string
+ *                   example: 65a6fc7b72128447ad32024e
+ *       400:
+ *         description: Invalid ID or user has not liked this content
  *       401:
  *         description: Unauthorized
  *       404:
@@ -588,7 +584,7 @@ router.route('/like/:userId').post(protect, likeContent);
  *       500:
  *         description: Server error
  */
-router.route('/unlike/:userId').post(protect, unlikeContent);
+router.route('/unlike').post(protect, unlikeContent);
 
 /**
  * @swagger
