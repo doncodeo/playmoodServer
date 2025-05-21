@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const upload = require('../middleware/multer');
-const { getChannelDetails, updateChannelInfo, updateChannelBannerImage } = require('../controllers/channelController');
+const { getChannelDetails, updateChannelInfo, updateChannelBannerImage, getAllChannels } = require('../controllers/channelController');
 const { protect } = require('../middleware/authmiddleware');
 
 /**
@@ -286,5 +286,35 @@ router.route('/:userId').put(protect, updateChannelInfo);
  *         description: Server error
  */
 router.route('/:userId/banner').put(protect, upload.single('image'), updateChannelBannerImage);
+
+/**
+ * @swagger
+ * /api/channels:
+ *   get:
+ *     summary: Get all creator channels
+ *     description: Retrieves details of all creator channels, including name, profile image, about section, banner image, subscriber count, social media links, and all content created by each creator. Publicly accessible.
+ *     tags: [Channels]
+ *     responses:
+ *       200:
+ *         description: All creator channels retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Channels retrieved successfully
+ *                 channels:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Channel'
+ *       404:
+ *         description: No creators found
+ *       500:
+ *         description: Server error
+ */
+router.route('/').get(getAllChannels);
+
 
 module.exports = router;

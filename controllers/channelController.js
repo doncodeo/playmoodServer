@@ -151,8 +151,53 @@ const updateChannelBannerImage = asyncHandler(async (req, res) => {
   res.status(200).json({ message: 'Channel banner image updated successfully', bannerImage: user.bannerImage });
 });
 
+// @desc Get all creator channels
+// @route GET /api/channels
+// @access Public
+const getAllChannels = asyncHandler(async (req, res) => {
+    // Fetch all creators with populated subscribers and communityPosts
+    const creators = await User.find({ role: 'creator' })
+        .populate('subscribers', 'name profileImage') // Populate subscribers to get their details
+        .populate('communityPosts', 'title content'); // Populate community posts
+
+    if (!creators || creators.length === 0) {
+        return res.status(404).json({ error: 'No creators found' });
+    }
+
+    // Fetch content for each creator
+    const channels = await Promise.all(
+        creators.map(async (creator) => {
+            const content = await Content.find({ user: creator._id }).select(
+                'title category description thumbnail video views likes createdAt'
+            );
+
+            return {
+                _id: creator._id,
+                name: creator.name,
+                profileImage: creator.profileImage,
+                about: creator.about,
+                bannerImage: creator.bannerImage,
+                subscribers: creator.subscribers.length,
+                subscriberDetails: creator.subscribers, // Optional: Include subscriber details
+                content,
+                communityPosts: creator.communityPosts || [],
+                instagram: creator.instagram || '',
+                tiktok: creator.tiktok || '',
+                linkedin: creator.linkedin || '',
+                twitter: creator.twitter || ''
+            };
+        })
+    );
+
+    res.status(200).json({
+        message: 'Channels retrieved successfully',
+        channels
+    });
+});
+
 module.exports = {
   getChannelDetails,
   updateChannelInfo,
   updateChannelBannerImage,
+  getAllChannels
 };
