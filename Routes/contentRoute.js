@@ -131,7 +131,9 @@ router.route('/').get(getContent);
  * /:
  *   post:
  *     summary: Create new content
- *     description: Creates a new content item with video and thumbnail uploads. Sends approval email to admins if created by a non-admin.
+ *     description: >
+ *       Creates a new content item. Requires a video file. Thumbnail is optional—if not provided, it will be automatically generated from the video.
+ *       Sends approval email to admins if content is created by a non-admin.
  *     tags: [Content]
  *     security:
  *       - BearerAuth: []
@@ -162,7 +164,11 @@ router.route('/').get(getContent);
  *                 items:
  *                   type: string
  *                   format: binary
- *                 description: Video and thumbnail files (exactly 2 files required)
+ *                 description: >
+ *                   Upload one or two files:
+ *                   - Required: 1 video file (.mp4)
+ *                   - Optional: 1 image file (.jpg, .jpeg, .png) as thumbnail
+ *                   If no thumbnail is uploaded, it will be generated from the video automatically.
  *     responses:
  *       201:
  *         description: Content created successfully
@@ -171,7 +177,7 @@ router.route('/').get(getContent);
  *             schema:
  *               $ref: '#/components/schemas/Content'
  *       400:
- *         description: Missing fields or incorrect number of files
+ *         description: Missing required fields or invalid files
  *       401:
  *         description: Unauthorized - Missing or invalid JWT token
  *       403:
@@ -179,6 +185,7 @@ router.route('/').get(getContent);
  *       500:
  *         description: Server error
  */
+
 router.route('/').post(protect, upload.array('files', 2), createContent);
 
 /**
