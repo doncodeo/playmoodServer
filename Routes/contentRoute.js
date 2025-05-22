@@ -126,13 +126,12 @@ const { protect } = require('../middleware/authmiddleware');
  */
 router.route('/').get(getContent);     
 
-
 /**
  * @swagger
- * /api/content:
+ * /:
  *   post:
  *     summary: Create new content
- *     description: Creates a new content item with a video and thumbnail. Only creators and admins can create content. Admins' content is auto-approved; creators' content requires admin approval.
+ *     description: Creates a new content item with video and thumbnail uploads. Sends approval email to admins if created by a non-admin.
  *     tags: [Content]
  *     security:
  *       - BearerAuth: []
@@ -142,31 +141,28 @@ router.route('/').get(getContent);
  *         multipart/form-data:
  *           schema:
  *             type: object
- *             required:
- *               - title
- *               - category
- *               - description
- *               - credit
- *               - files
  *             properties:
  *               title:
  *                 type: string
- *                 example: My Awesome Video
+ *                 example: Sample Video
  *               category:
  *                 type: string
  *                 example: Entertainment
  *               description:
  *                 type: string
- *                 example: A fun video about...
+ *                 example: A fun and engaging video.
  *               credit:
  *                 type: string
- *                 example: John Doe
+ *                 example: John Doe Productions
+ *               userId:
+ *                 type: string
+ *                 example: 65a8025e3af4e7929b379e7b
  *               files:
  *                 type: array
  *                 items:
  *                   type: string
  *                   format: binary
- *                 description: Video file (first) and thumbnail image (second)
+ *                 description: Video and thumbnail files (exactly 2 files required)
  *     responses:
  *       201:
  *         description: Content created successfully
@@ -175,11 +171,11 @@ router.route('/').get(getContent);
  *             schema:
  *               $ref: '#/components/schemas/Content'
  *       400:
- *         description: Missing fields or invalid file types
+ *         description: Missing fields or incorrect number of files
  *       401:
- *         description: Unauthorized
+ *         description: Unauthorized - Missing or invalid JWT token
  *       403:
- *         description: User is not a creator or admin
+ *         description: Unauthorized to create content
  *       500:
  *         description: Server error
  */

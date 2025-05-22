@@ -138,69 +138,36 @@ const getContentById = asyncHandler(async (req, res) => {
 // @desc Create Content
 // @route POST /api/content
 // @access Private
-
-
 const createContent = asyncHandler(async (req, res) => {
     try {
-        const { title, category, description, credit } = req.body;
-        const userId = req.user.id; // Use authenticated user's ID from protect middleware
+        const { title, category, description, credit, userId } = req.body;
 
-        // Validate required fields
-        if (!title || !category || !description || !credit) {
+        if (!title || !category || !description || !credit || !userId) {
             return res.status(400).json({ error: 'Important fields missing!' });
         }
 
-        // Validate files
         if (!req.files || req.files.length !== 2) {
             return res.status(400).json({ error: 'Both video and thumbnail files are required!' });
         }
 
         const [videoFile, thumbnailFile] = req.files;
 
-        // Validate file types
-        const videoMimeTypes = ['video/mp4', 'video/mpeg', 'video/quicktime', 'video/x-msvideo', 'video/x-matroska', 'video/webm'];
-        const imageMimeTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/bmp', 'image/webp'];
-
-        if (!videoMimeTypes.includes(videoFile.mimetype)) {
-            return res.status(400).json({ error: `Invalid video file type: ${videoFile.mimetype}` });
-        }
-        if (!imageMimeTypes.includes(thumbnailFile.mimetype)) {
-            return res.status(400).json({ error: `Invalid thumbnail file type: ${thumbnailFile.mimetype}` });
-        }
-
-        // Upload files to Cloudinary
         const videoResult = await cloudinary.uploader.upload(videoFile.path, {
             resource_type: 'video',
-            folder: 'videos',
+            folder: "videos"
         });
 
         const thumbnailResult = await cloudinary.uploader.upload(thumbnailFile.path, {
-            folder: 'thumbnails',
+            folder: "thumbnails"
         });
 
-        // Clean up temporary files
-        try {
-            await Promise.all([
-                fs.unlink(videoFile.path),
-                fs.unlink(thumbnailFile.path),
-            ]);
-        } catch (error) {
-            console.warn('Failed to delete temporary files:', error.message);
-        }
-
-        // Validate user
         const user = await userSchema.findById(userId);
-        if (!user) {
-            return res.status(404).json({ error: 'User not found' });
-        }
         if (user.role !== 'creator' && user.role !== 'admin') {
             return res.status(403).json({ error: 'Unauthorized to create content' });
         }
 
-        // Set approval status
         const isApproved = user.role === 'admin';
 
-        // Create content
         const content = await contentSchema.create({
             user: userId,
             title,
@@ -211,13 +178,12 @@ const createContent = asyncHandler(async (req, res) => {
             video: videoResult.secure_url,
             cloudinary_video_id: videoResult.public_id,
             cloudinary_thumbnail_id: thumbnailResult.public_id,
-            isApproved,
+            isApproved
         });
 
-        // Send email to admins if not approved
         if (!isApproved) {
             const admins = await userSchema.find({ role: 'admin' });
-            admins.forEach((admin) => {
+            admins.forEach(admin => {
                 const mailOptions = {
                     from: `"PlaymoodTV 📺" <${process.env.EMAIL_USERNAME}>`,
                     to: admin.email,
@@ -243,7 +209,7 @@ const createContent = asyncHandler(async (req, res) => {
                                         <p>Dear ${admin.name},</p>
                                         <p>A new content titled "${title}" has been created and requires your approval.</p>
                                         <p>Please use the following button to approve the content:</p>
-                                        <a class="approve-button" href="${process.env.APP_URL}/admin/approve-content/${content._id}" target="_blank">Approve Content</a>
+                                        <a class="approve-button" href="http://localhost:3000/admin/approve-content/${content._id}" target="_blank">Approve Content</a>
                                         <p>Thank you for your attention.</p>
                                     </div>
                                     <div class="footer">
@@ -253,12 +219,12 @@ const createContent = asyncHandler(async (req, res) => {
                                 </div>
                             </body>
                         </html>
-                    `,
+                    `
                 };
 
                 transporter.sendMail(mailOptions, (error, info) => {
                     if (error) {
-                        console.error('Error sending email:', error);
+                        console.error("Error sending email:", error);
                     } else {
                         console.log('Email sent:', info.response);
                     }
@@ -268,127 +234,10 @@ const createContent = asyncHandler(async (req, res) => {
 
         res.status(201).json(content);
     } catch (error) {
-        // Clean up temporary files in case of error
-        if (req.files) {
-            try {
-                await Promise.all(req.files.map((file) => fs.unlink(file.path)));
-            } catch (cleanupError) {
-                console.warn('Failed to delete temporary files:', cleanupError.message);
-            }
-        }
-        console.error('Create content error:', error);
-        res.status(500).json({ error: 'Server error', details: error.message });
+        console.error(error);
+        res.status(500).json({ error: 'Server error' });
     }
 });
-
-
-
-
-
-
-
-
-
-// const createContent = asyncHandler(async (req, res) => {
-//     try {
-//         const { title, category, description, credit, userId } = req.body;
-
-//         if (!title || !category || !description || !credit || !userId) {
-//             return res.status(400).json({ error: 'Important fields missing!' });
-//         }
-
-//         if (!req.files || req.files.length !== 2) {
-//             return res.status(400).json({ error: 'Both video and thumbnail files are required!' });
-//         }
-
-//         const [videoFile, thumbnailFile] = req.files;
-
-//         const videoResult = await cloudinary.uploader.upload(videoFile.path, {
-//             resource_type: 'video',
-//             folder: "videos"
-//         });
-
-//         const thumbnailResult = await cloudinary.uploader.upload(thumbnailFile.path, {
-//             folder: "thumbnails"
-//         });
-
-//         const user = await userSchema.findById(userId);
-//         if (user.role !== 'creator' && user.role !== 'admin') {
-//             return res.status(403).json({ error: 'Unauthorized to create content' });
-//         }
-
-//         const isApproved = user.role === 'admin';
-
-//         const content = await contentSchema.create({
-//             user: userId,
-//             title,
-//             category,
-//             description,
-//             credit,
-//             thumbnail: thumbnailResult.secure_url,
-//             video: videoResult.secure_url,
-//             cloudinary_video_id: videoResult.public_id,
-//             cloudinary_thumbnail_id: thumbnailResult.public_id,
-//             isApproved
-//         });
-
-//         if (!isApproved) {
-//             const admins = await userSchema.find({ role: 'admin' });
-//             admins.forEach(admin => {
-//                 const mailOptions = {
-//                     from: `"PlaymoodTV 📺" <${process.env.EMAIL_USERNAME}>`,
-//                     to: admin.email,
-//                     subject: 'New Content Approval Request',
-//                     html: `
-//                         <html>
-//                             <head>
-//                                 <style>
-//                                     body { font-family: Arial, sans-serif; background-color: #f0f0f0; color: #333; padding: 20px; }
-//                                     .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1); }
-//                                     .header { background-color: tomato; color: white; padding: 10px; text-align: center; border-top-left-radius: 8px; border-top-right-radius: 8px; }
-//                                     .content { padding: 20px; }
-//                                     .approve-button { display: inline-block; padding: 10px 20px; background-color: tomato; color: white; text-decoration: none; border-radius: 5px; }
-//                                     .footer { margin-top: 20px; text-align: center; color: #666; font-size: 12px; }
-//                                 </style>
-//                             </head>
-//                             <body>
-//                                 <div class="container">
-//                                     <div class="header">
-//                                         <h2>New Content Approval Request</h2>
-//                                     </div>
-//                                     <div class="content">
-//                                         <p>Dear ${admin.name},</p>
-//                                         <p>A new content titled "${title}" has been created and requires your approval.</p>
-//                                         <p>Please use the following button to approve the content:</p>
-//                                         <a class="approve-button" href="http://localhost:3000/admin/approve-content/${content._id}" target="_blank">Approve Content</a>
-//                                         <p>Thank you for your attention.</p>
-//                                     </div>
-//                                     <div class="footer">
-//                                         <p>Best regards,</p>
-//                                         <p>The PlaymoodTV Team</p>
-//                                     </div>
-//                                 </div>
-//                             </body>
-//                         </html>
-//                     `
-//                 };
-
-//                 transporter.sendMail(mailOptions, (error, info) => {
-//                     if (error) {
-//                         console.error("Error sending email:", error);
-//                     } else {
-//                         console.log('Email sent:', info.response);
-//                     }
-//                 });
-//             });
-//         }
-
-//         res.status(201).json(content);
-//     } catch (error) {
-//         console.error(error);
-//         res.status(500).json({ error: 'Server error' });
-//     }
-// });
 
 // @desc Approve Content
 // @route PUT /api/content/approve/:id
