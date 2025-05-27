@@ -347,146 +347,64 @@ const createContent = asyncHandler(async (req, res) => {
     }
 });
 
-// const createContent = asyncHandler(async (req, res) => {
-//     try {
-//         const { title, category, description, credit, userId } = req.body;
+// Add a comment to content
+const addComment = asyncHandler(async (req, res) => {
+    try {
+        const { contentId, text } = req.body;
+        const userId = req.user.id; // From protect middleware
 
-//         if (!title || !category || !description || !credit || !userId) {
-//             return res.status(400).json({ error: 'Important fields missing!' });
-//         }
+        // Validate input
+        if (!contentId || !text) {
+            return res.status(400).json({ error: 'Content ID and comment text are required!' });
+        }
+        if (typeof text !== 'string' || text.trim().length === 0) {
+            return res.status(400).json({ error: 'Comment text cannot be empty!' });
+        }
+        if (text.length > 1000) {
+            return res.status(400).json({ error: 'Comment cannot exceed 1000 characters!' });
+        }
 
-//         if (!req.files || req.files.length === 0) {
-//             return res.status(400).json({ error: 'At least a video file is required!' });
-//         }
+        // Validate content exists
+        const content = await contentSchema.findById(contentId);
+        if (!content) {
+            return res.status(404).json({ error: 'Content not found!' });
+        }
 
-//         let videoFile, thumbnailFile;
+        // Validate user exists
+        const user = await userSchema.findById(userId);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found!' });
+        }
 
-//         // Separate video and thumbnail files based on MIME type
-//         req.files.forEach(file => {
-//             if (file.mimetype.toLowerCase().startsWith('video/')) {
-//                 videoFile = file;
-//             } else if (file.mimetype.toLowerCase().startsWith('image/')) {
-//                 thumbnailFile = file;
-//             }
-//         });
+        // Add comment to content
+        const newComment = {
+            user: userId,
+            text: text.trim(),
+            createdAt: new Date(),
+        };
+        content.comments.push(newComment);
+        await content.save();
 
-//         if (!videoFile) {
-//             return res.status(400).json({ error: 'Video file is required!' });
-//         }
+        // Populate user details for the new comment
+        const updatedContent = await contentSchema
+            .findById(contentId)
+            .populate({
+                path: 'comments.user',
+                select: 'name profileImage', // Include user name and image
+            });
 
-//         // Upload video with eager transformation for high-quality thumbnail
-//         const videoResult = await cloudinary.uploader.upload(videoFile.path, {
-//             resource_type: 'video',
-//             folder: 'videos',
-//             eager: [{
-//                 width: 1280,
-//                 height: 720,
-//                 crop: 'fill',
-//                 gravity: 'auto',
-//                 format: 'jpg',
-//                 start_offset: '2' // Capture at 2 seconds
-//             }]
-//         });
+        // Get the newly added comment
+        const addedComment = updatedContent.comments[updatedContent.comments.length - 1];
 
-//         fs.unlinkSync(videoFile.path); // Remove video from temp
-
-//         let thumbnailUrl = '';
-//         let cloudinaryThumbnailId = '';
-
-//         // Upload manual thumbnail if provided
-//         if (thumbnailFile) {
-//             const thumbnailResult = await cloudinary.uploader.upload(thumbnailFile.path, {
-//                 folder: 'thumbnails',
-//                 transformation: [
-//                     { width: 1280, height: 720, crop: 'fill', gravity: 'auto' }
-//                 ]
-//             });
-//             fs.unlinkSync(thumbnailFile.path); // Clean up local file
-//             thumbnailUrl = thumbnailResult.secure_url;
-//             cloudinaryThumbnailId = thumbnailResult.public_id;
-//         } else {
-//             // Use generated thumbnail
-//             thumbnailUrl = videoResult.eager?.[0]?.secure_url || '';
-//         }
-
-//         const user = await userSchema.findById(userId);
-//         if (!user || (user.role !== 'creator' && user.role !== 'admin')) {
-//             return res.status(403).json({ error: 'Unauthorized to create content' });
-//         }
-
-//         const isApproved = user.role === 'admin';
-
-//         const content = await contentSchema.create({
-//             user: userId,
-//             title,
-//             category,
-//             description,
-//             credit,
-//             thumbnail: thumbnailUrl,
-//             video: videoResult.secure_url,
-//             cloudinary_video_id: videoResult.public_id,
-//             cloudinary_thumbnail_id: cloudinaryThumbnailId,
-//             isApproved
-//         });
-
-//         if (!isApproved) {
-//             const admins = await userSchema.find({ role: 'admin' });
-
-//             admins.forEach(admin => {
-//                 const mailOptions = {
-//                     from: `"PlaymoodTV 📺" <${process.env.EMAIL_USERNAME}>`,
-//                     to: admin.email,
-//                     subject: 'New Content Approval Request',
-//                     html: `
-//                         <html>
-//                             <head>
-//                                 <style>
-//                                     body { font-family: Arial, sans-serif; background-color: #f0f0f0; color: #333; padding: 20px; }
-//                                     .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1); }
-//                                     .header { background-color: tomato; color: white; padding: 10px; text-align: center; border-top-left-radius: 8px; border-top-right-radius: 8px; }
-//                                     .content { padding: 20px; }
-//                                     .approve-button { display: inline-block; padding: 10px 20px; background-color: tomato; color: white; text-decoration: none; border-radius: 5px; }
-//                                     .footer { margin-top: 20px; text-align: center; color: #666; font-size: 12px; }
-//                                 </style>
-//                             </head>
-//                             <body>
-//                                 <div class="container">
-//                                     <div class="header">
-//                                         <h2>New Content Approval Request</h2>
-//                                     </div>
-//                                     <div class="content">
-//                                         <p>Dear ${admin.name},</p>
-//                                         <p>A new content titled "${title}" has been created and requires your approval.</p>
-//                                         <p>Please use the following button to approve the content:</p>
-//                                         <a class="approve-button" href="http://localhost:3000/admin/approve-content/${content._id}" target="_blank">Approve Content</a>
-//                                         <p>Thank you for your attention.</p>
-//                                     </div>
-//                                     <div class="footer">
-//                                         <p>Best regards,</p>
-//                                         <p>The PlaymoodTV Team</p>
-//                                     </div>
-//                                 </div>
-//                             </body>
-//                         </html>
-//                     `
-//                 };
-
-//                 transporter.sendMail(mailOptions, (error, info) => {
-//                     if (error) {
-//                         console.error('Error sending email:', error);
-//                     } else {
-//                         console.log('Email sent:', info.response);
-//                     }
-//                 });
-//             });
-//         }
-
-//         res.status(201).json(content);
-//     } catch (error) {
-//         console.error(error);
-//         res.status(500).json({ error: 'Server error' });
-//     }
-// });
+        res.status(201).json({
+            message: 'Comment added successfully!',
+            comment: addedComment,
+        });
+    } catch (error) {
+        console.error('Add comment error:', JSON.stringify(error, null, 2));
+        res.status(500).json({ error: 'Server error', details: error.message });
+    }
+});
 
 // @desc Approve Content
 // @route PUT /api/content/approve/:id
@@ -714,6 +632,7 @@ module.exports = {
     getRecentContent,
     getContentById,
     createContent,
+    addComment,
     updateContent,
     deleteContent,
     approveContent,

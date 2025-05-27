@@ -4,6 +4,7 @@ const {
     getContent, 
     getRecentContent,
     createContent, 
+    addComment,
     updateContent, 
     deleteContent, 
     getContentById, 
@@ -245,67 +246,80 @@ router.route('/').get(getContent);
 router.route('/').post(protect, upload.array('files', 2), createContent);
 
 
-// /**
-//  * @swagger
-//  * /:
-//  *   post:
-//  *     summary: Create new content
-//  *     description: >
-//  *       Creates a new content item. Requires a video file. Thumbnail is optional—if not provided, it will be automatically generated from the video.
-//  *       Sends approval email to admins if content is created by a non-admin.
-//  *     tags: [Content]
-//  *     security:
-//  *       - BearerAuth: []
-//  *     requestBody:
-//  *       required: true
-//  *       content:
-//  *         multipart/form-data:
-//  *           schema:
-//  *             type: object
-//  *             properties:
-//  *               title:
-//  *                 type: string
-//  *                 example: Sample Video
-//  *               category:
-//  *                 type: string
-//  *                 example: Entertainment
-//  *               description:
-//  *                 type: string
-//  *                 example: A fun and engaging video.
-//  *               credit:
-//  *                 type: string
-//  *                 example: John Doe Productions
-//  *               userId:
-//  *                 type: string
-//  *                 example: 65a8025e3af4e7929b379e7b
-//  *               files:
-//  *                 type: array
-//  *                 items:
-//  *                   type: string
-//  *                   format: binary
-//  *                 description: >
-//  *                   Upload one or two files:
-//  *                   - Required: 1 video file (.mp4)
-//  *                   - Optional: 1 image file (.jpg, .jpeg, .png) as thumbnail
-//  *                   If no thumbnail is uploaded, it will be generated from the video automatically.
-//  *     responses:
-//  *       201:
-//  *         description: Content created successfully
-//  *         content:
-//  *           application/json:
-//  *             schema:
-//  *               $ref: '#/components/schemas/Content'
-//  *       400:
-//  *         description: Missing required fields or invalid files
-//  *       401:
-//  *         description: Unauthorized - Missing or invalid JWT token
-//  *       403:
-//  *         description: Unauthorized to create content
-//  *       500:
-//  *         description: Server error
-//  */
+/**
+ * @swagger
+ * /api/content/{contentId}/comment:
+ *   post:
+ *     summary: Add a comment to content
+ *     description: Allows an authenticated user to post a comment on a specific content item.
+ *     tags: [Content]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: contentId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID of the content to comment on
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - text
+ *             properties:
+ *               text:
+ *                 type: string
+ *                 example: Great video! Loved the content!
+ *                 description: The comment text (max 1000 characters)
+ *     responses:
+ *       201:
+ *         description: Comment added successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Comment added successfully!
+ *                 comment:
+ *                   type: object
+ *                   properties:
+ *                     user:
+ *                       type: object
+ *                       properties:
+ *                         _id:
+ *                           type: string
+ *                           example: 65a8025e3af4e7929b379e7a
+ *                         name:
+ *                           type: string
+ *                           example: John Doe
+ *                         profileImage:
+ *                           type: string
+ *                           example: https://res.cloudinary.com/.../profile.jpg
+ *                     text:
+ *                       type: string
+ *                       example: Great video! Loved the content!
+ *                     createdAt:
+ *                       type: string
+ *                       format: date-time
+ *                       example: 2025-05-27T15:40:59.819Z
+ *       400:
+ *         description: Missing or invalid comment text
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Content or user not found
+ *       500:
+ *         description: Server error
+ */
+router.route('/:contentId/comment').post(protect, addComment);
 
-// router.route('/').post(protect, upload.array('files', 2), createContent);
+
 
 /**
  * @swagger
