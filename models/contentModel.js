@@ -4,7 +4,7 @@ const contentSchema = new mongoose.Schema({
     user: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'profiles',
-        required: true
+        required: true,
     },
     title: {
         type: String,
@@ -22,7 +22,16 @@ const contentSchema = new mongoose.Schema({
         type: String,
     },
     shortPreview: {
-        type: String,
+        type: {
+            start: { type: Number, required: true }, // Start time in seconds
+            end: { type: Number, required: true }, // End time in seconds
+        },
+        validate: {
+            validator: function (preview) {
+                return preview.end - preview.start === 10; // Ensure exactly 10 seconds
+            },
+            message: 'Preview segment must be exactly 10 seconds.',
+        },
     },
     credit: {
         type: String,
@@ -46,9 +55,9 @@ const contentSchema = new mongoose.Schema({
         type: Number,
         default: 0,
     },
-    viewers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'profiles' }], // Array for logged-in users
-    viewerIPs: [{ type: String }], // Array to track viewer IPs for non-logged-in users
-    likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'profiles' }]
+    viewers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'profiles' }],
+    viewerIPs: [{ type: String }],
+    likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'profiles' }],
 }, {
     timestamps: true,
 });

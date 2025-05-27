@@ -124,16 +124,14 @@ const { protect } = require('../middleware/authmiddleware');
  *       500:
  *         description: Server error
  */
-router.route('/').get(getContent);     
+router.route('/').get(getContent);    
 
 /**
  * @swagger
- * /:
+ * /api/content:
  *   post:
  *     summary: Create new content
- *     description: >
- *       Creates a new content item. Requires a video file. Thumbnail is optional—if not provided, it will be automatically generated from the video.
- *       Sends approval email to admins if content is created by a non-admin.
+ *     description: Creates a new content item with a video, optional thumbnail, and a 10-second preview segment. Only creators and admins can create content. Admins' content is auto-approved; creators' content requires admin approval.
  *     tags: [Content]
  *     security:
  *       - BearerAuth: []
@@ -143,50 +141,171 @@ router.route('/').get(getContent);
  *         multipart/form-data:
  *           schema:
  *             type: object
+ *             required:
+ *               - title
+ *               - category
+ *               - description
+ *               - credit
+ *               - userId
+ *               - files
+ *               - previewStart
+ *               - previewEnd
  *             properties:
  *               title:
  *                 type: string
- *                 example: Sample Video
+ *                 example: My Awesome Video
  *               category:
  *                 type: string
  *                 example: Entertainment
  *               description:
  *                 type: string
- *                 example: A fun and engaging video.
+ *                 example: A fun video about...
  *               credit:
  *                 type: string
- *                 example: John Doe Productions
+ *                 example: John Doe
  *               userId:
  *                 type: string
- *                 example: 65a8025e3af4e7929b379e7b
+ *                 example: 65a8025e3af4e7929b379e7a
+ *               previewStart:
+ *                 type: number
+ *                 example: 30
+ *                 description: Start time of the 10-second preview (in seconds)
+ *               previewEnd:
+ *                 type: number
+ *                 example: 40
+ *                 description: End time of the 10-second preview (in seconds)
  *               files:
  *                 type: array
  *                 items:
  *                   type: string
  *                   format: binary
- *                 description: >
- *                   Upload one or two files:
- *                   - Required: 1 video file (.mp4)
- *                   - Optional: 1 image file (.jpg, .jpeg, .png) as thumbnail
- *                   If no thumbnail is uploaded, it will be generated from the video automatically.
+ *                 description: Video file (required) and optional thumbnail image
  *     responses:
  *       201:
  *         description: Content created successfully
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Content'
+ *               type: object
+ *               properties:
+ *                 _id:
+ *                   type: string
+ *                   example: 65a8025e3af4e7929b379e7b
+ *                 user:
+ *                   type: string
+ *                   example: 65a8025e3af4e7929b379e7a
+ *                 title:
+ *                   type: string
+ *                   example: My Awesome Video
+ *                 category:
+ *                   type: string
+ *                   example: Entertainment
+ *                 description:
+ *                   type: string
+ *                   example: A fun video about...
+ *                 credit:
+ *                   type: string
+ *                   example: John Doe
+ *                 thumbnail:
+ *                   type: string
+ *                   example: https://res.cloudinary.com/.../thumbnail.jpg
+ *                 video:
+ *                   type: string
+ *                   example: https://res.cloudinary.com/.../video.mp4
+ *                 cloudinary_video_id:
+ *                   type: string
+ *                   example: videos/video123
+ *                 cloudinary_thumbnail_id:
+ *                   type: string
+ *                   example: thumbnails/thumb123
+ *                 shortPreview:
+ *                   type: object
+ *                   properties:
+ *                     start:
+ *                       type: number
+ *                       example: 30
+ *                     end:
+ *                       type: number
+ *                       example: 40
+ *                 isApproved:
+ *                   type: boolean
+ *                   example: false
+ *                 previewUrl:
+ *                   type: string
+ *                   example: https://res.cloudinary.com/.../so_30,eo_40/video123.mp4
  *       400:
- *         description: Missing required fields or invalid files
+ *         description: Missing fields, invalid file types, or invalid preview timeline
  *       401:
- *         description: Unauthorized - Missing or invalid JWT token
+ *         description: Unauthorized
  *       403:
- *         description: Unauthorized to create content
+ *         description: User is not a creator or admin
  *       500:
  *         description: Server error
  */
-
 router.route('/').post(protect, upload.array('files', 2), createContent);
+
+
+// /**
+//  * @swagger
+//  * /:
+//  *   post:
+//  *     summary: Create new content
+//  *     description: >
+//  *       Creates a new content item. Requires a video file. Thumbnail is optional—if not provided, it will be automatically generated from the video.
+//  *       Sends approval email to admins if content is created by a non-admin.
+//  *     tags: [Content]
+//  *     security:
+//  *       - BearerAuth: []
+//  *     requestBody:
+//  *       required: true
+//  *       content:
+//  *         multipart/form-data:
+//  *           schema:
+//  *             type: object
+//  *             properties:
+//  *               title:
+//  *                 type: string
+//  *                 example: Sample Video
+//  *               category:
+//  *                 type: string
+//  *                 example: Entertainment
+//  *               description:
+//  *                 type: string
+//  *                 example: A fun and engaging video.
+//  *               credit:
+//  *                 type: string
+//  *                 example: John Doe Productions
+//  *               userId:
+//  *                 type: string
+//  *                 example: 65a8025e3af4e7929b379e7b
+//  *               files:
+//  *                 type: array
+//  *                 items:
+//  *                   type: string
+//  *                   format: binary
+//  *                 description: >
+//  *                   Upload one or two files:
+//  *                   - Required: 1 video file (.mp4)
+//  *                   - Optional: 1 image file (.jpg, .jpeg, .png) as thumbnail
+//  *                   If no thumbnail is uploaded, it will be generated from the video automatically.
+//  *     responses:
+//  *       201:
+//  *         description: Content created successfully
+//  *         content:
+//  *           application/json:
+//  *             schema:
+//  *               $ref: '#/components/schemas/Content'
+//  *       400:
+//  *         description: Missing required fields or invalid files
+//  *       401:
+//  *         description: Unauthorized - Missing or invalid JWT token
+//  *       403:
+//  *         description: Unauthorized to create content
+//  *       500:
+//  *         description: Server error
+//  */
+
+// router.route('/').post(protect, upload.array('files', 2), createContent);
 
 /**
  * @swagger

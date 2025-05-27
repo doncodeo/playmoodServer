@@ -138,19 +138,31 @@ const getContentById = asyncHandler(async (req, res) => {
 
 // @desc Create Content
 // @route POST /api/content
-// @access Private
-
-
-
+// @access Private 
 
 const createContent = asyncHandler(async (req, res) => {
     try {
-        const { title, category, description, credit, userId } = req.body;
+        const { title, category, description, credit, userId, previewStart, previewEnd } = req.body;
 
+        // Validate required fields
         if (!title || !category || !description || !credit || !userId) {
             return res.status(400).json({ error: 'Important fields missing!' });
         }
 
+        // Validate preview timeline
+        const start = parseFloat(previewStart);
+        const end = parseFloat(previewEnd);
+        if (isNaN(start) || isNaN(end)) {
+            return res.status(400).json({ error: 'Preview start and end times are required!' });
+        }
+        if (end - start !== 10) {
+            return res.status(400).json({ error: 'Preview segment must be exactly 10 seconds!' });
+        }
+        if (start < 0) {
+            return res.status(400).json({ error: 'Preview start time cannot be negative!' });
+        }
+
+        // Validate files
         if (!req.files || req.files.length === 0) {
             return res.status(400).json({ error: 'At least a video file is required!' });
         }
@@ -170,7 +182,7 @@ const createContent = asyncHandler(async (req, res) => {
             return res.status(400).json({ error: 'Video file is required!' });
         }
 
-        // Upload video with eager transformation for high-quality thumbnail
+        // Upload video to Cloudinary first
         const videoResult = await cloudinary.uploader.upload(videoFile.path, {
             resource_type: 'video',
             folder: 'videos',
@@ -180,11 +192,36 @@ const createContent = asyncHandler(async (req, res) => {
                 crop: 'fill',
                 gravity: 'auto',
                 format: 'jpg',
-                start_offset: '2' // Capture at 2 seconds
-            }]
+                start_offset: '2',
+            }],
         });
 
-        fs.unlinkSync(videoFile.path); // Remove video from temp
+        // Clean up video file immediately after upload
+        try {
+            fs.unlinkSync(videoFile.path);
+        } catch (cleanupError) {
+            console.warn('Failed to delete video temp file:', cleanupError.message);
+        }
+
+        // Fetch video metadata to get duration
+        let videoDuration = Infinity; // Default to allow preview if metadata fetch fails
+        try {
+            const videoInfo = await cloudinary.api.resource(videoResult.public_id, {
+                resource_type: 'video',
+            });
+            videoDuration = videoInfo.duration; // Duration in seconds
+            console.log(`Video duration: ${videoDuration}s`);
+        } catch (metadataError) {
+            console.warn('Failed to fetch video metadata:', metadataError.message);
+            // Proceed without duration validation to avoid blocking upload
+        }
+
+        // Validate preview timeline against video duration
+        if (end > videoDuration) {
+            return res.status(400).json({
+                error: `Preview end time (${end}s) exceeds video duration (${videoDuration}s)!`,
+            });
+        }
 
         let thumbnailUrl = '';
         let cloudinaryThumbnailId = '';
@@ -194,24 +231,32 @@ const createContent = asyncHandler(async (req, res) => {
             const thumbnailResult = await cloudinary.uploader.upload(thumbnailFile.path, {
                 folder: 'thumbnails',
                 transformation: [
-                    { width: 1280, height: 720, crop: 'fill', gravity: 'auto' }
-                ]
+                    { width: 1280, height: 720, crop: 'fill', gravity: 'auto' },
+                ],
             });
-            fs.unlinkSync(thumbnailFile.path); // Clean up local file
+            try {
+                fs.unlinkSync(thumbnailFile.path);
+            } catch (cleanupError) {
+                console.warn('Failed to delete thumbnail temp file:', cleanupError.message);
+            }
             thumbnailUrl = thumbnailResult.secure_url;
             cloudinaryThumbnailId = thumbnailResult.public_id;
         } else {
-            // Use generated thumbnail
             thumbnailUrl = videoResult.eager?.[0]?.secure_url || '';
         }
 
+        // Validate user
         const user = await userSchema.findById(userId);
         if (!user || (user.role !== 'creator' && user.role !== 'admin')) {
             return res.status(403).json({ error: 'Unauthorized to create content' });
         }
+        if (userId !== req.user.id) {
+            return res.status(403).json({ error: 'Cannot create content for another user!' });
+        }
 
         const isApproved = user.role === 'admin';
 
+        // Create content with preview timeline
         const content = await contentSchema.create({
             user: userId,
             title,
@@ -222,12 +267,16 @@ const createContent = asyncHandler(async (req, res) => {
             video: videoResult.secure_url,
             cloudinary_video_id: videoResult.public_id,
             cloudinary_thumbnail_id: cloudinaryThumbnailId,
-            isApproved
+            shortPreview: { start, end },
+            isApproved,
         });
 
+        // Generate preview URL
+        const previewUrl = `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/video/upload/so_${start},eo_${end}/${videoResult.public_id}.mp4`;
+
+        // Send email to admins if not approved
         if (!isApproved) {
             const admins = await userSchema.find({ role: 'admin' });
-
             admins.forEach(admin => {
                 const mailOptions = {
                     from: `"PlaymoodTV 📺" <${process.env.EMAIL_USERNAME}>`,
@@ -253,8 +302,9 @@ const createContent = asyncHandler(async (req, res) => {
                                     <div class="content">
                                         <p>Dear ${admin.name},</p>
                                         <p>A new content titled "${title}" has been created and requires your approval.</p>
+                                        <p>Preview: <a href="${previewUrl}" target="_blank">View 10-second Preview</a></p>
                                         <p>Please use the following button to approve the content:</p>
-                                        <a class="approve-button" href="http://localhost:3000/admin/approve-content/${content._id}" target="_blank">Approve Content</a>
+                                        <a class="approve-button" href="${process.env.APP_URL}/admin/approve-content/${content._id}" target="_blank">Approve Content</a>
                                         <p>Thank you for your attention.</p>
                                     </div>
                                     <div class="footer">
@@ -264,7 +314,7 @@ const createContent = asyncHandler(async (req, res) => {
                                 </div>
                             </body>
                         </html>
-                    `
+                    `,
                 };
 
                 transporter.sendMail(mailOptions, (error, info) => {
@@ -277,20 +327,25 @@ const createContent = asyncHandler(async (req, res) => {
             });
         }
 
-        res.status(201).json(content);
+        res.status(201).json({
+            ...content._doc,
+            previewUrl,
+        });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Server error' });
+        // Clean up temporary files in case of error
+        if (req.files) {
+            req.files.forEach(file => {
+                try {
+                    fs.unlinkSync(file.path);
+                } catch (cleanupError) {
+                    console.warn('Failed to delete temporary file:', cleanupError.message);
+                }
+            });
+        }
+        console.error('Create content error:', JSON.stringify(error, null, 2));
+        res.status(500).json({ error: 'Server error', details: error.message });
     }
 });
-
-
-
-
-
-
-
-
 
 // const createContent = asyncHandler(async (req, res) => {
 //     try {
@@ -300,33 +355,59 @@ const createContent = asyncHandler(async (req, res) => {
 //             return res.status(400).json({ error: 'Important fields missing!' });
 //         }
 
-//         if (!req.files || req.files.length !== 1) {
-//             return res.status(400).json({ error: 'Only one video file is required!' });
+//         if (!req.files || req.files.length === 0) {
+//             return res.status(400).json({ error: 'At least a video file is required!' });
 //         }
 
-//         const videoFile = req.files[0];
+//         let videoFile, thumbnailFile;
 
-//         if (!videoFile.mimetype.toLowerCase().startsWith('video/')) {
-//             return res.status(400).json({ error: `Invalid file type: ${videoFile.mimetype}` });
+//         // Separate video and thumbnail files based on MIME type
+//         req.files.forEach(file => {
+//             if (file.mimetype.toLowerCase().startsWith('video/')) {
+//                 videoFile = file;
+//             } else if (file.mimetype.toLowerCase().startsWith('image/')) {
+//                 thumbnailFile = file;
+//             }
+//         });
+
+//         if (!videoFile) {
+//             return res.status(400).json({ error: 'Video file is required!' });
 //         }
 
-//         // Upload video and extract thumbnail using Cloudinary eager transformation
+//         // Upload video with eager transformation for high-quality thumbnail
 //         const videoResult = await cloudinary.uploader.upload(videoFile.path, {
 //             resource_type: 'video',
 //             folder: 'videos',
 //             eager: [{
-//                 width: 320,
-//                 height: 180,
-//                 crop: 'pad',
+//                 width: 1280,
+//                 height: 720,
+//                 crop: 'fill',
+//                 gravity: 'auto',
 //                 format: 'jpg',
-//                 start_offset: '1' // 1-second mark
+//                 start_offset: '2' // Capture at 2 seconds
 //             }]
 //         });
 
-//         // Delete local file
-//         fs.unlinkSync(videoFile.path);
+//         fs.unlinkSync(videoFile.path); // Remove video from temp
 
-//         const thumbnailUrl = videoResult.eager?.[0]?.secure_url || '';
+//         let thumbnailUrl = '';
+//         let cloudinaryThumbnailId = '';
+
+//         // Upload manual thumbnail if provided
+//         if (thumbnailFile) {
+//             const thumbnailResult = await cloudinary.uploader.upload(thumbnailFile.path, {
+//                 folder: 'thumbnails',
+//                 transformation: [
+//                     { width: 1280, height: 720, crop: 'fill', gravity: 'auto' }
+//                 ]
+//             });
+//             fs.unlinkSync(thumbnailFile.path); // Clean up local file
+//             thumbnailUrl = thumbnailResult.secure_url;
+//             cloudinaryThumbnailId = thumbnailResult.public_id;
+//         } else {
+//             // Use generated thumbnail
+//             thumbnailUrl = videoResult.eager?.[0]?.secure_url || '';
+//         }
 
 //         const user = await userSchema.findById(userId);
 //         if (!user || (user.role !== 'creator' && user.role !== 'admin')) {
@@ -344,6 +425,7 @@ const createContent = asyncHandler(async (req, res) => {
 //             thumbnail: thumbnailUrl,
 //             video: videoResult.secure_url,
 //             cloudinary_video_id: videoResult.public_id,
+//             cloudinary_thumbnail_id: cloudinaryThumbnailId,
 //             isApproved
 //         });
 
@@ -392,115 +474,6 @@ const createContent = asyncHandler(async (req, res) => {
 //                 transporter.sendMail(mailOptions, (error, info) => {
 //                     if (error) {
 //                         console.error('Error sending email:', error);
-//                     } else {
-//                         console.log('Email sent:', info.response);
-//                     }
-//                 });
-//             });
-//         }
-
-//         res.status(201).json(content);
-//     } catch (error) {
-//         console.error(error);
-//         res.status(500).json({ error: 'Server error' });
-//     }
-// });
-
-
-
-
-
-
-
-
-
-// const createContent = asyncHandler(async (req, res) => {
-//     try {
-//         const { title, category, description, credit, userId } = req.body;
-
-//         if (!title || !category || !description || !credit || !userId) {
-//             return res.status(400).json({ error: 'Important fields missing!' });
-//         }
-
-//         if (!req.files || req.files.length !== 2) {
-//             return res.status(400).json({ error: 'Both video and thumbnail files are required!' });
-//         }
-
-//         const [videoFile, thumbnailFile] = req.files;
-
-//         const videoResult = await cloudinary.uploader.upload(videoFile.path, {
-//             resource_type: 'video',
-//             folder: "videos"
-//         });
-
-//         const thumbnailResult = await cloudinary.uploader.upload(thumbnailFile.path, {
-//             folder: "thumbnails"
-//         });
-
-//         const user = await userSchema.findById(userId);
-//         if (user.role !== 'creator' && user.role !== 'admin') {
-//             return res.status(403).json({ error: 'Unauthorized to create content' });
-//         }
-
-//         const isApproved = user.role === 'admin';
-
-//         const content = await contentSchema.create({
-//             user: userId,
-//             title,
-//             category,
-//             description,
-//             credit,
-//             thumbnail: thumbnailResult.secure_url,
-//             video: videoResult.secure_url,
-//             cloudinary_video_id: videoResult.public_id,
-//             cloudinary_thumbnail_id: thumbnailResult.public_id,
-//             isApproved
-//         });
-
-//         if (!isApproved) {
-//             const admins = await userSchema.find({ role: 'admin' });
-//             admins.forEach(admin => {
-//                 const mailOptions = {
-//                     from: `"PlaymoodTV 📺" <${process.env.EMAIL_USERNAME}>`,
-//                     to: admin.email,
-//                     subject: 'New Content Approval Request',
-//                     html: `
-//                         <html>
-//                             <head>
-//                                 <style>
-//                                     body { font-family: Arial, sans-serif; background-color: #f0f0f0; color: #333; padding: 20px; }
-//                                     .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1); }
-//                                     .header { background-color: tomato; color: white; padding: 10px; text-align: center; border-top-left-radius: 8px; border-top-right-radius: 8px; }
-//                                     .content { padding: 20px; }
-//                                     .approve-button { display: inline-block; padding: 10px 20px; background-color: tomato; color: white; text-decoration: none; border-radius: 5px; }
-//                                     .footer { margin-top: 20px; text-align: center; color: #666; font-size: 12px; }
-//                                 </style>
-//                             </head>
-//                             <body>
-//                                 <div class="container">
-//                                     <div class="header">
-//                                         <h2>New Content Approval Request</h2>
-//                                     </div>
-//                                     <div class="content">
-//                                         <p>Dear ${admin.name},</p>
-//                                         <p>A new content titled "${title}" has been created and requires your approval.</p>
-//                                         <p>Please use the following button to approve the content:</p>
-//                                         <a class="approve-button" href="http://localhost:3000/admin/approve-content/${content._id}" target="_blank">Approve Content</a>
-//                                         <p>Thank you for your attention.</p>
-//                                     </div>
-//                                     <div class="footer">
-//                                         <p>Best regards,</p>
-//                                         <p>The PlaymoodTV Team</p>
-//                                     </div>
-//                                 </div>
-//                             </body>
-//                         </html>
-//                     `
-//                 };
-
-//                 transporter.sendMail(mailOptions, (error, info) => {
-//                     if (error) {
-//                         console.error("Error sending email:", error);
 //                     } else {
 //                         console.log('Email sent:', info.response);
 //                     }
