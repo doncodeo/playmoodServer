@@ -62,5 +62,5 @@ const contentSchema = new mongoose.Schema({
     timestamps: true,
 });
 
-module.exports = mongoose.model('Contents', contentSchema);
+module.exports = mongoose.model('Contents', contentSchema); 
 
