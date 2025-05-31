@@ -951,20 +951,40 @@ const unlikeContent = asyncHandler(async (req, res) => {
     }
 });
 
-// @desc GET Content
-// @route GET /api/user/getlike/:id for body
-// @route GET /api/user/getlike/id for params
-
+// @desc    Get liked content for the authenticated user
+// @route   GET /api/users/likes
+// @access  Private
 const getLikedContents = asyncHandler(async (req, res) => {
-    // const userId = req.body.userId; dont ever use this method to req from FE lol although it works for BE
-    const userId = req.params.id; // Access userId from URL parameter
+    const userId = req.user.id; // Get userId from authenticated user
+
+    // Validate userId format (should always be valid from protect middleware)
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+        return res.status(400).json({ error: 'Invalid user ID format' });
+    }
 
     try {
-        const user = await userData.findById(userId).populate('likes');
-        res.status(200).json({ likedContents: user.likes });
+        // Find user and populate likes
+        const user = await userData.findById(userId).populate({
+            path: 'likes',
+            select: 'title category description thumbnail video shortPreview previewUrl isApproved comments', // Include relevant fields
+            match: { isApproved: true }, // Optional: Only return approved content
+            populate: {
+                path: 'comments.user',
+                select: 'name profileImage', // Populate comment user details
+            },
+        });
+
+        // Check if user exists
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        res.status(200).json({
+            likedContents: user.likes || [], // Return empty array if no likes
+        });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Server error' });
+        console.error('Get liked contents error:', JSON.stringify(error, null, 2));
+        res.status(500).json({ error: 'Server error', details: error.message });
     }
 });
 

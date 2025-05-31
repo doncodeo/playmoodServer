@@ -588,20 +588,13 @@ router.route('/unlike').post(protect, unlikeContent);
 
 /**
  * @swagger
- * /api/users/likes/{userId}:
+ * /api/users/likes:
  *   get:
- *     summary: Get liked content
- *     description: Retrieves the list of content liked by the user.
+ *     summary: Get liked content for the authenticated user
+ *     description: Retrieves the list of content liked by the currently authenticated user.
  *     tags: [Users]
  *     security:
  *       - BearerAuth: []
- *     parameters:
- *       - in: path
- *         name: userId
- *         required: true
- *         schema:
- *           type: string
- *         description: User ID
  *     responses:
  *       200:
  *         description: List of liked content
@@ -614,6 +607,8 @@ router.route('/unlike').post(protect, unlikeContent);
  *                   type: array
  *                   items:
  *                     $ref: '#/components/schemas/Content'
+ *       400:
+ *         description: Invalid user ID format
  *       401:
  *         description: Unauthorized
  *       404:
@@ -621,13 +616,14 @@ router.route('/unlike').post(protect, unlikeContent);
  *       500:
  *         description: Server error
  */
-router.route('/likes/:userId').get(protect, getLikedContents);
+router.route('/likes').get(protect, getLikedContents);
+
 
 /**
  * @swagger
  * /api/users/watchlist/{userId}:
  *   post:
- *     summary: Add content to watchlist
+ *     summary: Add content to watchlist 
  *     description: Adds a content ID to the user's watchlist.
  *     tags: [Users]
  *     security:
