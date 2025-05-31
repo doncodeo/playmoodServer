@@ -671,22 +671,17 @@ router.route('/likes').get(protect, getLikedContents);
  */
 router.route('/watchlist/:userId').post(protect, addWatchlist);
 
+
+
 /**
  * @swagger
- * /api/users/watchlist/{userId}:
+ * /api/users/watchlist:
  *   get:
- *     summary: Get watchlist
- *     description: Retrieves the user's watchlist.
+ *     summary: Get watchlist for authenticated user
+ *     description: Retrieves the watchlist of the currently authenticated user.
  *     tags: [Users]
  *     security:
  *       - BearerAuth: []
- *     parameters:
- *       - in: path
- *         name: userId
- *         required: true
- *         schema:
- *           type: string 
- *         description: User ID
  *     responses:
  *       200:
  *         description: User's watchlist
@@ -695,10 +690,12 @@ router.route('/watchlist/:userId').post(protect, addWatchlist);
  *             schema:
  *               type: object
  *               properties:
- *                 watchlist:
+ *                 watchList:
  *                   type: array
  *                   items:
  *                     $ref: '#/components/schemas/Content'
+ *       400:
+ *         description: Invalid user ID format
  *       401:
  *         description: Unauthorized
  *       404:
@@ -706,7 +703,10 @@ router.route('/watchlist/:userId').post(protect, addWatchlist);
  *       500:
  *         description: Server error
  */
-router.route('/watchlist/:userId').get(protect, getWatchlist);
+router.route('/watchlist').get(protect, getWatchlist);
+
+
+
 
 /**
  * @swagger
