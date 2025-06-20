@@ -496,44 +496,58 @@ const deleteContent = asyncHandler(async (req, res) => {
     }
 });
 
-// @desc Save Video Progress
-// @route POST /api/content/progress/
-// @access Private
+
+// @desc    Update video progress
+// @route   POST /api/content/progress/:contentId
+// @access  Private
 const saveVideoProgress = asyncHandler(async (req, res) => {
-    const userId = req.user._id;
-    const { contentId, progress } = req.body;
+    const userId = req.user.id;
+    const { contentId } = req.params;
+    const { progress } = req.body; // Progress in seconds
 
-    if (!contentId || progress === undefined || progress < 0) {
-        return res.status(400).json({ error: 'Content ID and valid progress are required' });
+    if (!mongoose.Types.ObjectId.isValid(contentId)) {
+        return res.status(400).json({ error: 'Invalid content ID format' });
+    }
+    if (typeof progress !== 'number' || progress < 0) {
+        return res.status(400).json({ error: 'Invalid progress value' });
     }
 
-    const content = await contentSchema.findById(contentId);
-    if (!content) {
-        return res.status(404).json({ error: 'Content not found' });
+    try {
+        const user = await userData.findById(userId);
+        const content = await require('../models/contentModel').findById(contentId);
+
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        if (!content) {
+            return res.status(404).json({ error: 'Content not found' });
+        }
+
+        // Find or create progress record
+        const existingRecord = user.videoProgress.find(record =>
+            record.contentId.equals(contentId)
+        );
+
+        if (existingRecord) {
+            existingRecord.progress = progress;
+        } else {
+            user.videoProgress.push({ contentId, progress });
+        }
+
+        await user.save();
+
+        res.status(200).json({
+            message: 'Video progress updated successfully',
+            progress,
+            contentId,
+        });
+    } catch (error) {
+        console.error('Update video progress error:', JSON.stringify(error, null, 2));
+        res.status(500).json({ error: 'Server error', details: error.message });
     }
+})
 
-    const user = await userSchema.findById(userId);
-    if (!user) {
-        return res.status(404).json({ error: 'User not found' });
-    }
 
-    const progressRecord = user.videoProgress.find(
-        record => record.contentId.toString() === contentId.toString()
-    );
-
-    if (progressRecord) {
-        progressRecord.progress = progress;
-    } else {
-        user.videoProgress.push({ contentId, progress });
-    }
-
-    await user.save();
-    res.status(200).json({ 
-        message: 'Video progress saved successfully', 
-        contentId, 
-        progress 
-    });
-});
 
 // @desc Get Video Progress
 // @route GET /api/content/progress/:contentId
@@ -572,56 +586,82 @@ const getVideoProgress = asyncHandler(async (req, res) => {
     res.status(200).json({ progress });
 });
 
-// @desc Get all videos in user's continue watching list
-// @route GET /api/content/continue-watching
-// @access Private
+// @desc    Get all videos in user's continue watching list
+// @route   GET /api/content/continue-watching
+// @access  Private
 const ContinueWatching = asyncHandler(async (req, res) => {
-    const userId = req.user._id;
+    const userId = req.user.id; // Use id instead of _id for consistency
 
-    // Fetch user with populated videoProgress
-    const user = await userSchema.findById(userId).populate({
-        path: 'videoProgress.contentId',
-        select: 'title category description thumbnail video views likes createdAt',
-    });
+    console.log('Authenticated userId:', userId); // Debug
 
-    if (!user) {
-        return res.status(404).json({ error: 'User not found' });
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+        console.error('Invalid userId format:', userId);
+        return res.status(400).json({ error: 'Invalid user ID format' });
     }
 
-    // Filter videos with progress > 0 and valid content
-    const continueWatching = user.videoProgress
-        .filter(record => record.progress > 0 && record.contentId) // Exclude zero progress or deleted content
-        .map(record => ({
-            contentId: record.contentId._id,
-            title: record.contentId.title,
-            category: record.contentId.category,
-            description: record.contentId.description,
-            thumbnail: record.contentId.thumbnail,
-            video: record.contentId.video,
-            views: record.contentId.views,
-            likes: record.contentId.likes,
-            createdAt: record.contentId.createdAt,
-            progress: record.progress,
-        }))
-        .sort((a, b) => b.createdAt - a.createdAt); // Sort by content creation date (newest first)
+    try {
+        // Fetch user with populated videoProgress
+        const user = await userSchema.findById(userId).populate({
+            path: 'videoProgress.contentId',
+            select: 'title category description thumbnail video videoPreviewUrl duration views likes createdAt',
+            match: { isApproved: true }, // Optional: Only approved content
+        });
 
-    // Generate ETag based on userId and videoProgress
-    const etag = `"continue-watching-${userId}-${JSON.stringify(continueWatching.map(v => `${v.contentId}-${v.progress}`))}"`;
+        if (!user) {
+            console.error('User not found for ID:', userId);
+            return res.status(404).json({ error: 'User not found' });
+        }
 
-    if (req.get('If-None-Match') === etag) {
-        return res.status(304).end();
+        // Filter videos with progress > 0 and valid content
+        const continueWatching = user.videoProgress
+            .filter(record => record.progress > 0 && record.contentId) // Exclude zero progress or invalid content
+            .map(record => ({
+                contentId: record.contentId._id,
+                title: record.contentId.title,
+                category: record.contentId.category,
+                description: record.contentId.description,
+                thumbnail: record.contentId.thumbnail,
+                video: record.contentId.video,
+                videoPreviewUrl: record.contentId.videoPreviewUrl,
+                duration: record.contentId.duration,
+                views: record.contentId.views,
+                likes: record.contentId.likes,
+                createdAt: record.contentId.createdAt,
+                progress: record.progress,
+            }))
+            .sort((a, b) => b.createdAt - a.createdAt); // Sort by creation date
+
+        console.log('Continue watching count:', continueWatching.length); // Debug
+
+        // Generate ETag
+        const etag = `"continue-watching-${userId}-${JSON.stringify(continueWatching.map(v => `${v.contentId}-${v.progress}`))}"`;
+
+        if (req.get('If-None-Match') === etag) {
+            return res.status(304).end();
+        }
+
+        res.set({
+            'Cache-Control': 'private, max-age=300',
+            'ETag': etag,
+        });
+
+        res.status(200).json({
+            message: 'Continue watching list retrieved successfully',
+            continueWatching,
+        });
+    } catch (error) {
+        console.error('Continue watching error:', {
+            message: error.message || 'No message',
+            name: error.name || 'No name',
+            stack: error.stack || 'No stack',
+        });
+        if (error.name === 'CastError') {
+            return res.status(400).json({ error: 'Invalid video progress entry detected', details: error.message });
+        }
+        res.status(500).json({ error: 'Server error', details: error.message || 'Unknown error' });
     }
-
-    res.set({
-        'Cache-Control': 'private, max-age=300', // Cache for 5 minutes
-        'ETag': etag,
-    });
-
-    res.status(200).json({
-        message: 'Continue watching list retrieved successfully',
-        continueWatching,
-    });
 });
+
 
 
 

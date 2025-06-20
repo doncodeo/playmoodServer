@@ -436,7 +436,7 @@ router.route('/unapproved').get(protect, getUnapprovedContent);
  *       500:
  *         description: Server error
  */
-router.route('/:id').get(protect, getContentById);
+router.route('/:id').get(getContentById);
 
 /**
  * @swagger
@@ -580,13 +580,20 @@ router.route('/approve/:id').put(protect, approveContent);
 
 /**
  * @swagger
- * /progress:
+ * /api/content/progress/{contentId}:
  *   post:
- *     summary: Save video progress
- *     description: Saves the playback progress for a specific content item for the authenticated user.
+ *     summary: Update video progress
+ *     description: Updates the playback progress for a specific video for the authenticated user.
  *     tags: [Content]
  *     security:
  *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: contentId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Content ID
  *     requestBody:
  *       required: true
  *       content:
@@ -594,16 +601,13 @@ router.route('/approve/:id').put(protect, approveContent);
  *           schema:
  *             type: object
  *             properties:
- *               contentId:
- *                 type: string
- *                 example: 65a6fc7b72128447ad32024e
  *               progress:
  *                 type: number
  *                 example: 120.5
  *                 description: Playback progress in seconds
  *     responses:
  *       200:
- *         description: Video progress saved successfully
+ *         description: Video progress updated
  *         content:
  *           application/json:
  *             schema:
@@ -611,21 +615,21 @@ router.route('/approve/:id').put(protect, approveContent);
  *               properties:
  *                 message:
  *                   type: string
- *                   example: Video progress saved successfully
- *                 contentId:
- *                   type: string
+ *                   example: Video progress updated successfully
  *                 progress:
  *                   type: number
+ *                 contentId:
+ *                   type: string
  *       400:
- *         description: Missing or invalid fields
+ *         description: Invalid content ID or progress value
  *       401:
- *         description: Unauthorized - Missing or invalid JWT token
+ *         description: Unauthorized
  *       404:
- *         description: Content or user not found
+ *         description: User or content not found
  *       500:
  *         description: Server error
  */
-router.route('/progress').post(protect, saveVideoProgress);
+router.route('/progress/:contentId').post(protect, saveVideoProgress);
 
 /**
  * @swagger
@@ -678,7 +682,7 @@ router.route('/progress/:contentId').get(protect, getVideoProgress);
 
 /**
  * @swagger
- * /continue-watching:
+ * /api/content/continue-watching:
  *   get:
  *     summary: Get continue watching list
  *     description: Retrieves all videos the authenticated user has started watching, including video details and playback progress. Includes caching with ETag.
@@ -696,7 +700,7 @@ router.route('/progress/:contentId').get(protect, getVideoProgress);
  *           ETag:
  *             schema:
  *               type: string
- *               example: "continue-watching-65a8025e3af4e7929b379e7b-[...]"
+ *               example: "continue-watching-682fa4973b7d2a9c142724e3-[...]"
  *         content:
  *           application/json:
  *             schema:
@@ -712,41 +716,36 @@ router.route('/progress/:contentId').get(protect, getVideoProgress);
  *                     properties:
  *                       contentId:
  *                         type: string
- *                         example: 65a6fc7b72128447ad32024e
+ *                         example: 6835dd0b1d00e49b7470f471
  *                       title:
  *                         type: string
- *                         example: My Awesome Video
  *                       category:
  *                         type: string
- *                         example: Entertainment
  *                       description:
  *                         type: string
- *                         example: A fun video about...
  *                       thumbnail:
  *                         type: string
- *                         example: https://res.cloudinary.com/.../thumbnail.jpg
  *                       video:
  *                         type: string
- *                         example: https://res.cloudinary.com/.../video.mp4
+ *                       videoPreviewUrl:
+ *                         type: string
+ *                       duration:
+ *                         type: number
  *                       views:
  *                         type: number
- *                         example: 100
  *                       likes:
  *                         type: array
  *                         items:
  *                           type: string
- *                           example: 65a8025e3af4e7929b379e7c
  *                       createdAt:
  *                         type: string
  *                         format: date-time
- *                         example: 2025-05-14T22:52:00.000Z
  *                       progress:
  *                         type: number
- *                         example: 120.5
  *       304:
  *         description: Not Modified (ETag match)
  *       401:
- *         description: Unauthorized - Missing or invalid JWT token
+ *         description: Unauthorized
  *       404:
  *         description: User not found
  *       500:
@@ -754,8 +753,4 @@ router.route('/progress/:contentId').get(protect, getVideoProgress);
  */
 router.route('/continue-watching').get(protect, ContinueWatching);
 
-
-
-
-
-module.exports = router;
+module.exports = router;   
