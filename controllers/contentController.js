@@ -67,6 +67,76 @@ const getRecentContent = asyncHandler(async (req, res) => {
     }
 });
 
+
+// @desc    Get the most recent approved content for a specific creator
+// @route   GET /api/content/creator/:userId/recent
+// @access  Public
+const getRecentCreatorContent = asyncHandler(async (req, res) => {
+    const { userId } = req.params;
+
+    console.log('Requested creator userId:', userId); // Debug
+
+    // Validate userId format
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+        console.error('Invalid userId format:', userId);
+        return res.status(400).json({ error: 'Invalid creator ID format' });
+    }
+
+    try {
+        // Verify user exists and is a creator
+        const user = await userSchema.findById(userId).select('name role');
+        if (!user) {
+            console.error('User not found for ID:', userId);
+            return res.status(404).json({ error: 'Creator not found' });
+        }
+        if (user.role !== 'creator') {
+            console.error('User is not a creator:', userId);
+            return res.status(400).json({ error: 'User is not a creator' });
+        }
+
+        // Fetch the most recent approved content
+        const recentContent = await contentSchema.findOne({
+            user: userId,
+            isApproved: true,
+        })
+            .sort({ createdAt: -1 })
+            .populate('user', 'name')
+            .populate({
+                path: 'comments.user',
+                select: 'name profileImage',
+            });
+
+        // Generate ETag
+        const lastCreated = recentContent ? recentContent.createdAt.getTime() : 0;
+        const etag = `"creator-recent-${userId}-${lastCreated}"`;
+
+        if (req.get('If-None-Match') === etag) {
+            return res.status(304).end();
+        }
+
+        res.set({
+            'Cache-Control': 'private, max-age=900', // Cache for 15 minutes
+            'ETag': etag,
+        });
+
+        res.status(200).json({
+            message: recentContent ? 'Most recent creator content retrieved successfully' : 'No approved content found for this creator',
+            content: recentContent || null,
+        });
+    } catch (error) {
+        console.error('Get most recent creator content error:', {
+            message: error.message || 'No message',
+            name: error.name || 'No name',
+            stack: error.stack || 'No stack',
+        });
+        if (error.name === 'CastError') {
+            return res.status(400).json({ error: 'Invalid data detected', details: error.message });
+        }
+        res.status(500).json({ error: 'Server error', details: error.message || 'Unknown error' });
+    }
+});
+
+
 // @desc Get All Unapproved Content
 // @route GET /api/content/unapproved
 // @access Private (Admin only)
@@ -670,6 +740,7 @@ const ContinueWatching = asyncHandler(async (req, res) => {
 module.exports = {
     getContent,
     getRecentContent,
+    getRecentCreatorContent,
     getContentById,
     createContent,
     addComment,

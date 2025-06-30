@@ -3,6 +3,7 @@ const router = express.Router();
 const { 
     getContent, 
     getRecentContent,
+    getRecentCreatorContent,
     createContent, 
     addComment,
     updateContent, 
@@ -356,6 +357,56 @@ router.route('/:contentId/comment').post(protect, addComment);
  *         description: Server error
  */
 router.route('/new').get(getRecentContent);
+
+/**
+ * @swagger
+ * /api/content/creator/{userId}/recent:
+ *   get:
+ *     summary: Get the most recent approved content for a specific creator
+ *     description: Retrieves the single most recent approved content item created by the specified creator, sorted by creation date. Includes caching with ETag.
+ *     tags: [Content]
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Creator's user ID
+ *     responses:
+ *       200:
+ *         description: Most recent creator content retrieved successfully
+ *         headers:
+ *           Cache-Control:
+ *             schema:
+ *               type: string
+ *               example: private, max-age=900
+ *           ETag:
+ *             schema:
+ *               type: string
+ *               example: "creator-recent-682fa4973b7d2a9c142724e3-1697059200000"
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Most recent creator content retrieved successfully
+ *                 content:
+ *                   oneOf:
+ *                     - $ref: '#/components/schemas/Content'
+ *                     - type: null
+ *       304:
+ *         description: Not Modified (ETag match)
+ *       400:
+ *         description: Invalid creator ID format or user is not a creator
+ *       404:
+ *         description: Creator not found
+ *       500:
+ *         description: Server error
+ */
+router.route('/:userId/recent').get(getRecentCreatorContent);
+
 
 /**
  * @swagger
