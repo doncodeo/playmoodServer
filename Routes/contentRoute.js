@@ -360,7 +360,7 @@ router.route('/new').get(getRecentContent);
 
 /**
  * @swagger
- * /api/content/creator/{userId}/recent:
+ * /api/content/{userId}/recent:
  *   get:
  *     summary: Get the most recent approved content for a specific creator
  *     description: Retrieves the single most recent approved content item created by the specified creator, sorted by creation date. Includes caching with ETag.

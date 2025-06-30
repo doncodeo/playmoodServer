@@ -111,7 +111,7 @@ router.route('/create').post(protect, createCommunityPost);
  * /api/community/{userId}:
  *   get:
  *     summary: Get all community posts for a user
- *     description: Retrieves all community posts for a specified user, populated with user details (name and profile image).
+ *     description: Retrieves all community posts for a specified user, sorted by timestamp (newest first). Populates post creator and commenter details (name, profileImage).
  *     tags: [CommunityPosts]
  *     parameters:
  *       - in: path
@@ -123,14 +123,31 @@ router.route('/create').post(protect, createCommunityPost);
  *     responses:
  *       200:
  *         description: List of community posts
+ *         headers:
+ *           Cache-Control:
+ *             schema:
+ *               type: string
+ *               example: private, max-age=300
+ *           ETag:
+ *             schema:
+ *               type: string
+ *               example: "community-682fa4973b7d2a9c142724e3-2-1697059200000"
  *         content:
  *           application/json:
  *             schema:
- *               type: array
- *               items:
- *                 $ref: '#/components/schemas/CommunityPost'
- *       404:
- *         description: User not found
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Community posts retrieved successfully
+ *                 posts:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/CommunityPost'
+ *       304:
+ *         description: Not Modified (ETag match)
+ *       400:
+ *         description: Invalid user ID format
  *       500:
  *         description: Server error
  */

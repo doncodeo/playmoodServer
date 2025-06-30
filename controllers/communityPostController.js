@@ -39,19 +39,53 @@ const createCommunityPost = asyncHandler(async (req, res) => {
 const getCommunityPosts = asyncHandler(async (req, res) => {
     const { userId } = req.params;
 
-    try {
-        const user = await User.findById(userId).populate({
-            path: 'communityPosts',
-            populate: { path: 'user', select: 'name profileImage' }
-        });
+    console.log('Requested userId for community posts:', userId); // Debug
 
-        if (!user) {
-            return res.status(404).json({ error: 'User not found' });
+    // Validate userId format
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+        console.error('Invalid userId format:', userId);
+        return res.status(400).json({ error: 'Invalid user ID format' });
+    }
+
+    try {
+        // Fetch posts directly from CommunityPost collection
+        const posts = await CommunityPost.find({ user: userId })
+            .sort({ timestamp: -1 }) // Sort by newest first
+            .populate('user', 'name profileImage') // Populate post creator
+            .populate({
+                path: 'comments.user',
+                select: 'name profileImage', // Populate commenter details
+            });
+
+        console.log('Community posts count:', posts.length); // Debug
+
+        // Generate ETag
+        const lastCreated = posts.length > 0 ? posts[0].timestamp.getTime() : 0;
+        const etag = `"community-${userId}-${posts.length}-${lastCreated}"`;
+
+        if (req.get('If-None-Match') === etag) {
+            return res.status(304).end();
         }
 
-        res.status(200).json(user.communityPosts);
+        res.set({
+            'Cache-Control': 'private, max-age=300', // Cache for 5 minutes
+            'ETag': etag,
+        });
+
+        res.status(200).json({
+            message: posts.length > 0 ? 'Community posts retrieved successfully' : 'No community posts found',
+            posts: posts || [],
+        });
     } catch (error) {
-        res.status(500).json({ error: 'Server error: Unable to retrieve posts' });
+        console.error('Get community posts error:', {
+            message: error.message || 'No message',
+            name: error.name || 'No name',
+            stack: error.stack || 'No stack',
+        });
+        if (error.name === 'CastError') {
+            return res.status(400).json({ error: 'Invalid data detected', details: error.message });
+        }
+        res.status(500).json({ error: 'Server error', details: error.message || 'Unknown error' });
     }
 });
 
