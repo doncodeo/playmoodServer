@@ -49,10 +49,11 @@ app.use('/api/rolechange', require('./Routes/roleChangeRoute'));
 app.use('/api/subscribe', require('./Routes/subscribeRoute'));
 app.use('/api/channel', require('./Routes/channelRoute'));
 app.use('/api/community', require('./Routes/communityPostRoute'));
+app.use('/api/playlists', require('./Routes/playlistRoutes'));
 
 // Serve login.html for /login route
 app.get('/login', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'login.html'));
+  res.sendFile(path.join(__dirname, 'public', 'login.html')); 
 });
 
 // Serve index.html for any other route (excluding OPTIONS method)

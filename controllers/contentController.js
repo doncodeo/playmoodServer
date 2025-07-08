@@ -220,7 +220,7 @@ const createContent = asyncHandler(async (req, res) => {
         }
 
         // Validate preview timeline
-        const start = parseFloat(previewStart);
+        const start = parseFloat(previewStart); 
         const end = parseFloat(previewEnd);
         if (isNaN(start) || isNaN(end)) {
             return res.status(400).json({ error: 'Preview start and end times are required!' });
