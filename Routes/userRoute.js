@@ -707,7 +707,6 @@ router.route('/watchlist').get(protect, getWatchlist);
 
 
 
-
 /**
  * @swagger
  * /api/users/watchlist/{userId}/remove:
@@ -743,7 +742,6 @@ router.route('/watchlist').get(protect, getWatchlist);
  *           application/json:
  *             schema:
  *               type: object
-ны
  *               properties:
  *                 message:
  *                   type: string
@@ -758,7 +756,6 @@ router.route('/watchlist').get(protect, getWatchlist);
  *         description: Server error
  */
 router.route('/watchlist/:userId/remove').post(protect, removeWatchlist);
-
 /**
  * @swagger
  * /api/users/history/{userId}:
