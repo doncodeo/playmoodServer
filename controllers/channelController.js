@@ -9,12 +9,12 @@ const fs = require('fs').promises;
 // @route GET /api/creators/:userId
 // @access Public
 const getChannelDetails = asyncHandler(async (req, res) => {
-    const { userId } = req.params;
+    const { userId } = req.params; 
 
-    // Validate userId presence
+    // Validate userId presence 
     if (!userId) {
         return res.status(400).json({ error: 'User ID is required' });
-    }
+    } 
 
     // Validate userId format (MongoDB ObjectId)
     if (!userId.match(/^[0-9a-fA-F]{24}$/)) {

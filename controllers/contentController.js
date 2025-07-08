@@ -5,6 +5,7 @@ const cloudinary = require('../config/cloudinary');
 const nodemailer = require('nodemailer');
 const mongoose = require('mongoose'); // Add mongoose import
 const fs = require('fs');
+const { setEtagAndCache } = require('../utils/responseHelpers');
 
 const transporter = nodemailer.createTransport({
     service: 'Gmail',
@@ -18,23 +19,13 @@ const transporter = nodemailer.createTransport({
 // @route GET /api/content 
 // @access Private
 const getContent = asyncHandler(async (req, res) => {
-    const content = await contentSchema.find({ isApproved: true }).populate('user', 'name'); 
-
-    // Generate an ETag based on content length and last update
-    const lastUpdated = content.length > 0 ? Math.max(...content.map(c => c.updatedAt.getTime())) : 0; 
+    const content = await contentSchema.find({ isApproved: true }).populate('user', 'name').lean();
+    const lastUpdated = content.length > 0 ? Math.max(...content.map(c => c.updatedAt.getTime())) : 0;
     const etag = `"all-${content.length}-${lastUpdated}"`;
- 
-    // Check if the client’s ETag matches
-    if (req.get('If-None-Match') === etag) {
-        return res.status(304).end(); // Not Modified
-    }
 
-    // Set caching headers
-    res.set({
-        'Cache-Control': 'private, max-age=900', // Cache for 15 minutes
-        'ETag': etag,
-    });
+    if (req.get('If-None-Match') === etag) return res.status(304).end();
 
+    setEtagAndCache(res, etag, 900);
     res.status(200).json(content);
 });
 

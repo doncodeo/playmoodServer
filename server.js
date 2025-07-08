@@ -87,13 +87,38 @@ app.get('*', (req, res) => {
   }
 });
 
-// Connect to MongoDB and start server
+let server;
+
 connectDB()
   .then(() => {
-    app.listen(port, () => console.log(`Server started on port ${port}`));
+    server = app.listen(port, () => console.log(`Server started on port ${port}`));
   })
   .catch((error) => {
     console.error('Failed to connect to MongoDB:', error.message);
     process.exit(1);
   });
+
+// Graceful shutdown
+const shutdown = async () => {
+  console.log('\nGracefully shutting down...');
+  if (server) {
+    server.close(() => {
+      console.log('HTTP server closed.');
+      // Close MongoDB connection if using Mongoose
+      if (typeof require('mongoose').connection.close === 'function') {
+        require('mongoose').connection.close(false, () => {
+          console.log('MongoDB connection closed.');
+          process.exit(0);
+        });
+      } else {
+        process.exit(0);
+      }
+    });
+  } else {
+    process.exit(0); 
+  }
+};
+
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
 
