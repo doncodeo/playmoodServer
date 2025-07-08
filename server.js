@@ -5,23 +5,47 @@ const connectDB = require('./config/db');
 const path = require('path');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./swagger');
+const helmet = require('helmet'); // Add helmet
+const rateLimit = require('express-rate-limit'); // Add rate limiter
+const compression = require('compression'); // Add compression
+const mongoSanitize = require('express-mongo-sanitize'); // Add input sanitizer
 
 const app = express();
 const port = process.env.PORT || 5000;
 
-// Enable CORScx
+// Security: Set secure HTTP headers
+app.use(helmet());
+
+// Security: Sanitize data to prevent NoSQL injection
+app.use(mongoSanitize());
+
+// Security: Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+});
+app.use(limiter);
+
+// Security: Hide X-Powered-By header
+app.disable('x-powered-by');
+
+// Enable CORS
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:5174',
   'https://playmoodtv.com',
 ];
-
 app.use(cors({
   origin: allowedOrigins,
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  credentials: true, // if you need cookies/auth
 }));
 
+// Optimization: Compress all responses
+app.use(compression());
+
 // Serve static files
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'))); 
 
 // Middleware for JSON and URL-encoded data
 app.use(express.json());
