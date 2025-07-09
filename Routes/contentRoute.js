@@ -6,10 +6,12 @@ const {
     getRecentCreatorContent,
     createContent, 
     addComment,
+    getComments,
     updateContent, 
     deleteContent, 
     getContentById, 
     approveContent,
+    rejectContent,
     getUnapprovedContent,
     saveVideoProgress,
     getVideoProgress,
@@ -321,6 +323,75 @@ router.route('/').post(protect, upload.array('files', 2), createContent);
 router.route('/:contentId/comment').post(protect, addComment);
 
 
+/**
+ * @swagger
+ * /api/content/{id}/comments:
+ *   get:
+ *     summary: Get comments for a content item
+ *     description: Retrieves all comments for a specific content item, with pagination.
+ *     tags: [Content]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: MongoDB ObjectId of the content
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number for pagination
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Number of comments per page
+ *     responses:
+ *       200:
+ *         description: Comments retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Comments retrieved successfully
+ *                 totalComments:
+ *                   type: integer
+ *                   example: 25
+ *                 page:
+ *                   type: integer
+ *                   example: 1
+ *                 limit:
+ *                   type: integer
+ *                   example: 10
+ *                 comments:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       user:
+ *                         type: object
+ *                         properties:
+ *                           _id: { type: string }
+ *                           name: { type: string }
+ *                           profileImage: { type: string }
+ *                       text: { type: string }
+ *                       createdAt: { type: string, format: date-time }
+ *       400:
+ *         description: Invalid content ID
+ *       404:
+ *         description: Content not found
+ *       500:
+ *         description: Server error
+ */
+router.route('/:id/comments').get(getComments);
+
+
 
 /**
  * @swagger
@@ -406,7 +477,6 @@ router.route('/new').get(getRecentContent);
  *         description: Server error
  */
 router.route('/:userId/recent').get(getRecentCreatorContent);
-
 
 /**
  * @swagger
@@ -591,7 +661,7 @@ router.route('/:id').delete(protect, deleteContent);
 
 /**
  * @swagger
- * /approve/{id}:
+ * /api/content/approve/{id}:
  *   put:
  *     summary: Approve content
  *     description: Approves a specific content item by ID (admin only).
@@ -618,6 +688,8 @@ router.route('/:id').delete(protect, deleteContent);
  *                   example: Content approved successfully
  *                 content:
  *                   $ref: '#/components/schemas/Content'
+ *       400:
+ *         description: Invalid content ID
  *       401:
  *         description: Unauthorized - Missing or invalid JWT token
  *       403:
@@ -628,6 +700,63 @@ router.route('/:id').delete(protect, deleteContent);
  *         description: Server error
  */
 router.route('/approve/:id').put(protect, approveContent);
+
+/**
+ * @swagger
+ * /api/content/reject/{id}:
+ *   put:
+ *     summary: Reject content
+ *     description: Rejects a specific content item by ID with a reason (admin only).
+ *     tags: [Content]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: MongoDB ObjectId of the content
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - rejectionReason
+ *             properties:
+ *               rejectionReason:
+ *                 type: string
+ *                 example: Content does not meet quality standards
+ *     responses:
+ *       200:
+ *         description: Content rejected successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Content rejected successfully
+ *                 content:
+ *                   $ref: '#/components/schemas/Content'
+ *       400:
+ *         description: Invalid content ID or rejection reason
+ *       401:
+ *         description: Unauthorized - Missing or invalid JWT token
+ *       403:
+ *         description: Forbidden - Admin access required
+ *       404:
+ *         description: Content not found
+ *       500:
+ *         description: Server error
+ */
+router.route('/reject/:id').put(protect, rejectContent);
+
+
+
 
 /**
  * @swagger

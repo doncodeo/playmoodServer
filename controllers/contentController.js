@@ -58,7 +58,6 @@ const getRecentContent = asyncHandler(async (req, res) => {
     }
 });
 
-
 // @desc    Get the most recent approved content for a specific creator
 // @route   GET /api/content/creator/:userId/recent
 // @access  Public
@@ -467,29 +466,184 @@ const addComment = asyncHandler(async (req, res) => {
     }
 });
 
-// @desc Approve Content
-// @route PUT /api/content/approve/:id
-// @access Private (Admin only)
-const approveContent = asyncHandler(async (req, res) => {
-    const { id } = req.params;
-
+// @desc    Get comments for a content item
+// @route   GET /api/content/:id/comments
+// @access  Public (or Private, add protect middleware if needed)
+const getComments = asyncHandler(async (req, res) => {
     try {
-        const content = await contentSchema.findById(id);
+        const { id } = req.params;
+        const { page = 1, limit = 10 } = req.query; // Pagination parameters
+
+        // Validate content ID
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ error: 'Invalid content ID format' });
+        }
+
+        // Find content and populate comments
+        const content = await contentSchema.findById(id).populate({
+            path: 'comments.user',
+            select: 'name profileImage',
+        });
+
         if (!content) {
             return res.status(404).json({ error: 'Content not found' });
         }
 
-        content.isApproved = true;
-        await content.save();
+        // Optional: Restrict comments to approved content
+        // if (!content.isApproved) {
+        //     return res.status(403).json({ error: 'Comments are only available for approved content' });
+        // }
 
-        res.status(200).json({ message: 'Content approved successfully', content });
+        // Paginate comments
+        const comments = content.comments;
+        const totalComments = comments.length;
+        const startIndex = (page - 1) * limit;
+        const endIndex = page * limit;
+        const paginatedComments = comments.slice(startIndex, endIndex);
+
+        res.status(200).json({
+            message: 'Comments retrieved successfully',
+            totalComments,
+            page: parseInt(page),
+            limit: parseInt(limit),
+            comments: paginatedComments,
+        });
     } catch (error) {
-        console.error(`Error approving content: ${error.message}`);
-        res.status(500).json({ error: 'Server error, please try again later' });
+        console.error('Get comments error:', {
+            message: error.message || 'No message',
+            name: error.name || 'No name',
+            stack: error.stack || 'No stack',
+        });
+        if (error.name === 'CastError') {
+            return res.status(400).json({ error: 'Invalid content ID', details: error.message });
+        }
+        res.status(500).json({ error: 'Server error', details: error.message || 'Unknown error' });
     }
 });
 
-// @desc Update Content
+// @desc    Approve Content
+// @route   PUT /api/content/approve/:id
+// @access  Private (Admin only)
+const approveContent = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const user = req.user;
+
+    console.log('Approving content:', { id, userId: user.id }); // Debug
+
+    // Validate ID
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        console.error('Invalid content ID:', id);
+        return res.status(400).json({ error: 'Invalid content ID format' });
+    }
+
+    // Check admin role
+    if (user.role !== 'admin') {
+        console.error('Unauthorized access - not admin:', user.id);
+        return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    try {
+        const content = await contentSchema.findById(id);
+        if (!content) {
+            console.error('Content not found:', id);
+            return res.status(404).json({ error: 'Content not found' });
+        }
+
+        content.isApproved = true;
+        content.rejectionReason = undefined; // Clear rejection reason
+        await content.save();
+
+        // Populate user details
+        const populatedContent = await contentSchema.findById(id).populate('user', 'name profileImage');
+
+        res.status(200).json({
+            message: 'Content approved successfully',
+            content: populatedContent,
+        });
+    } catch (error) {
+        console.error('Approve content error:', {
+            message: error.message || 'No message',
+            name: error.name || 'No name',
+            stack: error.stack || 'No stack',
+        });
+        if (error.name === 'MulterError') {
+            return res.status(400).json({ error: 'Unexpected file upload detected', details: error.message });
+        }
+        if (error.name === 'CastError') {
+            return res.status(400).json({ error: 'Invalid data detected', details: error.message });
+        }
+        res.status(500).json({ error: 'Server error', details: error.message || 'Unknown error' });
+    }
+});
+
+// @desc    Reject Content
+// @route   PUT /api/content/reject/:id
+// @access  Private (Admin only)
+const rejectContent = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { rejectionReason } = req.body;
+    const user = req.user;
+
+    console.log('Rejecting content:', { id, userId: user.id, rejectionReason }); // Debug
+
+    // Validate ID
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        console.error('Invalid content ID:', id);
+        return res.status(400).json({ error: 'Invalid content ID format' });
+    }
+
+    // Validate rejection reason
+    if (!rejectionReason || typeof rejectionReason !== 'string' || rejectionReason.trim().length === 0) {
+        console.error('Invalid rejection reason:', rejectionReason);
+        return res.status(400).json({ error: 'Rejection reason is required and must be a non-empty string' });
+    }
+    if (rejectionReason.length > 500) {
+        console.error('Rejection reason too long:', rejectionReason.length);
+        return res.status(400).json({ error: 'Rejection reason cannot exceed 500 characters' });
+    }
+
+    // Check admin role
+    if (user.role !== 'admin') {
+        console.error('Unauthorized access - not admin:', user.id);
+        return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    try {
+        const content = await contentSchema.findById(id);
+        if (!content) {
+            console.error('Content not found:', id);
+            return res.status(404).json({ error: 'Content not found' });
+        }
+
+        content.isApproved = false;
+        content.rejectionReason = rejectionReason.trim();
+        await content.save();
+
+        // Populate user details
+        const populatedContent = await contentSchema.findById(id).populate('user', 'name profileImage');
+
+        res.status(200).json({
+            message: 'Content rejected successfully',
+            content: populatedContent,
+        });
+    } catch (error) {
+        console.error('Reject content error:', {
+            message: error.message || 'No message',
+            name: error.name || 'No name',
+            stack: error.stack || 'No stack',
+        });
+        if (error.name === 'MulterError') {
+            return res.status(400).json({ error: 'Unexpected file upload detected', details: error.message });
+        }
+        if (error.name === 'CastError') {
+            return res.status(400).json({ error: 'Invalid data detected', details: error.message });
+        }
+        res.status(500).json({ error: 'Server error', details: error.message || 'Unknown error' });
+    }
+});
+
+
+// @desc Update Content 
 // @route PUT /api/content/:id
 // @access Private
 const updateContent = asyncHandler(async (req, res) => {
@@ -608,8 +762,6 @@ const saveVideoProgress = asyncHandler(async (req, res) => {
     }
 })
 
-
-
 // @desc Get Video Progress
 // @route GET /api/content/progress/:contentId
 // @access Private
@@ -723,11 +875,6 @@ const ContinueWatching = asyncHandler(async (req, res) => {
     }
 });
 
-
-
-
-
-
 module.exports = {
     getContent,
     getRecentContent,
@@ -735,9 +882,11 @@ module.exports = {
     getContentById,
     createContent,
     addComment,
+    getComments,
     updateContent,
     deleteContent,
     approveContent,
+    rejectContent,
     getUnapprovedContent,
     saveVideoProgress,
     getVideoProgress,
