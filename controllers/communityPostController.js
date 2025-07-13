@@ -1,6 +1,8 @@
 const asyncHandler = require('express-async-handler');
 const CommunityPost = require('../models/communityPostModel');
 const User = require('../models/userModel');
+const mongoose = require('mongoose');
+
 
 // @desc    Create a new community post
 // @route   POST /api/community-posts
