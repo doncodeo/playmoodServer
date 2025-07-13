@@ -314,33 +314,91 @@ router.route('/:userId/banner').put(protect, upload.single('image'), updateChann
  *       500:
  *         description: Server error
  */
+router.route('/').get(getAllChannels);
+
 /**
  * @swagger
- * /my-channel:
+ * /api/channel/my-channel/{id}:
  *   get:
- *     summary: Get the authenticated creator's own channel details
- *     description: Retrieves details of the authenticated creator's channel, including all content (approved and unapproved), subscriber count, and other channel information. Requires authentication as a creator.
+ *     summary: Get a creator's channel details
+ *     description: Retrieves details of a creator's channel by user ID, including all content (approved and unapproved), subscriber count, and other channel information. Requires authentication; only the user themselves or an admin can access.
  *     tags: [Channels]
  *     security:
  *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: MongoDB ObjectId of the creator
  *     responses:
  *       200:
  *         description: Creator's channel details retrieved successfully
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Channel'
+ *               type: object
+ *               properties:
+ *                 name:
+ *                   type: string
+ *                   example: Creator Name
+ *                 profileImage:
+ *                   type: string
+ *                   example: https://example.com/profile.jpg
+ *                 about:
+ *                   type: string
+ *                   example: About the creator
+ *                 bannerImage:
+ *                   type: string
+ *                   example: https://example.com/banner.jpg
+ *                 subscribers:
+ *                   type: integer
+ *                   example: 100
+ *                 subscriberDetails:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       _id: { type: string }
+ *                       name: { type: string }
+ *                       profileImage: { type: string }
+ *                 content:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Content'
+ *                 communityPosts:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       title: { type: string }
+ *                       content: { type: string }
+ *                 instagram:
+ *                   type: string
+ *                   example: https://instagram.com/creator
+ *                 tiktok:
+ *                   type: string
+ *                   example: https://tiktok.com/@creator
+ *                 linkedin:
+ *                   type: string
+ *                   example: https://linkedin.com/in/creator
+ *                 twitter:
+ *                   type: string
+ *                   example: https://twitter.com/creator
+ *       400:
+ *         description: Invalid user ID
  *       401:
  *         description: Unauthorized - Missing or invalid JWT token
  *       403:
- *         description: Forbidden - User is not a creator
+ *         description: Forbidden - You can only view your own channel or must be an admin
  *       404:
  *         description: Creator not found
  *       500:
  *         description: Server error
  */
-router.route('/my-channel').get(protect, getMyChannelDetails);
-router.route('/').get(getAllChannels);
+router.route('/my-channel/:id').get(protect, getMyChannelDetails);
 
 
-module.exports = router;
+
+module.exports = router; 

@@ -3,6 +3,8 @@ const User = require('../models/userModel');
 const Content = require('../models/contentModel');
 const cloudinary = require('../config/cloudinary');
 const fs = require('fs').promises;
+const mongoose = require('mongoose');
+
 
 
 // @desc Get creator channel details
@@ -199,36 +201,65 @@ const getAllChannels = asyncHandler(async (req, res) => {
 // @route GET /api/channel/my-channel
 // @access Private (authenticated creator only)
 const getMyChannelDetails = asyncHandler(async (req, res) => {
-    const userId = req.user._id; // Get user ID from authenticated user
+    const userId = req.user._id; // From protect middleware
+  // const { userId } = req.params;
 
-    // Fetch creator with populated subscribers and communityPosts
-    const creator = await User.findOne({ _id: userId, role: 'creator' })
-        .populate('subscribers', 'name profileImage')
-        .populate('communityPosts', 'title content');
 
-    if (!creator) {
-        return res.status(404).json({ error: 'Creator not found' });
+    console.log(userId)
+
+    // Validate userId
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+        console.error('Invalid user ID:', userId);
+        return res.status(400).json({ error: 'Invalid user ID' });
     }
 
-    // Fetch all of creator's content (approved and unapproved)
-    const content = await Content.find({ user: creator._id }).select(
-        'title category description thumbnail video views likes createdAt isApproved rejectionReason'
-    );
+    // Check if user is a creator
+    if (req.user.role !== 'creator') {
+        console.error('Unauthorized access - not a creator:', userId);
+        return res.status(403).json({ error: 'Forbidden - Creator access required' });
+    }
 
-    res.status(200).json({
-        name: creator.name,
-        profileImage: creator.profileImage,
-        about: creator.about,
-        bannerImage: creator.bannerImage,
-        subscribers: creator.subscribers.length,
-        subscriberDetails: creator.subscribers,
-        content,
-        communityPosts: creator.communityPosts || [],
-        instagram: creator.instagram || "",
-        tiktok: creator.tiktok || "",
-        linkedin: creator.linkedin || "",
-        twitter: creator.twitter || ""
-    });
+    try {
+        // Fetch creator with populated subscribers and communityPosts
+        const creator = await User.findOne({ _id: userId, role: 'creator' })
+            .populate('subscribers', 'name profileImage')
+            .populate('communityPosts', 'title content');
+
+        if (!creator) {
+            console.error('Creator not found:', userId);
+            return res.status(404).json({ error: 'Creator not found' });
+        }
+
+        // Fetch all of creator's content (approved and unapproved)
+        const content = await Content.find({ user: creator._id }).select(
+            'title category description thumbnail video views likes createdAt isApproved rejectionReason'
+        );
+
+        res.status(200).json({
+            name: creator.name,
+            profileImage: creator.profileImage,
+            about: creator.about,
+            bannerImage: creator.bannerImage,
+            subscribers: creator.subscribers.length,
+            subscriberDetails: creator.subscribers,
+            content,
+            communityPosts: creator.communityPosts || [],
+            instagram: creator.instagram || '',
+            tiktok: creator.tiktok || '',
+            linkedin: creator.linkedin || '',
+            twitter: creator.twitter || '',
+        });
+    } catch (error) {
+        console.error('Get channel details error:', {
+            message: error.message || 'No message',
+            name: error.name || 'No name',
+            stack: error.stack || 'No stack',
+        });
+        if (error.name === 'CastError') {
+            return res.status(400).json({ error: 'Invalid user ID', details: error.message });
+        }
+        res.status(500).json({ error: 'Server error', details: error.message || 'Unknown error' });
+    }
 });
 
 module.exports = {
