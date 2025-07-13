@@ -31,7 +31,7 @@ const getChannelDetails = asyncHandler(async (req, res) => {
     }
 
     // Fetch creator's content
-    const content = await Content.find({ user: creator._id }).select(
+    const content = await Content.find({ user: creator._id, isApproved: true }).select(
         'title category description thumbnail video views likes createdAt'
     );
 
@@ -195,9 +195,46 @@ const getAllChannels = asyncHandler(async (req, res) => {
     });
 });
 
+// @desc Get creator's own channel details
+// @route GET /api/channel/my-channel
+// @access Private (authenticated creator only)
+const getMyChannelDetails = asyncHandler(async (req, res) => {
+    const userId = req.user._id; // Get user ID from authenticated user
+
+    // Fetch creator with populated subscribers and communityPosts
+    const creator = await User.findOne({ _id: userId, role: 'creator' })
+        .populate('subscribers', 'name profileImage')
+        .populate('communityPosts', 'title content');
+
+    if (!creator) {
+        return res.status(404).json({ error: 'Creator not found' });
+    }
+
+    // Fetch all of creator's content (approved and unapproved)
+    const content = await Content.find({ user: creator._id }).select(
+        'title category description thumbnail video views likes createdAt isApproved rejectionReason'
+    );
+
+    res.status(200).json({
+        name: creator.name,
+        profileImage: creator.profileImage,
+        about: creator.about,
+        bannerImage: creator.bannerImage,
+        subscribers: creator.subscribers.length,
+        subscriberDetails: creator.subscribers,
+        content,
+        communityPosts: creator.communityPosts || [],
+        instagram: creator.instagram || "",
+        tiktok: creator.tiktok || "",
+        linkedin: creator.linkedin || "",
+        twitter: creator.twitter || ""
+    });
+});
+
 module.exports = {
   getChannelDetails,
   updateChannelInfo,
   updateChannelBannerImage,
-  getAllChannels
+  getAllChannels,
+  getMyChannelDetails
 };

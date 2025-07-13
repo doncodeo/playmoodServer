@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const upload = require('../middleware/multer');
-const { getChannelDetails, updateChannelInfo, updateChannelBannerImage, getAllChannels } = require('../controllers/channelController');
+const { getChannelDetails, updateChannelInfo, updateChannelBannerImage, getAllChannels, getMyChannelDetails } = require('../controllers/channelController');
 const { protect } = require('../middleware/authmiddleware');
 
 /**
@@ -314,6 +314,32 @@ router.route('/:userId/banner').put(protect, upload.single('image'), updateChann
  *       500:
  *         description: Server error
  */
+/**
+ * @swagger
+ * /my-channel:
+ *   get:
+ *     summary: Get the authenticated creator's own channel details
+ *     description: Retrieves details of the authenticated creator's channel, including all content (approved and unapproved), subscriber count, and other channel information. Requires authentication as a creator.
+ *     tags: [Channels]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Creator's channel details retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Channel'
+ *       401:
+ *         description: Unauthorized - Missing or invalid JWT token
+ *       403:
+ *         description: Forbidden - User is not a creator
+ *       404:
+ *         description: Creator not found
+ *       500:
+ *         description: Server error
+ */
+router.route('/my-channel').get(protect, getMyChannelDetails);
 router.route('/').get(getAllChannels);
 
 
