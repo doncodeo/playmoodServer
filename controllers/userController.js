@@ -1165,9 +1165,65 @@ const markPrivacyPolicyAsRead = asyncHandler(async (req, res) => {
         res.status(500).json({ message: 'Server error' });
     }
 });
+const forgetPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await userData.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const token = await Token.findOne({ userId: user._id });
+    if (token) {
+      await token.deleteOne();
+    }
+
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    const hashedToken = await crypto
+      .createHash("sha256")
+      .update(resetToken)
+      .digest("hex");
+
+    await new Token({
+      userId: user._id,
+      token: hashedToken,
+      createdAt: Date.now(),
+    }).save();
+
+    const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
+
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: "Password Reset",
+      html: `
+        <p>You are receiving this email because you (or someone else) has requested the reset of the password for your account.</p>
+        <p>Please click on the following link, or paste this into your browser to complete the process:</p>
+        <p><a href="${resetUrl}">${resetUrl}</a></p>
+        <p>If you did not request this, please ignore this email and your password will remain unchanged.</p>
+      `,
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    res.status(200).json({ message: "Password reset link sent to your email" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
  
  module.exports = {
-    getUser, 
+    getUser,
+    forgetPassword,
     registerUser,
     verifyEmail,
     resendVerificationCode,
