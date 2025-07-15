@@ -43,7 +43,7 @@ const getCommunityPosts = asyncHandler(async (req, res) => {
 
     console.log('Requested userId for community posts:', userId); // Debug
 
-    // Validate userId format
+    // Validate userId format 
     if (!mongoose.Types.ObjectId.isValid(userId)) {
         console.error('Invalid userId format:', userId);
         return res.status(400).json({ error: 'Invalid user ID format' });
