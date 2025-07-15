@@ -22,6 +22,7 @@ const {
   saveContentToHistory,
   getUserHistory,
   markPrivacyPolicyAsRead,
+  forgetPassword,
 } = require('../controllers/userController');
 const { protect } = require('../middleware/authmiddleware');
 
@@ -880,5 +881,42 @@ router.route('/history/:userId').get(protect, getUserHistory);
  *         description: Server error
  */
 router.route('/policy/:userId').patch(protect, markPrivacyPolicyAsRead);
+
+/**
+ * @swagger
+ * /api/users/forget-password:
+ *   post:
+ *     summary: Request password reset
+ *     description: Sends a password reset link to the user's email address.
+ *     tags: [Users]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 example: john@example.com
+ *     responses:
+ *       200:
+ *         description: Password reset link sent successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Password reset link sent to your email
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: Server error
+ */
+router.post('/forget-password', forgetPassword);
 
 module.exports = router;
