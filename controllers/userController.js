@@ -766,12 +766,15 @@ const loginUser = asyncHandler(async (req, res) => {
             name: user.name,
             email: user.email,
             role: user.role,
-            like: user.likes,
+            profileImage: user.profileImage,
+            cloudinary_id: user.cloudinary_id,
+            likes: user.likes,
             watchlist: user.watchlist,
-            profile: user.profileImage,
+            history: user.history,
+            verified: user.isEmailVerified,
+            hasReadPrivacyPolicy: user.hasReadPrivacyPolicy,
             token: generateToken(user._id, user.role)
         });
-        res.json({data});
     }else {
         res.status(404).json({ error: 'User not found or invalid credentials' });
 
