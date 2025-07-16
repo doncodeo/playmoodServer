@@ -1028,7 +1028,7 @@ const addWatchlist = asyncHandler(async (req, res) => {
 // @route   GET /api/users/watchlist
 // @access  Private
 const getWatchlist = asyncHandler(async (req, res) => {
-    const userId = req.user.id; // From protect middleware
+    const userId = req.params.id; // From protect middleware
 
     console.log('Authenticated user ID:', userId); // Debug
 

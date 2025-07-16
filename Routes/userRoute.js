@@ -704,7 +704,7 @@ router.route('/watchlist/:userId').post(protect, addWatchlist);
  *       500:
  *         description: Server error
  */
-router.route('/watchlist').get(protect, getWatchlist);
+router.route('/watchlist/:id').get(protect, getWatchlist);
 
 
 
