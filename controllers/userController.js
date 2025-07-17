@@ -999,22 +999,22 @@ const addWatchlist = asyncHandler(async (req, res) => {
         const { contentId } = req.body;
         const userId = req.user.id;
 
+        // Find the user by ID
+        const user = await userData.findById(userId);
 
-        // Check if the user has already liked the content
-        const user = await userData.findOne({ _id: userId, watchlist: contentId });
-
-        if (user) {
-            return res.status(400).json({ error: 'This content already exist on users watchlist' });
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
         }
 
-        // Find the user by ID and update the likes array
-        const updatedUser = await userData.findByIdAndUpdate(
-            userId,
-            { $push: { watchlist: contentId } },
-            { new: true }
-        );
+        // Check if the content is already in the watchlist
+        if (user.watchlist.includes(contentId)) {
+            return res.status(400).json({ error: 'This content already exists in the user\'s watchlist' });
+        }
 
-        // res.status(200).json({ watchlist: updatedUser.watchlist, message: "Content successfully added to Watchlist" });
+        // Add the content to the watchlist
+        user.watchlist.push(contentId);
+        await user.save();
+
         res.status(200).json({ contentId: contentId, message: "Content added to watchlist!" });
 
     } catch (error) {
