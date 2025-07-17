@@ -676,7 +676,7 @@ router.route('/watchlist/:userId').post(protect, addWatchlist);
 
 /**
  * @swagger
- * /api/users/watchlist:
+ * /api/users/watchlist/{userId}:
  *   get:
  *     summary: Get watchlist for authenticated user
  *     description: Retrieves the watchlist of the currently authenticated user.
@@ -704,16 +704,15 @@ router.route('/watchlist/:userId').post(protect, addWatchlist);
  *       500:
  *         description: Server error
  */
+
 router.route('/watchlists/:id').get(protect, getWatchlist);
-
-
 
 /**
  * @swagger
  * /api/users/watchlist/{userId}/remove:
  *   post:
  *     summary: Remove content from watchlist
- *     description: Removes a content ID from the user's watchlist.
+ *     description: Removes a content ID from the user's watchlist. 
  *     tags: [Users]
  *     security:
  *       - BearerAuth: []
