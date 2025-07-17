@@ -126,6 +126,19 @@ const getRecentCreatorContent = asyncHandler(async (req, res) => {
     }
 });
 
+const getWatchlist = asyncHandler(async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const user = await userSchema.findById(userId).populate('watchlist');
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        res.status(200).json({ watchlist: user.watchlist });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
 
 // @desc Get All Unapproved Content
 // @route GET /api/content/unapproved
@@ -891,5 +904,6 @@ module.exports = {
     saveVideoProgress,
     getVideoProgress,
     ContinueWatching,
-};
+    getWatchlist
+}
 
