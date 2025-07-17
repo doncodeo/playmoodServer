@@ -996,9 +996,8 @@ const getLikedContents = asyncHandler(async (req, res) => {
 
 const addWatchlist = asyncHandler(async (req, res) => {
     try {
-        const contentId = req.body.contentId;
-        // const userId = req.body.userId;
-        const userId = req.params.id;
+        const { contentId } = req.body;
+        const userId = req.user.id;
 
 
         // Check if the user has already liked the content
@@ -1077,9 +1076,8 @@ const getWatchlist = asyncHandler(async (req, res) => {
 // @route PUT /api/user/removelist/:id
 const removeWatchlist = asyncHandler(async (req, res) => {
     try {
-        const contentId = req.body.contentId;
-        // const userId = req.body.userId;
-        const userId = req.params.id;
+        const { contentId } = req.body;
+        const userId = req.user.id;
 
 
         // Find the user by ID and update the likes array to remove the contentId

@@ -622,7 +622,7 @@ router.route('/likes').get(protect, getLikedContents);
 
 /**
  * @swagger
- * /api/users/watchlist/{userId}:
+ * /api/users/watchlist/:
  *   post:
  *     summary: Add content to watchlist 
  *     description: Adds a content ID to the user's watchlist.
@@ -670,13 +670,12 @@ router.route('/likes').get(protect, getLikedContents);
  *       500:
  *         description: Server error
  */
-router.route('/watchlist/:userId').post(protect, addWatchlist);
-
+router.route('/watchlist').post(protect, addWatchlist);
 
 
 /**
  * @swagger
- * /api/users/watchlist/{userId}:
+ * /api/users/watchlist:
  *   get:
  *     summary: Get watchlist for authenticated user
  *     description: Retrieves the watchlist of the currently authenticated user.
@@ -704,15 +703,16 @@ router.route('/watchlist/:userId').post(protect, addWatchlist);
  *       500:
  *         description: Server error
  */
-
 router.route('/watchlists/:id').get(protect, getWatchlist);
+
+
 
 /**
  * @swagger
  * /api/users/watchlist/{userId}/remove:
  *   post:
  *     summary: Remove content from watchlist
- *     description: Removes a content ID from the user's watchlist. 
+ *     description: Removes a content ID from the user's watchlist.
  *     tags: [Users]
  *     security:
  *       - BearerAuth: []
@@ -755,7 +755,7 @@ router.route('/watchlists/:id').get(protect, getWatchlist);
  *       500:
  *         description: Server error
  */
-router.route('/watchlist/:userId/remove').post(protect, removeWatchlist);
+router.route('/watchlist/remove').post(protect, removeWatchlist);
 /**
  * @swagger
  * /api/users/history/{userId}:
