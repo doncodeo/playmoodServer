@@ -622,7 +622,7 @@ router.route('/likes').get(protect, getLikedContents);
 
 /**
  * @swagger
- * /api/users/watchlist/{userId}:
+ * /api/users/watchlist/:
  *   post:
  *     summary: Add content to watchlist 
  *     description: Adds a content ID to the user's watchlist.
@@ -671,7 +671,6 @@ router.route('/likes').get(protect, getLikedContents);
  *         description: Server error
  */
 router.route('/watchlist').post(protect, addWatchlist);
-
 
 
 /**
