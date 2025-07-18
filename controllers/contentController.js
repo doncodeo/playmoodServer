@@ -914,10 +914,10 @@ const addWatchlist = asyncHandler(async (req, res) => {
 const getWatchlist = asyncHandler(async (req, res) => {
     const userId = req.user.id; // From protect middleware
 
-    console.log('Authenticated user ID:', userId); // Debug
+    console.log('Authenticated user ID for getWatchlist:', userId); // Debug
 
     if (!mongoose.Types.ObjectId.isValid(userId)) {
-        console.error('Invalid userId format:', userId);
+        console.error('Invalid userId format in getWatchlist:', userId);
         return res.status(400).json({ error: 'Invalid user ID format' });
     }
 
@@ -933,11 +933,11 @@ const getWatchlist = asyncHandler(async (req, res) => {
         });
 
         if (!user) {
-            console.error('User not found for ID:', userId);
+            console.error('User not found for ID in getWatchlist:', userId);
             return res.status(404).json({ error: 'User not found' });
         }
 
-        console.log('User watchlist:', user.watchlist ? user.watchlist.length : 'No watchlist items'); // Debug
+        console.log('User watchlist in getWatchlist:', user.watchlist ? user.watchlist.length : 'No watchlist items'); // Debug
 
         res.status(200).json({
             watchList: user.watchlist || [], // Return empty array if no watchlist items
@@ -977,11 +977,11 @@ const removeWatchlist = asyncHandler(async (req, res) => {
         }
 
         // res.status(200).json({ watchlist: updatedUser.watchlist, message:"Content removed from watchlist!" });
-        res.status(200).json({ contentId: contentId, message: "Content removed to watchlist!" });
+        res.status(200).json({ contentId: contentId, message: "Content removed from watchlist!" });
 
     } catch (error) {
         console.error(error);
-        res.status(500).json({ error: 'Server error', message: "watchlist successfully removed!" });
+        res.status(500).json({ error: 'Server error' });
     }
 });
 module.exports = {

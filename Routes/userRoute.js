@@ -619,20 +619,13 @@ router.route('/likes').get(protect, getLikedContents);
 
 /**
  * @swagger
- * /api/users/watchlist/:
+ * /api/users/watchlist/add:
  *   post:
- *     summary: Add content to watchlist 
- *     description: Adds a content ID to the user's watchlist.
+ *     summary: Add content to watchlist
+ *     description: Adds a content ID to the authenticated user's watchlist.
  *     tags: [Users]
  *     security:
  *       - BearerAuth: []
- *     parameters:
- *       - in: path
- *         name: userId
- *         required: true
- *         schema:
- *           type: string
- *         description: User ID
  *     requestBody:
  *       required: true
  *       content:
@@ -644,7 +637,7 @@ router.route('/likes').get(protect, getLikedContents);
  *             properties:
  *               contentId:
  *                 type: string
- *                 example: 65a6fc7b72128447ad32024e
+ *                 example: "65a6fc7b72128447ad32024e"
  *     responses:
  *       200:
  *         description: Content added to watchlist
@@ -656,10 +649,12 @@ router.route('/likes').get(protect, getLikedContents);
  *                 message:
  *                   type: string
  *                   example: Content added to watchlist
- *                 user:
- *                   $ref: '#/components/schemas/User'
+ *                 watchlist:
+ *                   type: array
+ *                   items:
+ *                     type: string
  *       400:
- *         description: Content already in watchlist
+ *         description: Content already in watchlist or invalid ID
  *       401:
  *         description: Unauthorized
  *       404:
@@ -667,6 +662,82 @@ router.route('/likes').get(protect, getLikedContents);
  *       500:
  *         description: Server error
  */
+
+/**
+ * @swagger
+ * /api/users/watchlist:
+ *   get:
+ *     summary: Get user's watchlist
+ *     description: Retrieves the watchlist of the authenticated user.
+ *     tags: [Users]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: User's watchlist
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 watchlist:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Content'
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: Server error
+ */
+
+/**
+ * @swagger
+ * /api/users/watchlist/remove:
+ *   post:
+ *     summary: Remove content from watchlist
+ *     description: Removes a content ID from the authenticated user's watchlist.
+ *     tags: [Users]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - contentId
+ *             properties:
+ *               contentId:
+ *                 type: string
+ *                 example: "65a6fc7b72128447ad32024e"
+ *     responses:
+ *       200:
+ *         description: Content removed from watchlist
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Content removed from watchlist
+ *                 watchlist:
+ *                   type: array
+ *                   items:
+ *                     type: string
+ *       400:
+ *         description: Content not in watchlist or invalid ID
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: Server error
+ */
+
 /**
  * @swagger
  * /api/users/history/{userId}:
