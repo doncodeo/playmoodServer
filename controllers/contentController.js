@@ -884,6 +884,11 @@ const addWatchlist = asyncHandler(async (req, res) => {
         const { contentId } = req.body;
         const userId = req.user.id;
 
+        // Check if content exists
+        const content = await contentSchema.findById(contentId);
+        if (!content) {
+            return res.status(404).json({ error: 'Content not found' });
+        }
 
         // Check if the user has already liked the content
         const user = await userSchema.findOne({ _id: userId, watchlist: contentId });
@@ -899,8 +904,7 @@ const addWatchlist = asyncHandler(async (req, res) => {
             { new: true }
         );
 
-        // res.status(200).json({ watchlist: updatedUser.watchlist, message: "Content successfully added to Watchlist" });
-        res.status(200).json({ contentId: contentId, message: "Content added to watchlist!" });
+        res.status(200).json({ watchlist: updatedUser.watchlist, message: "Content successfully added to Watchlist" });
 
     } catch (error) {
         console.error(error);

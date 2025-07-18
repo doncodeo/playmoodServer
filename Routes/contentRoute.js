@@ -935,7 +935,7 @@ router.route('/continue-watching').get(protect, ContinueWatching);
 
 /**
  * @swagger
- * /api/content/watchlist:
+ * /api/content/watchlist/add:
  *   post:
  *     summary: Add content to watchlist
  *     description: Adds a content ID to the authenticated user's watchlist.
@@ -977,11 +977,11 @@ router.route('/continue-watching').get(protect, ContinueWatching);
  *       500:
  *         description: Server error
  */
-router.route('/watchlist').post(protect, addWatchlist);
+router.route('/watchlist/add').post(protect, addWatchlist);
 
 /**
  * @swagger
- * /api/content/watchlist:
+ * /api/content/watchlist/all:
  *   get:
  *     summary: Get user's watchlist
  *     description: Retrieves the watchlist of the authenticated user.
@@ -1007,7 +1007,7 @@ router.route('/watchlist').post(protect, addWatchlist);
  *       500:
  *         description: Server error
  */
-router.route('/watchlist').get(protect, getWatchlist);
+router.route('/watchlist/all').get(protect, getWatchlist);
 
 /**
  * @swagger
@@ -1043,7 +1043,7 @@ router.route('/watchlist').get(protect, getWatchlist);
  *                   example: "65a6fc7b72128447ad32024e"
  *                 message:
  *                   type: string
- *                   example: Content removed to watchlist!
+ *                   example: Content removed from watchlist!
  *       400:
  *         description: Content not in watchlist or invalid ID
  *       401:
