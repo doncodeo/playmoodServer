@@ -883,6 +883,8 @@ const addWatchlist = asyncHandler(async (req, res) => {
     try {
         const { contentId } = req.body;
         const userId = req.user.id;
+        console.log(userId)
+        console.log(contentId)
 
         // Check if content exists
         const content = await contentSchema.findById(contentId);
@@ -892,7 +894,7 @@ const addWatchlist = asyncHandler(async (req, res) => {
 
         // Check if the user has already liked the content
         const user = await userSchema.findOne({ _id: userId, watchlist: contentId });
-
+ 
         if (user) {
             return res.status(400).json({ error: 'This content already exist on users watchlist' });
         }

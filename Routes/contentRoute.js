@@ -1010,7 +1010,7 @@ router.route('/watchlist/add').post(protect, addWatchlist);
 router.route('/watchlist/all').get(protect, getWatchlist);
 
 /**
- * @swagger
+ * @swagger 
  * /api/content/watchlist/remove:
  *   post:
  *     summary: Remove content from watchlist
