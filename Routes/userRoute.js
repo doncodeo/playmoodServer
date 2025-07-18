@@ -16,9 +16,6 @@ const {
   likeContent,
   unlikeContent,
   getLikedContents,
-  addWatchlist,
-  getWatchlist,
-  removeWatchlist,
   saveContentToHistory,
   getUserHistory,
   markPrivacyPolicyAsRead,
@@ -670,92 +667,6 @@ router.route('/likes').get(protect, getLikedContents);
  *       500:
  *         description: Server error
  */
-router.route('/watchlist').post(protect, addWatchlist);
-
-
-/**
- * @swagger
- * /api/users/watchlist:
- *   get:
- *     summary: Get watchlist for authenticated user
- *     description: Retrieves the watchlist of the currently authenticated user.
- *     tags: [Users]
- *     security:
- *       - BearerAuth: []
- *     responses:
- *       200:
- *         description: User's watchlist
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 watchList:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/Content'
- *       400:
- *         description: Invalid user ID format
- *       401:
- *         description: Unauthorized
- *       404:
- *         description: User not found
- *       500:
- *         description: Server error
- */
-router.route('/watchlists/:id').get(protect, getWatchlist);
-
-
-
-/**
- * @swagger
- * /api/users/watchlist/{userId}/remove:
- *   post:
- *     summary: Remove content from watchlist
- *     description: Removes a content ID from the user's watchlist.
- *     tags: [Users]
- *     security:
- *       - BearerAuth: []
- *     parameters:
- *       - in: path
- *         name: userId
- *         required: true
- *         schema:
- *           type: string
- *         description: User ID
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - contentId
- *             properties:
- *               contentId:
- *                 type: string
- *                 example: 65a6fc7b72128447ad32024e
- *     responses:
- *       200:
- *         description: Content removed from watchlist
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: Content removed from watchlist
- *                 user:
- *                   $ref: '#/components/schemas/User'
- *       401:
- *         description: Unauthorized
- *       404:
- *         description: User or content not found
- *       500:
- *         description: Server error
- */
-router.route('/watchlist/remove').post(protect, removeWatchlist);
 /**
  * @swagger
  * /api/users/history/{userId}:

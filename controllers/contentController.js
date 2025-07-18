@@ -876,6 +876,114 @@ const ContinueWatching = asyncHandler(async (req, res) => {
     }
 });
 
+// @desc PUT Content
+// @route PUT /api/user/watchlist/:id (user id) push the content id  {"contentId": "65a6fc7b72128447ad32024e", "userId": "65a8025e3af4e7929b379e7b"}
+
+const addWatchlist = asyncHandler(async (req, res) => {
+    try {
+        const { contentId } = req.body;
+        const userId = req.user.id;
+
+
+        // Check if the user has already liked the content
+        const user = await userSchema.findOne({ _id: userId, watchlist: contentId });
+
+        if (user) {
+            return res.status(400).json({ error: 'This content already exist on users watchlist' });
+        }
+
+        // Find the user by ID and update the likes array
+        const updatedUser = await userSchema.findByIdAndUpdate(
+            userId,
+            { $push: { watchlist: contentId } },
+            { new: true }
+        );
+
+        // res.status(200).json({ watchlist: updatedUser.watchlist, message: "Content successfully added to Watchlist" });
+        res.status(200).json({ contentId: contentId, message: "Content added to watchlist!" });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// @desc    Get watchlist for authenticated user
+// @route   GET /api/users/watchlist
+// @access  Private
+const getWatchlist = asyncHandler(async (req, res) => {
+    const userId = req.user.id; // From protect middleware
+
+    console.log('Authenticated user ID:', userId); // Debug
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+        console.error('Invalid userId format:', userId);
+        return res.status(400).json({ error: 'Invalid user ID format' });
+    }
+
+    try {
+        const user = await userSchema.findById(userId).populate({
+            path: 'watchlist',
+            select: 'title category description thumbnail video shortPreview previewUrl isApproved comments',
+            match: { isApproved: true }, // Optional: Only approved content
+            populate: {
+                path: 'comments.user',
+                select: 'name profileImage',
+            },
+        });
+
+        if (!user) {
+            console.error('User not found for ID:', userId);
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        console.log('User watchlist:', user.watchlist ? user.watchlist.length : 'No watchlist items'); // Debug
+
+        res.status(200).json({
+            watchList: user.watchlist || [], // Return empty array if no watchlist items
+        });
+    } catch (error) {
+        console.error('Get watchlist error:', {
+            message: error.message || 'No message',
+            name: error.name || 'No name',
+            stack: error.stack || 'No stack',
+            error: JSON.stringify(error, null, 2),
+        });
+        if (error.name === 'CastError') {
+            return res.status(400).json({ error: 'Invalid watchlist entry detected', details: error.message });
+        }
+        res.status(500).json({ error: 'Server error', details: error.message || 'Unknown error' });
+    }
+});
+
+
+// @desc PUT Content
+// @route PUT /api/user/removelist/:id
+const removeWatchlist = asyncHandler(async (req, res) => {
+    try {
+        const { contentId } = req.body;
+        const userId = req.user.id;
+
+
+        // Find the user by ID and update the likes array to remove the contentId
+        const updatedUser = await userSchema.findByIdAndUpdate(
+            userId,
+            { $pull: { watchlist: contentId } },
+            { new: true }
+        );
+
+        if (!updatedUser) {
+            return res.status(404).json({ error: 'User/Content not found' });
+        }
+
+        // res.status(200).json({ watchlist: updatedUser.watchlist, message:"Content removed from watchlist!" });
+        res.status(200).json({ contentId: contentId, message: "Content removed to watchlist!" });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Server error', message: "watchlist successfully removed!" });
+    }
+});
 module.exports = {
     getContent,
     getRecentContent,
@@ -891,5 +999,8 @@ module.exports = {
     getUnapprovedContent,
     saveVideoProgress,
     getVideoProgress,
-    ContinueWatching
+    ContinueWatching,
+    addWatchlist,
+    getWatchlist,
+    removeWatchlist,
 }
