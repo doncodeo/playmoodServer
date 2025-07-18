@@ -51,8 +51,9 @@ const playlistSchema = new mongoose.Schema(
 
 // Prevent duplicate videos in playlist
 playlistSchema.pre('save', function (next) {
-    this.videos = [...new Set(this.videos.map(String))].map(mongoose.Types.ObjectId);
-    this.likes = [...new Set(this.likes.map(String))].map(mongoose.Types.ObjectId);
+    const { ObjectId } = mongoose.Types;
+    this.videos = [...new Set(this.videos.map(String))].map((id) => new ObjectId(id));
+    this.likes = [...new Set(this.likes.map(String))].map((id) => new ObjectId(id));
     next();
 });
 
