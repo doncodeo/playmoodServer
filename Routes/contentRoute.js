@@ -560,10 +560,6 @@ router.route('/unapproved').get(protect, getUnapprovedContent);
  *       500:
  *         description: Server error
  */
-router.route('/continue-watching').get(protect, ContinueWatching);
-router.route('/watchlist').post(protect, addWatchlist);
-router.route('/watchlist').get(protect, getWatchlist);
-router.route('/watchlist/remove').post(protect, removeWatchlist);
 router.route('/:id').get(getContentById);
 
 /**
@@ -762,9 +758,6 @@ router.route('/approve/:id').put(protect, approveContent);
  */
 router.route('/reject/:id').put(protect, rejectContent);
 
-
-
-
 /**
  * @swagger
  * /api/content/progress/{contentId}:
@@ -938,5 +931,10 @@ router.route('/progress/:contentId').get(protect, getVideoProgress);
  *       500:
  *         description: Server error
  */
+router.route('/continue-watching').get(protect, ContinueWatching);
 
-module.exports = router;   
+router.route('/watchlist').post(protect, addWatchlist);
+router.route('/watchlist').get(protect, getWatchlist);
+router.route('/watchlist/remove').post(protect, removeWatchlist);
+
+module.exports = router;     
