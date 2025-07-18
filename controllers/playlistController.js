@@ -100,12 +100,12 @@ const addVideoToPlaylist = asyncHandler(async (req, res) => {
         }
 
         // Add video if not already in playlist
-        if (playlist.videos.includes(contentId)) {
+        if (playlist.videos.includes(new mongoose.Types.ObjectId(contentId))) {
             console.error('Video already in playlist:', contentId);
             return res.status(400).json({ error: 'Video already in playlist' });
         }
 
-        playlist.videos.push(contentId);
+        playlist.videos.push(new mongoose.Types.ObjectId(contentId));
         await playlist.save();
 
         // Populate video details
