@@ -15,8 +15,7 @@ const {
     getUnapprovedContent,
     saveVideoProgress,
     getVideoProgress,
-    ContinueWatching,
-    getWatchlist
+    ContinueWatching
 } = require('../controllers/contentController');
 const upload = require('../middleware/multer');
 const { protect } = require('../middleware/authmiddleware');
@@ -558,7 +557,6 @@ router.route('/unapproved').get(protect, getUnapprovedContent);
  *       500:
  *         description: Server error
  */
-router.route('/watchlist').get(protect, getWatchlist);
 router.route('/continue-watching').get(protect, ContinueWatching);
 router.route('/:id').get(getContentById);
 

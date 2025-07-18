@@ -1008,7 +1008,7 @@ const addWatchlist = asyncHandler(async (req, res) => {
         }
 
         // Find the user by ID and update the likes array
-        const updatedUser = await userData.findByIdAndUpdate(
+        const updatedUser = await userData.findByIdAndUpdate( 
             userId,
             { $push: { watchlist: contentId } },
             { new: true }
