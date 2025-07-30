@@ -3,6 +3,8 @@ const router = express.Router();
 const { 
     getContent, 
     getRecentContent,
+    getTopTenContent,
+    getRecommendedContent,
     getRecentCreatorContent,
     createContent, 
     addComment,
@@ -431,6 +433,67 @@ router.route('/:id/comments').get(getComments);
  *         description: Server error
  */
 router.route('/new').get(getRecentContent);
+
+/**
+ * @swagger
+ * /top-ten:
+ *   get:
+ *     summary: Get top 10 most viewed content
+ *     description: Retrieves the 10 most viewed approved content items, sorted by views in descending order.
+ *     tags: [Content]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of top 10 content
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Content'
+ *       304:
+ *         description: Not Modified (ETag match)
+ *       401:
+ *         description: Unauthorized - Missing or invalid JWT token
+ *       500:
+ *         description: Server error
+ */
+router.route('/top-ten').get(protect, getTopTenContent);
+
+/**
+ * @swagger
+ * /recommended/{id}:
+ *   get:
+ *     summary: Get recommended content based on category
+ *     description: Retrieves a list of approved content items that share the same category as the specified content ID.
+ *     tags: [Content]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: MongoDB ObjectId of the content to base recommendations on
+ *     responses:
+ *       200:
+ *         description: List of recommended content
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Content'
+ *       401:
+ *         description: Unauthorized - Missing or invalid JWT token
+ *       404:
+ *         description: Content not found
+ *       500:
+ *         description: Server error
+ */
+router.route('/recommended/:id').get(protect, getRecommendedContent);
 
 /**
  * @swagger
