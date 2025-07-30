@@ -58,6 +58,56 @@ const getRecentContent = asyncHandler(async (req, res) => {
     }
 });
 
+// @desc Get Top 10 Content
+// @route GET /api/content/top-ten
+// @access Private
+const getTopTenContent = asyncHandler(async (req, res) => {
+    try {
+        const topContents = await contentSchema.find({ isApproved: true })
+            .sort({ views: -1 })
+            .limit(10)
+            .populate('user', 'name')
+            .lean();
+
+        const lastUpdated = topContents.length > 0 ? Math.max(...topContents.map(c => c.updatedAt.getTime())) : 0;
+        const etag = `"top-10-${topContents.length}-${lastUpdated}"`;
+
+        if (req.get('If-None-Match') === etag) {
+            return res.status(304).end();
+        }
+
+        setEtagAndCache(res, etag, 900); // Cache for 15 minutes
+        res.status(200).json(topContents);
+    } catch (error) {
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// @desc Get Recommended Content
+// @route GET /api/content/recommended/:id
+// @access Private
+const getRecommendedContent = asyncHandler(async (req, res) => {
+    try {
+        const content = await contentSchema.findById(req.params.id);
+
+        if (!content) {
+            return res.status(404).json({ error: 'Content not found' });
+        }
+
+        const recommendedContents = await contentSchema.find({
+            category: content.category,
+            isApproved: true,
+            _id: { $ne: req.params.id }
+        })
+        .populate('user', 'name')
+        .lean();
+
+        res.status(200).json(recommendedContents);
+    } catch (error) {
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
 // @desc    Get the most recent approved content for a specific creator
 // @route   GET /api/content/creator/:userId/recent
 // @access  Public
@@ -993,6 +1043,8 @@ const removeWatchlist = asyncHandler(async (req, res) => {
 module.exports = {
     getContent,
     getRecentContent,
+    getTopTenContent,
+    getRecommendedContent,
     getRecentCreatorContent,
     getContentById,
     createContent,
