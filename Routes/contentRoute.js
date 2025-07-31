@@ -729,8 +729,8 @@ router.route('/:id').delete(protect, deleteContent);
  * @swagger
  * /api/content/approve/{id}:
  *   put:
- *     summary: Approve content
- *     description: Approves a specific content item by ID (admin only).
+ *     summary: Approve and optionally update content
+ *     description: Approves a specific content item by ID (admin only). The admin can also optionally update content fields like title, category, description, and credit in the same request.
  *     tags: [Content]
  *     security:
  *       - BearerAuth: []
@@ -741,9 +741,28 @@ router.route('/:id').delete(protect, deleteContent);
  *         schema:
  *           type: string
  *         description: MongoDB ObjectId of the content
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 example: "Updated Content Title"
+ *               category:
+ *                 type: string
+ *                 example: "Educational"
+ *               description:
+ *                 type: string
+ *                 example: "This is the updated and approved description."
+ *               credit:
+ *                 type: string
+ *                 example: "Updated Credits"
  *     responses:
  *       200:
- *         description: Content approved successfully
+ *         description: Content approved and updated successfully
  *         content:
  *           application/json:
  *             schema:
@@ -751,7 +770,7 @@ router.route('/:id').delete(protect, deleteContent);
  *               properties:
  *                 message:
  *                   type: string
- *                   example: Content approved successfully
+ *                   example: Content approved and updated successfully
  *                 content:
  *                   $ref: '#/components/schemas/Content'
  *       400:
