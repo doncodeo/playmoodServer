@@ -34,6 +34,9 @@
     "passport-google-oauth20": "^2.0.0",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
-    "xoauth2": "^1.2.0"
+    "xoauth2": "^1.2.0",
+    "nodejs-whisper": "^0.2.9",
+    "fluent-ffmpeg": "^2.1.2",
+    "@ffmpeg-installer/ffmpeg": "^1.1.0"
   }
 }

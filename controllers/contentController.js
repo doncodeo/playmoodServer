@@ -6,6 +6,7 @@ const nodemailer = require('nodemailer');
 const mongoose = require('mongoose'); // Add mongoose import
 const fs = require('fs');
 const { setEtagAndCache } = require('../utils/responseHelpers');
+const aiService = require('../ai/ai-service');
 
 const transporter = nodemailer.createTransport({
     service: 'Gmail',
@@ -90,23 +91,52 @@ const getRecommendedContent = asyncHandler(async (req, res) => {
     try {
         const content = await contentSchema.findById(req.params.id);
 
-        if (!content) {
-            return res.status(404).json({ error: 'Content not found' });
+        if (!content || !content.contentEmbedding || content.contentEmbedding.length === 0) {
+            return res.status(404).json({ error: 'Content not found or does not have an embedding for recommendations.' });
         }
 
-        const recommendedContents = await contentSchema.find({
-            category: content.category,
+        // This is a simplified cosine similarity calculation.
+        // For production, a dedicated vector database would be more efficient.
+        const allContent = await contentSchema.find({
             isApproved: true,
-            _id: { $ne: req.params.id }
+            _id: { $ne: req.params.id },
+            contentEmbedding: { $exists: true, $ne: [] }
+        }).lean();
+
+        const recommendedContents = allContent.map(otherContent => {
+            const similarity = cosineSimilarity(content.contentEmbedding, otherContent.contentEmbedding);
+            return { ...otherContent, similarity };
         })
-        .populate('user', 'name')
-        .lean();
+        .sort((a, b) => b.similarity - a.similarity)
+        .slice(0, 10); // Get top 10 recommendations
 
         res.status(200).json(recommendedContents);
     } catch (error) {
+        console.error('Error getting recommended content:', error);
         res.status(500).json({ error: 'Server error' });
     }
 });
+
+function cosineSimilarity(vecA, vecB) {
+    if (!vecA || !vecB || vecA.length !== vecB.length) {
+        return 0;
+    }
+
+    let dotProduct = 0;
+    let normA = 0;
+    let normB = 0;
+    for (let i = 0; i < vecA.length; i++) {
+        dotProduct += vecA[i] * vecB[i];
+        normA += vecA[i] * vecA[i];
+        normB += vecB[i] * vecB[i];
+    }
+
+    if (normA === 0 || normB === 0) {
+        return 0;
+    }
+
+    return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+}
 
 // @desc    Get the most recent approved content for a specific creator
 // @route   GET /api/content/creator/:userId/recent
@@ -293,6 +323,16 @@ const createContent = asyncHandler(async (req, res) => {
             return res.status(400).json({ error: 'Video file is required!' });
         }
 
+        // Generate captions
+        let captions = '';
+        try {
+            captions = await aiService.generateCaptions(videoFile.path);
+        } catch (captionError) {
+            console.error('Failed to generate captions:', captionError);
+            // We can decide if captioning failure should block the upload.
+            // For now, we'll just log the error and continue.
+        }
+
         // Upload video to Cloudinary first
         const videoResult = await cloudinary.uploader.upload(videoFile.path, {
             resource_type: 'video',
@@ -312,6 +352,14 @@ const createContent = asyncHandler(async (req, res) => {
             fs.unlinkSync(videoFile.path);
         } catch (cleanupError) {
             console.warn('Failed to delete video temp file:', cleanupError.message);
+        }
+
+        // AI Content Moderation
+        let moderationResult = { status: 'needs_review', labels: [] };
+        try {
+            moderationResult = await aiService.analyzeVideoForModeration(videoResult.secure_url);
+        } catch (moderationError) {
+            console.error('Failed to analyze video for moderation:', moderationError);
         }
 
         // Fetch video metadata to get duration
@@ -365,7 +413,26 @@ const createContent = asyncHandler(async (req, res) => {
             return res.status(403).json({ error: 'Cannot create content for another user!' });
         }
 
-        const isApproved = user.role === 'admin';
+        let isApproved = user.role === 'admin';
+        let rejectionReason = '';
+
+        if (moderationResult.status === 'approved' && user.role !== 'admin') {
+            isApproved = true;
+        } else if (moderationResult.status === 'rejected') {
+            isApproved = false;
+            rejectionReason = `Content automatically rejected by AI due to: ${moderationResult.labels.join(', ')}`;
+        }
+
+
+        // Generate content embeddings
+        let contentEmbedding = [];
+        try {
+            contentEmbedding = await aiService.generateEmbeddings({ title, description, category });
+        } catch (embeddingError) {
+            console.error('Failed to generate content embeddings:', embeddingError);
+            // We can decide if this failure should block the upload.
+            // For now, we'll just log the error and continue.
+        }
 
         // Create content with preview timeline
         const content = await contentSchema.create({
@@ -380,6 +447,11 @@ const createContent = asyncHandler(async (req, res) => {
             cloudinary_thumbnail_id: cloudinaryThumbnailId,
             shortPreview: { start, end },
             isApproved,
+            rejectionReason: rejectionReason || undefined,
+            captions,
+            contentEmbedding,
+            aiModerationStatus: moderationResult.status,
+            aiModerationLabels: moderationResult.labels,
         });
 
         // Generate preview URL
@@ -473,6 +545,12 @@ const addComment = asyncHandler(async (req, res) => {
         }
         if (text.length > 1000) {
             return res.status(400).json({ error: 'Comment cannot exceed 1000 characters!' });
+        }
+
+        // Moderate comment
+        const moderationResult = await aiService.moderateComment(text);
+        if (moderationResult.status !== 'approved') {
+            return res.status(400).json({ error: 'Comment cannot be posted as it violates our community guidelines.' });
         }
 
         // Validate content exists

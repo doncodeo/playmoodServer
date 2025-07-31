@@ -57,6 +57,20 @@ const contentSchema = new mongoose.Schema(
             trim: true,
             maxlength: [500, 'Rejection reason cannot exceed 500 characters'],
         },
+        captions: {
+            type: String,
+        },
+        contentEmbedding: {
+            type: [Number],
+        },
+        aiModerationStatus: {
+            type: String,
+            enum: ['approved', 'rejected', 'needs_review', 'pending'],
+            default: 'pending',
+        },
+        aiModerationLabels: {
+            type: [String],
+        },
         views: {
             type: Number,
             default: 0,
