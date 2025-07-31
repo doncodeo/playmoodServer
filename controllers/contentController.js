@@ -600,6 +600,13 @@ const approveContent = asyncHandler(async (req, res) => {
             return res.status(404).json({ error: 'Content not found' });
         }
 
+        // Update content fields from request body if they exist
+        const { title, category, description, credit } = req.body;
+        if (title) content.title = title;
+        if (category) content.category = category;
+        if (description) content.description = description;
+        if (credit) content.credit = credit;
+
         content.isApproved = true;
         content.rejectionReason = undefined; // Clear rejection reason
         await content.save();
@@ -608,7 +615,7 @@ const approveContent = asyncHandler(async (req, res) => {
         const populatedContent = await contentSchema.findById(id).populate('user', 'name profileImage');
 
         res.status(200).json({
-            message: 'Content approved successfully',
+            message: 'Content approved and updated successfully',
             content: populatedContent,
         });
     } catch (error) {
