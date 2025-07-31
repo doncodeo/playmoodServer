@@ -459,7 +459,7 @@ router.route('/new').get(getRecentContent);
  *       500:
  *         description: Server error
  */
-router.route('/top-ten').get(protect, getTopTenContent);
+router.route('/top-ten').get(getTopTenContent);
 
 /**
  * @swagger
