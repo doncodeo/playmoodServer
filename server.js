@@ -74,6 +74,7 @@ app.use('/api/subscribe', require('./Routes/subscribeRoute'));
 app.use('/api/channel', require('./Routes/channelRoute'));
 app.use('/api/community', require('./Routes/communityPostRoute'));
 app.use('/api/playlists', require('./Routes/playlistRoutes'));
+app.use('/api/ai', require('./Routes/aiRoute'));
 
 // Serve login.html for /login route
 app.get('/login', (req, res) => {
