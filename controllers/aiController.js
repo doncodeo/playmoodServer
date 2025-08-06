@@ -1,7 +1,9 @@
 const asyncHandler = require('express-async-handler');
 const aiService = require('../ai/ai-service');
 const contentSchema = require('../models/contentModel');
-const { video } = require('../config/cloudinary');
+const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
 
 // @desc    Generate captions for a video
 // @route   POST /api/ai/generate-captions
@@ -14,26 +16,44 @@ const generateCaptions = asyncHandler(async (req, res) => {
     }
 
     const content = await contentSchema.findById(contentId);
-    if (!content) {
-        return res.status(404).json({ error: 'Content not found' });
+    if (!content || !content.video) {
+        return res.status(404).json({ error: 'Content not found or video URL is missing' });
     }
 
-    // This assumes the video is stored locally, which might not be the case.
-    // This will need to be adapted to work with cloud-stored videos.
-    // For now, we'll simulate it with the video path.
-    // In a real scenario, we'd need to download the video from content.video (a URL)
-    // to a temporary local path before passing it to the AI service.
+    const videoUrl = content.video;
+    const tempDir = path.join(__dirname, '..', 'temp');
+    if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir);
+    }
+    const tempFilePath = path.join(tempDir, `${contentId}.mp4`);
+    const writer = fs.createWriteStream(tempFilePath);
 
-    // Placeholder for local video path
-    const videoPath = 'path/to/local/video.mp4'; // This needs to be replaced with actual logic
-
+    let captions;
     try {
-        const captions = await aiService.generateCaptions(videoPath);
+        const response = await axios({
+            url: videoUrl,
+            method: 'GET',
+            responseType: 'stream',
+        });
+
+        response.data.pipe(writer);
+
+        await new Promise((resolve, reject) => {
+            writer.on('finish', resolve);
+            writer.on('error', reject);
+        });
+
+        captions = await aiService.generateCaptions(tempFilePath);
         content.captions = captions;
         await content.save();
         res.status(200).json({ message: 'Captions generated successfully', captions });
     } catch (error) {
         res.status(500).json({ error: 'Failed to generate captions', details: error.message });
+    } finally {
+        // Clean up the temporary file
+        if (fs.existsSync(tempFilePath)) {
+            fs.unlinkSync(tempFilePath);
+        }
     }
 });
 
