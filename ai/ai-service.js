@@ -42,6 +42,7 @@ class AIService {
                         // For now, we're keeping it simple as per the original implementation.
                         const transcript = await whisper(audioPath, {
                             modelName: "base.en", // Using a specific model
+                            autoDownloadModelName: "base.en",
                             whisperOptions: {
                                 "-fp16": true, // Enable half-precision for faster processing if supported
                                 "-nt": true // No timestamps
