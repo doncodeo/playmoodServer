@@ -1,4 +1,4 @@
-const { whisper } = require('nodejs-whisper');
+const { nodewhisper: whisper } = require('nodejs-whisper');
 const ffmpeg = require('fluent-ffmpeg');
 const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
 const path = require('path');
