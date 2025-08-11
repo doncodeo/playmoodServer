@@ -19,10 +19,11 @@ class AIService {
     /**
      * Generates captions for a video file.
      * @param {string} videoPath - The local path to the video file.
+     * @param {string} contentId - The ID of the content being processed.
      * @returns {Promise<string>} The generated transcript.
      */
-    async generateCaptions(videoPath) {
-        console.log(`AI Service: Starting caption generation for ${videoPath}`);
+    async generateCaptions(videoPath, contentId) {
+        console.log(`[${contentId}] AI Service: Starting caption generation for ${videoPath}`);
 
         const audioPath = path.join(path.dirname(videoPath), `${path.basename(videoPath, path.extname(videoPath))}.wav`);
 
@@ -31,19 +32,30 @@ class AIService {
                 .toFormat('wav')
                 .audioFrequency(16000)
                 .on('error', (err) => {
-                    console.error(`An error occurred during audio extraction: ${err.message}`);
-                    reject(err);
+                    console.error(`[${contentId}] An error occurred during audio extraction: ${err.message}`);
+                    reject(new Error(`FFmpeg error: ${err.message}`));
                 })
                 .on('end', async () => {
-                    console.log(`Audio extracted to ${audioPath}`);
+                    console.log(`[${contentId}] Audio extracted to ${audioPath}`);
                     try {
-                        const transcript = await whisper(audioPath);
-                        console.log('Transcription complete.');
+                        // It's better to handle the model loading and other whisper options here.
+                        // For now, we're keeping it simple as per the original implementation.
+                        const transcript = await whisper(audioPath, {
+                            modelName: "base.en", // Using a specific model
+                            whisperOptions: {
+                                "-fp16": true, // Enable half-precision for faster processing if supported
+                                "-nt": true // No timestamps
+                            }
+                        });
+                        console.log(`[${contentId}] Transcription complete.`);
                         fs.unlinkSync(audioPath); // Clean up the audio file
-                        resolve(transcript);
+                        // The whisper library may return an array of objects or a single string.
+                        // Let's ensure we return a string.
+                        const resultText = Array.isArray(transcript) ? transcript.map(t => t.text).join(' ').trim() : transcript;
+                        resolve(resultText);
                     } catch (error) {
-                        console.error('An error occurred during transcription:', error);
-                        reject(error);
+                        console.error(`[${contentId}] An error occurred during transcription:`, error);
+                        reject(new Error(`Whisper error: ${error.message}`));
                     }
                 })
                 .save(audioPath);

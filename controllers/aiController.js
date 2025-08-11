@@ -20,41 +20,59 @@ const generateCaptions = asyncHandler(async (req, res) => {
         return res.status(404).json({ error: 'Content not found or video URL is missing' });
     }
 
-    const videoUrl = content.video;
-    const tempDir = path.join(__dirname, '..', 'temp');
-    if (!fs.existsSync(tempDir)) {
-        fs.mkdirSync(tempDir);
-    }
-    const tempFilePath = path.join(tempDir, `${contentId}.mp4`);
-    const writer = fs.createWriteStream(tempFilePath);
+    // Immediately respond that the process has started
+    res.status(202).json({ message: 'Caption generation started. This is a long-running process. The captions will be available on the content object once completed.' });
 
-    let captions;
-    try {
-        const response = await axios({
-            url: videoUrl,
-            method: 'GET',
-            responseType: 'stream',
-        });
-
-        response.data.pipe(writer);
-
-        await new Promise((resolve, reject) => {
-            writer.on('finish', resolve);
-            writer.on('error', reject);
-        });
-
-        captions = await aiService.generateCaptions(tempFilePath);
-        content.captions = captions;
-        await content.save();
-        res.status(200).json({ message: 'Captions generated successfully', captions });
-    } catch (error) {
-        res.status(500).json({ error: 'Failed to generate captions', details: error.message });
-    } finally {
-        // Clean up the temporary file
-        if (fs.existsSync(tempFilePath)) {
-            fs.unlinkSync(tempFilePath);
+    // Run the captioning process in the background
+    (async () => {
+        const videoUrl = content.video;
+        const tempDir = path.join(__dirname, '..', 'temp');
+        if (!fs.existsSync(tempDir)) {
+            fs.mkdirSync(tempDir);
         }
-    }
+        const tempFilePath = path.join(tempDir, `${contentId}.mp4`);
+        const writer = fs.createWriteStream(tempFilePath);
+
+        try {
+            console.log(`[${contentId}] Starting video download from ${videoUrl}`);
+            const response = await axios({
+                url: videoUrl,
+                method: 'GET',
+                responseType: 'stream',
+            });
+
+            response.data.pipe(writer);
+
+            await new Promise((resolve, reject) => {
+                writer.on('finish', () => {
+                    console.log(`[${contentId}] Video download finished.`);
+                    resolve();
+                });
+                writer.on('error', (error) => {
+                    console.error(`[${contentId}] Error writing video file:`, error);
+                    reject(error);
+                });
+            });
+
+            content.captions = 'processing';
+            await content.save();
+
+            const captions = await aiService.generateCaptions(tempFilePath, contentId);
+            content.captions = captions;
+            await content.save();
+            console.log(`[${contentId}] Captions generated and saved successfully.`);
+
+        } catch (error) {
+            console.error(`[${contentId}] Failed to generate captions:`, error.message);
+            content.captions = `failed: ${error.message}`;
+            await content.save();
+        } finally {
+            // Clean up the temporary file
+            if (fs.existsSync(tempFilePath)) {
+                fs.unlinkSync(tempFilePath);
+            }
+        }
+    })();
 });
 
 // @desc    Generate embeddings for a piece of content
