@@ -1,10 +1,4 @@
-const { nodewhisper: whisper } = require('nodejs-whisper');
-const ffmpeg = require('fluent-ffmpeg');
-const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
-const path = require('path');
-const fs = require('fs');
-
-ffmpeg.setFfmpegPath(ffmpegInstaller.path);
+const { AssemblyAI } = require('assemblyai');
 
 // This service will act as an abstraction layer for our AI models and services.
 // It will expose a set of functions that our application can use without needing
@@ -12,55 +6,35 @@ ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 
 class AIService {
     constructor() {
-        // In the future, we might initialize connections to AI providers here.
-        // For now, with local models, we might load them here.
+        this.assemblyai = new AssemblyAI({
+            apiKey: process.env.ASSEMBLYAI_API_KEY,
+        });
     }
 
     /**
-     * Generates captions for a video file.
-     * @param {string} videoPath - The local path to the video file.
+     * Generates captions for a video or audio file from a URL.
+     * @param {string} url - The public URL to the video or audio file.
      * @param {string} contentId - The ID of the content being processed.
      * @returns {Promise<string>} The generated transcript.
      */
-    async generateCaptions(videoPath, contentId) {
-        console.log(`[${contentId}] AI Service: Starting caption generation for ${videoPath}`);
+    async generateCaptions(url, contentId) {
+        console.log(`[${contentId}] AI Service: Starting caption generation for ${url}`);
 
-        const audioPath = path.join(path.dirname(videoPath), `${path.basename(videoPath, path.extname(videoPath))}.wav`);
+        try {
+            const transcript = await this.assemblyai.transcripts.transcribe({
+                audio: url,
+            });
 
-        return new Promise((resolve, reject) => {
-            ffmpeg(videoPath)
-                .toFormat('wav')
-                .audioFrequency(16000)
-                .on('error', (err) => {
-                    console.error(`[${contentId}] An error occurred during audio extraction: ${err.message}`);
-                    reject(new Error(`FFmpeg error: ${err.message}`));
-                })
-                .on('end', async () => {
-                    console.log(`[${contentId}] Audio extracted to ${audioPath}`);
-                    try {
-                        // It's better to handle the model loading and other whisper options here.
-                        // For now, we're keeping it simple as per the original implementation.
-                        const transcript = await whisper(audioPath, {
-                            modelName: "base.en", // Using a specific model
-                            autoDownloadModelName: "base.en",
-                            whisperOptions: {
-                                "-fp16": true, // Enable half-precision for faster processing if supported
-                                "-nt": true // No timestamps
-                            }
-                        });
-                        console.log(`[${contentId}] Transcription complete.`);
-                        fs.unlinkSync(audioPath); // Clean up the audio file
-                        // The whisper library may return an array of objects or a single string.
-                        // Let's ensure we return a string.
-                        const resultText = Array.isArray(transcript) ? transcript.map(t => t.text).join(' ').trim() : transcript;
-                        resolve(resultText);
-                    } catch (error) {
-                        console.error(`[${contentId}] An error occurred during transcription:`, error);
-                        reject(new Error(`Whisper error: ${error.message}`));
-                    }
-                })
-                .save(audioPath);
-        });
+            if (transcript.status === 'error') {
+                throw new Error(`Transcription failed: ${transcript.error}`);
+            }
+
+            console.log(`[${contentId}] Transcription complete.`);
+            return transcript.text;
+        } catch (error) {
+            console.error(`[${contentId}] An error occurred during transcription:`, error);
+            throw new Error(`AssemblyAI error: ${error.message}`);
+        }
     }
 
     /**
