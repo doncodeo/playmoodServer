@@ -1,7 +1,6 @@
 const asyncHandler = require('express-async-handler');
 const aiService = require('../ai/ai-service');
 const contentSchema = require('../models/contentModel');
-const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 
@@ -26,38 +25,12 @@ const generateCaptions = asyncHandler(async (req, res) => {
     // Run the captioning process in the background
     (async () => {
         const videoUrl = content.video;
-        const tempDir = path.join(__dirname, '..', 'temp');
-        if (!fs.existsSync(tempDir)) {
-            fs.mkdirSync(tempDir);
-        }
-        const tempFilePath = path.join(tempDir, `${contentId}.mp4`);
-        const writer = fs.createWriteStream(tempFilePath);
 
         try {
-            console.log(`[${contentId}] Starting video download from ${videoUrl}`);
-            const response = await axios({
-                url: videoUrl,
-                method: 'GET',
-                responseType: 'stream',
-            });
-
-            response.data.pipe(writer);
-
-            await new Promise((resolve, reject) => {
-                writer.on('finish', () => {
-                    console.log(`[${contentId}] Video download finished.`);
-                    resolve();
-                });
-                writer.on('error', (error) => {
-                    console.error(`[${contentId}] Error writing video file:`, error);
-                    reject(error);
-                });
-            });
-
             content.captions = 'processing';
             await content.save();
 
-            const captions = await aiService.generateCaptions(tempFilePath, contentId);
+            const captions = await aiService.generateCaptions(videoUrl, contentId);
             content.captions = captions;
             await content.save();
             console.log(`[${contentId}] Captions generated and saved successfully.`);
@@ -66,11 +39,6 @@ const generateCaptions = asyncHandler(async (req, res) => {
             console.error(`[${contentId}] Failed to generate captions:`, error.message);
             content.captions = `failed: ${error.message}`;
             await content.save();
-        } finally {
-            // Clean up the temporary file
-            if (fs.existsSync(tempFilePath)) {
-                fs.unlinkSync(tempFilePath);
-            }
         }
     })();
 });
