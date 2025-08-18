@@ -22,10 +22,15 @@ const generateCaptions = asyncHandler(async (req, res) => {
         return res.status(404).json({ error: 'Content not found or video URL is missing' });
     }
 
+    // Defensively check if captions is an array. If not, it's an old document.
+    const captionsIsArray = Array.isArray(content.captions);
+
     // Check if captions for this language already exist
-    const existingCaptions = content.captions.find(c => c.languageCode === languageCode);
-    if (existingCaptions) {
-        return res.status(200).json({ message: `Captions for language '${languageCode}' already exist.` });
+    if (captionsIsArray) {
+        const existingCaptions = content.captions.find(c => c.languageCode === languageCode);
+        if (existingCaptions) {
+            return res.status(200).json({ message: `Captions for language '${languageCode}' already exist.` });
+        }
     }
 
     // Immediately respond that the process has started
@@ -44,10 +49,13 @@ const generateCaptions = asyncHandler(async (req, res) => {
                     text: captionText,
                 };
 
-                await contentSchema.updateOne(
-                    { _id: contentId },
-                    { $push: { captions: newCaption } }
-                );
+                // If the original captions field was an array, push the new caption.
+                // Otherwise, overwrite the old string field with a new array containing the new caption.
+                const updateOperation = captionsIsArray
+                    ? { $push: { captions: newCaption } }
+                    : { $set: { captions: [newCaption] } };
+
+                await contentSchema.updateOne({ _id: contentId }, updateOperation);
 
                 console.log(`[${contentId}] Captions for language '${languageCode}' generated and saved successfully.`);
             } else {
