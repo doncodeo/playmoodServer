@@ -6,10 +6,58 @@ const {
     removeVideoFromPlaylist,
     getPlaylist,
     getUserPlaylists,
+    getPublicUserPlaylists,
     updatePlaylist,
     deletePlaylist,
 } = require('../controllers/playlistController');
 const { protect } = require('../middleware/authmiddleware'); 
+
+/**
+ * @swagger
+ * /api/playlists/user/{userId}/public:
+ *   get:
+ *     summary: Get all public playlists for a user
+ *     description: Retrieves all public playlists for a specific user.
+ *     tags: [Playlists]
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User ID
+ *     responses:
+ *       200:
+ *         description: Public playlists retrieved successfully
+ *         headers:
+ *           Cache-Control:
+ *             schema:
+ *               type: string
+ *               example: public, max-age=300
+ *           ETag:
+ *             schema:
+ *               type: string
+ *               example: "user-public-playlists-682fa4973b7d2a9c142724e3-2-1697059200000"
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Public playlists retrieved successfully
+ *                 playlists:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Playlist'
+ *       304:
+ *         description: Not Modified (ETag match)
+ *       400:
+ *         description: Invalid user ID
+ *       500:
+ *         description: Server error
+ */
+router.get('/user/:userId/public', getPublicUserPlaylists);
 
 /**
  * @swagger

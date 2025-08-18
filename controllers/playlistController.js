@@ -65,6 +65,60 @@ const createPlaylist = asyncHandler(async (req, res) => {
     }
 });
 
+// @desc    Get all public playlists for a user
+// @route   GET /api/playlists/user/:userId/public
+// @access  Public
+const getPublicUserPlaylists = asyncHandler(async (req, res) => {
+    const { userId } = req.params;
+
+    console.log('Fetching public playlists for userId:', { userId }); // Debug
+
+    // Validate userId
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+        console.error('Invalid userId format:', userId);
+        return res.status(400).json({ error: 'Invalid user ID format' });
+    }
+
+    try {
+        // Fetch playlists
+        const query = { user: userId, visibility: 'public' };
+        const playlists = await Playlist.find(query)
+            .sort({ createdAt: -1 })
+            .populate('user', 'name profileImage')
+            .populate('videos', 'title thumbnail video category');
+
+        console.log('Public user playlists count:', playlists.length); // Debug
+
+        // Generate ETag
+        const lastCreated = playlists.length > 0 ? playlists[0].createdAt.getTime() : 0;
+        const etag = `"user-public-playlists-${userId}-${playlists.length}-${lastCreated}"`;
+
+        if (req.get('If-None-Match') === etag) {
+            return res.status(304).end();
+        }
+
+        res.set({
+            'Cache-Control': 'public, max-age=300',
+            'ETag': etag,
+        });
+
+        res.status(200).json({
+            message: playlists.length > 0 ? 'Public playlists retrieved successfully' : 'No public playlists found',
+            playlists,
+        });
+    } catch (error) {
+        console.error('Get public user playlists error:', {
+            message: error.message || 'No message',
+            name: error.name || 'No name',
+            stack: error.stack || 'No stack',
+        });
+        if (error.name === 'CastError') {
+            return res.status(400).json({ error: 'Invalid data detected', details: error.message });
+        }
+        res.status(500).json({ error: 'Server error', details: error.message || 'Unknown error' });
+    }
+});
+
 // @desc    Add a video to a playlist
 // @route   POST /api/playlists/:playlistId/videos/:contentId
 // @access  Private
@@ -419,6 +473,7 @@ module.exports = {
     removeVideoFromPlaylist,
     getPlaylist,
     getUserPlaylists,
+    getPublicUserPlaylists,
     updatePlaylist,
     deletePlaylist,
 };
