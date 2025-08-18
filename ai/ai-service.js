@@ -15,14 +15,16 @@ class AIService {
      * Generates captions for a video or audio file from a URL.
      * @param {string} url - The public URL to the video or audio file.
      * @param {string} contentId - The ID of the content being processed.
+     * @param {string} languageCode - The language code for transcription.
      * @returns {Promise<string>} The generated transcript.
      */
-    async generateCaptions(url, contentId) {
-        console.log(`[${contentId}] AI Service: Starting caption generation for ${url}`);
+    async generateCaptions(url, contentId, languageCode = 'en_us') {
+        console.log(`[${contentId}] AI Service: Starting caption generation for ${url} with language ${languageCode}`);
 
         try {
             const transcript = await this.assemblyai.transcripts.transcribe({
                 audio: url,
+                language_code: languageCode,
             });
 
             if (transcript.status === 'error') {

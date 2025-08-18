@@ -283,7 +283,7 @@ const getContentById = asyncHandler(async (req, res) => {
 
 const createContent = asyncHandler(async (req, res) => {
     try {
-        const { title, category, description, credit, userId, previewStart, previewEnd } = req.body;
+        const { title, category, description, credit, userId, previewStart, previewEnd, languageCode } = req.body;
 
         // Validate required fields
         if (!title || !category || !description || !credit || !userId) {
@@ -326,7 +326,7 @@ const createContent = asyncHandler(async (req, res) => {
         // Generate captions
         let captions = '';
         try {
-            captions = await aiService.generateCaptions(videoFile.path);
+            captions = await aiService.generateCaptions(videoFile.path, null, languageCode);
         } catch (captionError) {
             console.error('Failed to generate captions:', captionError);
             // We can decide if captioning failure should block the upload.

@@ -8,10 +8,14 @@ const path = require('path');
 // @route   POST /api/ai/generate-captions
 // @access  Private
 const generateCaptions = asyncHandler(async (req, res) => {
-    const { contentId } = req.body;
+    const { contentId, languageCode } = req.body;
 
     if (!contentId) {
         return res.status(400).json({ error: 'Content ID is required' });
+    }
+
+    if (languageCode && typeof languageCode !== 'string') {
+        return res.status(400).json({ error: 'Invalid language code format' });
     }
 
     const content = await contentSchema.findById(contentId);
@@ -30,7 +34,7 @@ const generateCaptions = asyncHandler(async (req, res) => {
             content.captions = 'processing';
             await content.save();
 
-            const captions = await aiService.generateCaptions(videoUrl, contentId);
+            const captions = await aiService.generateCaptions(videoUrl, contentId, languageCode);
             content.captions = captions;
             await content.save();
             console.log(`[${contentId}] Captions generated and saved successfully.`);
