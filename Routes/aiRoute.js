@@ -32,13 +32,19 @@ const { protect } = require('../middleware/authmiddleware');
  *             type: object
  *             required:
  *               - contentId
+ *               - languageCode
  *             properties:
  *               contentId:
  *                 type: string
  *                 example: "65a6fc7b72128447ad32024e"
+ *               languageCode:
+ *                 type: string
+ *                 example: "es"
  *     responses:
  *       200:
- *         description: Captions generated successfully
+ *         description: Captions already exist for the given language
+ *       202:
+ *         description: Caption generation started
  *         content:
  *           application/json:
  *             schema:

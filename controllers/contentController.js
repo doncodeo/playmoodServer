@@ -324,13 +324,19 @@ const createContent = asyncHandler(async (req, res) => {
         }
 
         // Generate captions
-        let captions = '';
+        let initialCaptions = [];
         try {
-            captions = await aiService.generateCaptions(videoFile.path, null, languageCode);
+            const captionText = await aiService.generateCaptions(videoFile.path, null, languageCode);
+            if (captionText) {
+                initialCaptions.push({
+                    languageCode: languageCode || 'en_us',
+                    text: captionText,
+                });
+            }
         } catch (captionError) {
-            console.error('Failed to generate captions:', captionError);
+            console.error('Failed to generate initial captions:', captionError);
             // We can decide if captioning failure should block the upload.
-            // For now, we'll just log the error and continue.
+            // For now, we'll just log the error and continue without captions.
         }
 
         // Upload video to Cloudinary first
@@ -448,7 +454,7 @@ const createContent = asyncHandler(async (req, res) => {
             shortPreview: { start, end },
             isApproved,
             rejectionReason: rejectionReason || undefined,
-            captions,
+            captions: initialCaptions,
             contentEmbedding,
             aiModerationStatus: moderationResult.status,
             aiModerationLabels: moderationResult.labels,

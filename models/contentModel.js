@@ -57,9 +57,18 @@ const contentSchema = new mongoose.Schema(
             trim: true,
             maxlength: [500, 'Rejection reason cannot exceed 500 characters'],
         },
-        captions: {
-            type: String,
-        },
+        captions: [
+            {
+                languageCode: {
+                    type: String,
+                    required: true,
+                },
+                text: {
+                    type: String,
+                    required: true,
+                },
+            },
+        ],
         contentEmbedding: {
             type: [Number],
         },
