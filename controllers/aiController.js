@@ -138,9 +138,39 @@ const moderateComment = asyncHandler(async (req, res) => {
     }
 });
 
+// @desc    Translate a video
+// @route   POST /api/ai/translate-video
+// @access  Private
+const translateVideo = asyncHandler(async (req, res) => {
+    const { contentId, language } = req.body;
+
+    if (!contentId || !language) {
+        return res.status(400).json({ error: 'Content ID and language are required' });
+    }
+
+    const content = await contentSchema.findById(contentId);
+    if (!content || !content.video) {
+        return res.status(404).json({ error: 'Content not found or video URL is missing' });
+    }
+
+    // Immediately respond that the process has started
+    res.status(202).json({ message: `Video translation to '${language}' started. This is a long-running process.` });
+
+    // Run the translation process in the background
+    (async () => {
+        try {
+            await aiService.translateVideo(content.video, contentId, language);
+            console.log(`[${contentId}] Video translation to '${language}' initiated successfully.`);
+        } catch (error) {
+            console.error(`[${contentId}] Failed to initiate video translation to '${language}':`, error.message);
+        }
+    })();
+});
+
 module.exports = {
     generateCaptions,
     generateEmbeddings,
     analyzeVideoForModeration,
     moderateComment,
+    translateVideo,
 };
