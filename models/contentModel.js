@@ -80,6 +80,10 @@ const contentSchema = new mongoose.Schema(
         aiModerationLabels: {
             type: [String],
         },
+        translatedVideos: [{
+            language: String,
+            url: String,
+        }],
         views: {
             type: Number,
             default: 0,

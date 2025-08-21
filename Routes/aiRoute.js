@@ -5,6 +5,7 @@ const {
     generateEmbeddings,
     analyzeVideoForModeration,
     moderateComment,
+    translateVideo,
 } = require('../controllers/aiController');
 const { protect } = require('../middleware/authmiddleware');
 
@@ -205,5 +206,42 @@ router.post('/analyze-video', protect, analyzeVideoForModeration);
  *         description: Failed to moderate comment
  */
 router.post('/moderate-comment', protect, moderateComment);
+
+/**
+ * @swagger
+ * /api/ai/translate-video:
+ *   post:
+ *     summary: Translate a video to a different language
+ *     description: Takes a content ID and a target language, then translates the video.
+ *     tags: [AI]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - contentId
+ *               - language
+ *             properties:
+ *               contentId:
+ *                 type: string
+ *                 example: "65a6fc7b72128447ad32024e"
+ *               language:
+ *                 type: string
+ *                 example: "Spanish"
+ *     responses:
+ *       202:
+ *         description: Video translation started
+ *       400:
+ *         description: Content ID and language are required
+ *       404:
+ *         description: Content not found
+ *       500:
+ *         description: Failed to start video translation
+ */
+router.post('/translate-video', protect, translateVideo);
 
 module.exports = router;
