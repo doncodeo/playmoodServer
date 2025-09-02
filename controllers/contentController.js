@@ -1,5 +1,6 @@
 const asyncHandler = require('express-async-handler');
 const contentSchema = require('../models/contentModel');
+const Highlight = require('../models/highlightModel');
 const userSchema = require('../models/userModel');
 const cloudinary = require('../config/cloudinary');
 const nodemailer = require('nodemailer');
@@ -240,12 +241,21 @@ const getUnapprovedContent = asyncHandler(async (req, res) => {
 // @access Private
 const getContentById = asyncHandler(async (req, res) => {
     const { id } = req.params;
+    const { highlightId } = req.query;
     const userId = req.user ? req.user._id : null;
     const viewerIP = req.ip;
 
     const content = await contentSchema.findById(id).populate('user', 'name');
     if (!content) {
         return res.status(404).json({ error: 'Content not found' });
+    }
+
+    let highlightUrl = null;
+    if (highlightId) {
+        const highlight = await Highlight.findById(highlightId);
+        if (highlight && highlight.content.toString() === id) {
+            highlightUrl = `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/video/upload/so_${highlight.startTime},eo_${highlight.endTime}/${content.cloudinary_video_id}.mp4`;
+        }
     }
 
     // Check if the viewer has already viewed this content
@@ -274,7 +284,12 @@ const getContentById = asyncHandler(async (req, res) => {
         'ETag': etag,
     });
 
-    res.status(200).json(content);
+    const contentData = content.toObject();
+    if (highlightUrl) {
+        contentData.highlightUrl = highlightUrl;
+    }
+
+    res.status(200).json(contentData);
 });
 
 // @desc Create Content
