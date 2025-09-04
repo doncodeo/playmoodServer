@@ -6,6 +6,7 @@ const {
     analyzeVideoForModeration,
     moderateComment,
     translateVideo,
+    getSupportedLanguages,
 } = require('../controllers/aiController');
 const { protect } = require('../middleware/authmiddleware');
 
@@ -243,5 +244,32 @@ router.post('/moderate-comment', protect, moderateComment);
  *         description: Failed to start video translation
  */
 router.post('/translate-video', protect, translateVideo);
+
+/**
+ * @swagger
+ * /api/ai/supported-languages:
+ *   get:
+ *     summary: Get a list of supported languages for video translation
+ *     description: Returns an array of language codes that are supported by the video translation service.
+ *     tags: [AI]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: A list of supported languages
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 languages:
+ *                   type: array
+ *                   items:
+ *                     type: string
+ *                   example: ["english", "spanish", "french"]
+ *       500:
+ *         description: Failed to fetch supported languages
+ */
+router.get('/supported-languages', protect, getSupportedLanguages);
 
 module.exports = router;

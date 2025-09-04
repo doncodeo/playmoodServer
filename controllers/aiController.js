@@ -167,10 +167,23 @@ const translateVideo = asyncHandler(async (req, res) => {
     })();
 });
 
+// @desc    Get a list of supported languages for translation
+// @route   GET /api/ai/supported-languages
+// @access  Private
+const getSupportedLanguages = asyncHandler(async (req, res) => {
+    try {
+        const languages = await aiService.getSupportedLanguages();
+        res.status(200).json({ languages });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch supported languages', details: error.message });
+    }
+});
+
 module.exports = {
     generateCaptions,
     generateEmbeddings,
     analyzeVideoForModeration,
     moderateComment,
     translateVideo,
+    getSupportedLanguages,
 };
