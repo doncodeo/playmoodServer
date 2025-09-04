@@ -87,6 +87,17 @@ class AIService {
         return Promise.resolve({ status: 'approved' });
     }
 
+    async getSupportedLanguages() {
+        console.log(`AI Service: Fetching supported languages from Heygen`);
+        try {
+            const response = await this.heygen.get('/video_translate/target_languages');
+            return response.data.data.languages;
+        } catch (error) {
+            console.error(`An error occurred while fetching supported languages:`, error.response ? error.response.data : error.message);
+            throw new Error(`Heygen API error: ${error.message}`);
+        }
+    }
+
     /**
      * Translates a video to a specified language using Heygen API.
      * @param {string} videoUrl - The public URL of the video to translate.
