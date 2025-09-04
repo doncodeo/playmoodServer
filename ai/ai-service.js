@@ -7,7 +7,7 @@ const contentSchema = require('../models/contentModel');
 // to know the specifics of the underlying AI implementation.
 
 class AIService {
-    constructor() {
+    constructor() {`x`
         this.assemblyai = new AssemblyAI({
             apiKey: process.env.ASSEMBLYAI_API_KEY,
         });
