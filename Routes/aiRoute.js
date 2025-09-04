@@ -6,6 +6,7 @@ const {
     analyzeVideoForModeration,
     moderateComment,
     translateVideo,
+    processPendingTranslations,
     getSupportedLanguages,
 } = require('../controllers/aiController');
 const { protect } = require('../middleware/authmiddleware');
@@ -234,16 +235,59 @@ router.post('/moderate-comment', protect, moderateComment);
  *                 type: string
  *                 example: "Spanish"
  *     responses:
- *       202:
- *         description: Video translation started
+ *       201:
+ *         description: Video translation initiated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Video translation to 'Spanish' initiated successfully."
+ *                 videoTranslateId:
+ *                   type: string
+ *                   example: "e00b00a17bbc4b85ae3c6b18a8efc735"
  *       400:
  *         description: Content ID and language are required
  *       404:
  *         description: Content not found
+ *       409:
+ *         description: A translation for this language already exists or is in progress
  *       500:
  *         description: Failed to start video translation
  */
 router.post('/translate-video', protect, translateVideo);
+
+/**
+ * @swagger
+ * /api/ai/process-translations:
+ *   post:
+ *     summary: Process pending video translations
+ *     description: Scans for pending translations, checks their status, and processes them if they are complete.
+ *     tags: [AI]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Translation processing finished
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 processed:
+ *                   type: integer
+ *                 success:
+ *                   type: integer
+ *                 failed:
+ *                   type: integer
+ *       500:
+ *         description: An error occurred during processing
+ */
+router.post('/process-translations', protect, processPendingTranslations);
 
 /**
  * @swagger

@@ -83,6 +83,13 @@ const contentSchema = new mongoose.Schema(
         translatedVideos: [{
             language: String,
             url: String,
+            videoTranslateId: String,
+            status: {
+                type: String,
+                enum: ['pending', 'success', 'failed'],
+                default: 'pending'
+            },
+            cloudinary_video_id: String
         }],
         views: {
             type: Number,

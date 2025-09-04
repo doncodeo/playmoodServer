@@ -1,8 +1,12 @@
 const asyncHandler = require('express-async-handler');
 const aiService = require('../ai/ai-service');
 const contentSchema = require('../models/contentModel');
-const fs = require('fs');
+const { downloadFile } = require('../utils/fileHelpers');
+const cloudinary = require('../config/cloudinary');
+const os = require('os');
 const path = require('path');
+const crypto = require('crypto');
+const fsp = require('fs').promises;
 
 // @desc    Generate captions for a video
 // @route   POST /api/ai/generate-captions
@@ -153,19 +157,103 @@ const translateVideo = asyncHandler(async (req, res) => {
         return res.status(404).json({ error: 'Content not found or video URL is missing' });
     }
 
-    // Immediately respond that the process has started
-    res.status(202).json({ message: `Video translation to '${language}' started. This is a long-running process.` });
+    // Check if a translation for this language is already pending or successful
+    const existingTranslation = content.translatedVideos.find(v => v.language === language && (v.status === 'pending' || v.status === 'success'));
+    if (existingTranslation) {
+        return res.status(409).json({ message: `A translation for language '${language}' already exists or is in progress.` });
+    }
 
-    // Run the translation process in the background
-    (async () => {
-        try {
-            await aiService.translateVideo(content.video, contentId, language);
-            console.log(`[${contentId}] Video translation to '${language}' initiated successfully.`);
-        } catch (error) {
-            console.error(`[${contentId}] Failed to initiate video translation to '${language}':`, error.message);
-        }
-    })();
+    try {
+        const videoTranslateId = await aiService.translateVideo(content.video, contentId, language);
+
+        const newTranslation = {
+            language: language,
+            videoTranslateId: videoTranslateId,
+            status: 'pending'
+        };
+
+        content.translatedVideos.push(newTranslation);
+        await content.save();
+
+        res.status(201).json({ message: `Video translation to '${language}' initiated successfully.`, videoTranslateId: videoTranslateId });
+
+    } catch (error) {
+        console.error(`[${contentId}] Failed to initiate video translation to '${language}':`, error.message);
+        res.status(500).json({ error: 'Failed to initiate video translation', details: error.message });
+    }
 });
+
+// @desc    Process pending video translations
+// @route   POST /api/ai/process-translations
+// @access  Private (or protected by a secret key if called by a cron job)
+const processPendingTranslations = asyncHandler(async (req, res) => {
+    console.log('Starting to process pending video translations...');
+
+    const contentsToProcess = await contentSchema.find({
+        'translatedVideos.status': 'pending'
+    });
+
+    if (contentsToProcess.length === 0) {
+        console.log('No pending translations found.');
+        return res.status(200).json({ message: 'No pending translations to process.' });
+    }
+
+    let processedCount = 0;
+    let successCount = 0;
+    let failedCount = 0;
+
+    for (const content of contentsToProcess) {
+        let needsSave = false;
+        for (const translation of content.translatedVideos) {
+            if (translation.status === 'pending') {
+                processedCount++;
+                try {
+                    const statusData = await aiService.checkTranslationStatus(translation.videoTranslateId);
+                    console.log(`[${content._id}] Status for ${translation.language} (${translation.videoTranslateId}): ${statusData.status}`);
+
+                    if (statusData.status === 'success') {
+                        const tempFileName = `${crypto.randomBytes(16).toString('hex')}.mp4`;
+                        const tempFilePath = path.join(os.tmpdir(), tempFileName);
+                        console.log(`[${content._id}] Downloading translated video from ${statusData.url} to ${tempFilePath}`);
+                        await downloadFile(statusData.url, tempFilePath);
+
+                        console.log(`[${content._id}] Uploading ${tempFilePath} to Cloudinary...`);
+                        const uploadResult = await cloudinary.uploader.upload(tempFilePath, {
+                            resource_type: 'video',
+                            folder: `translated_videos/${content._id}`
+                        });
+                        console.log(`[${content._id}] Successfully uploaded to Cloudinary. Public ID: ${uploadResult.public_id}`);
+
+                        await fsp.unlink(tempFilePath);
+
+                        translation.status = 'success';
+                        translation.url = uploadResult.secure_url;
+                        translation.cloudinary_video_id = uploadResult.public_id;
+                        successCount++;
+                        needsSave = true;
+
+                    } else if (statusData.status === 'failed') {
+                        console.error(`[${content._id}] Translation failed for ${translation.language}. Reason: ${statusData.message}`);
+                        translation.status = 'failed';
+                        failedCount++;
+                        needsSave = true;
+                    }
+
+                } catch (error) {
+                    console.error(`[${content._id}] Error processing translation for language ${translation.language}:`, error);
+                }
+            }
+        }
+        if (needsSave) {
+            await content.save();
+        }
+    }
+
+    const summary = `Processing complete. Processed: ${processedCount}, Succeeded: ${successCount}, Failed: ${failedCount}.`;
+    console.log(summary);
+    res.status(200).json({ message: summary, processed: processedCount, success: successCount, failed: failedCount });
+});
+
 
 // @desc    Get a list of supported languages for translation
 // @route   GET /api/ai/supported-languages
@@ -185,5 +273,6 @@ module.exports = {
     analyzeVideoForModeration,
     moderateComment,
     translateVideo,
+    processPendingTranslations,
     getSupportedLanguages,
 };

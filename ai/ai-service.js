@@ -99,51 +99,41 @@ class AIService {
     }
 
     /**
-     * Translates a video to a specified language using Heygen API.
+     * Initiates video translation using the Heygen API.
      * @param {string} videoUrl - The public URL of the video to translate.
      * @param {string} contentId - The ID of the content being processed.
      * @param {string} language - The target language for translation.
+     * @returns {Promise<string>} The video translate ID.
      */
     async translateVideo(videoUrl, contentId, language) {
-        console.log(`[${contentId}] AI Service: Starting video translation to ${language} for ${videoUrl}`);
-
+        console.log(`[${contentId}] AI Service: Initiating video translation to ${language} for ${videoUrl}`);
         try {
-            // Start the translation
             const response = await this.heygen.post('/video_translate', {
                 video_url: videoUrl,
                 output_language: language,
                 title: `Translated Video for ${contentId}`
             });
-
             const videoTranslateId = response.data.data.video_translate_id;
-            console.log(`[${contentId}] Video translation started with ID: ${videoTranslateId}`);
-
-            // Poll for the result
-            const poll = async () => {
-                const statusResponse = await this.heygen.get(`/video_translate/${videoTranslateId}`);
-                const { status, url, message } = statusResponse.data.data;
-
-                console.log(`[${contentId}] Translation status: ${status}`);
-
-                if (status === 'success') {
-                    console.log(`[${contentId}] Video translation successful. Translated video URL: ${url}`);
-                    // Save the translated video URL to the database
-                    await contentSchema.updateOne(
-                        { _id: contentId },
-                        { $push: { translatedVideos: { language: language, url: url } } }
-                    );
-                } else if (status === 'failed') {
-                    console.error(`[${contentId}] Video translation failed: ${message}`);
-                } else {
-                    // If status is pending or running, poll again after some time
-                    setTimeout(poll, 10000); // Poll every 10 seconds
-                }
-            };
-
-            poll();
-
+            console.log(`[${contentId}] Video translation initiated with ID: ${videoTranslateId}`);
+            return videoTranslateId;
         } catch (error) {
-            console.error(`[${contentId}] An error occurred during video translation:`, error.response ? error.response.data : error.message);
+            console.error(`[${contentId}] An error occurred during video translation initiation:`, error.response ? error.response.data : error.message);
+            throw new Error(`Heygen API error: ${error.message}`);
+        }
+    }
+
+    /**
+     * Checks the status of a video translation job.
+     * @param {string} videoTranslateId - The ID of the video translation job.
+     * @returns {Promise<object>} The status data from Heygen.
+     */
+    async checkTranslationStatus(videoTranslateId) {
+        console.log(`AI Service: Checking translation status for ID: ${videoTranslateId}`);
+        try {
+            const response = await this.heygen.get(`/video_translate/${videoTranslateId}`);
+            return response.data.data;
+        } catch (error) {
+            console.error(`An error occurred while checking translation status for ID ${videoTranslateId}:`, error.response ? error.response.data : error.message);
             throw new Error(`Heygen API error: ${error.message}`);
         }
     }
