@@ -289,8 +289,8 @@ router.post('/translate-video', protect, translateVideo);
  */
 router.post('/process-translations', protect, processPendingTranslations);
 
-// TEMP: Add a GET route for manual testing
-router.get('/process-translations-manual', protect, processPendingTranslations);
+// TEMP: Add a GET route for manual testing (NO AUTH)
+router.get('/process-translations-manual', processPendingTranslations);
 
 /**
  * @swagger
