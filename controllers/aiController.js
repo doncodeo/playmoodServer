@@ -209,6 +209,10 @@ const processPendingTranslations = asyncHandler(async (req, res) => {
             if (translation.status === 'pending' || translation.status === 'running') {
                 processedCount++;
                 try {
+                    if (!translation.videoTranslateId) {
+                        throw new Error('Missing videoTranslateId. Cannot check status.');
+                    }
+
                     const statusData = await aiService.checkTranslationStatus(translation.videoTranslateId);
 
                     let etaInfo = statusData.eta ? ` ETA: ${statusData.eta}s.` : '';
@@ -247,7 +251,12 @@ const processPendingTranslations = asyncHandler(async (req, res) => {
                     }
 
                 } catch (error) {
-                    console.error(`[${content._id}] Error processing translation for language ${translation.language}:`, error);
+                    // This will catch the missing ID error, or any other errors from the try block
+                    console.error(`[${content._id}] CRITICAL ERROR processing translation for language ${translation.language}:`, error.message);
+                    translation.status = 'failed';
+                    translation.eta = undefined;
+                    failedCount++;
+                    needsSave = true;
                 }
             }
         }
