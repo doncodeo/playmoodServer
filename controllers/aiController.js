@@ -187,29 +187,36 @@ const translateVideo = asyncHandler(async (req, res) => {
 // @route   POST /api/ai/process-translations
 // @access  Private (or protected by a secret key if called by a cron job)
 const processPendingTranslations = asyncHandler(async (req, res) => {
-    console.log('Starting to process pending video translations...');
+    console.log('Starting to process pending and running video translations...');
 
     const contentsToProcess = await contentSchema.find({
-        'translatedVideos.status': 'pending'
+        'translatedVideos.status': { $in: ['pending', 'running'] }
     });
 
     if (contentsToProcess.length === 0) {
-        console.log('No pending translations found.');
-        return res.status(200).json({ message: 'No pending translations to process.' });
+        console.log('No pending or running translations found.');
+        return res.status(200).json({ message: 'No pending or running translations to process.' });
     }
 
     let processedCount = 0;
     let successCount = 0;
     let failedCount = 0;
+    let runningCount = 0;
 
     for (const content of contentsToProcess) {
         let needsSave = false;
         for (const translation of content.translatedVideos) {
-            if (translation.status === 'pending') {
+            if (translation.status === 'pending' || translation.status === 'running') {
                 processedCount++;
                 try {
                     const statusData = await aiService.checkTranslationStatus(translation.videoTranslateId);
-                    console.log(`[${content._id}] Status for ${translation.language} (${translation.videoTranslateId}): ${statusData.status}`);
+
+                    let etaInfo = statusData.eta ? ` ETA: ${statusData.eta}s.` : '';
+                    console.log(`[${content._id}] Status for ${translation.language} (${translation.videoTranslateId}): ${statusData.status}.${etaInfo}`);
+
+                    translation.status = statusData.status;
+                    translation.eta = statusData.eta; // This will be undefined if not present, which is fine
+                    needsSave = true;
 
                     if (statusData.status === 'success') {
                         const tempFileName = `${crypto.randomBytes(16).toString('hex')}.mp4`;
@@ -226,17 +233,17 @@ const processPendingTranslations = asyncHandler(async (req, res) => {
 
                         await fsp.unlink(tempFilePath);
 
-                        translation.status = 'success';
                         translation.url = uploadResult.secure_url;
                         translation.cloudinary_video_id = uploadResult.public_id;
+                        translation.eta = undefined; // Clear ETA on completion
                         successCount++;
-                        needsSave = true;
 
                     } else if (statusData.status === 'failed') {
                         console.error(`[${content._id}] Translation failed for ${translation.language}. Reason: ${statusData.message}`);
-                        translation.status = 'failed';
+                        translation.eta = undefined; // Clear ETA on failure
                         failedCount++;
-                        needsSave = true;
+                    } else if (statusData.status === 'running') {
+                        runningCount++;
                     }
 
                 } catch (error) {
@@ -249,9 +256,9 @@ const processPendingTranslations = asyncHandler(async (req, res) => {
         }
     }
 
-    const summary = `Processing complete. Processed: ${processedCount}, Succeeded: ${successCount}, Failed: ${failedCount}.`;
+    const summary = `Processing complete. Processed: ${processedCount}, Succeeded: ${successCount}, Failed: ${failedCount}, Still Running: ${runningCount}.`;
     console.log(summary);
-    res.status(200).json({ message: summary, processed: processedCount, success: successCount, failed: failedCount });
+    res.status(200).json({ message: summary, processed: processedCount, success: successCount, failed: failedCount, running: runningCount });
 });
 
 

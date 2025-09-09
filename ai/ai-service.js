@@ -131,7 +131,12 @@ class AIService {
         console.log(`AI Service: Checking translation status for ID: ${videoTranslateId}`);
         try {
             const response = await this.heygen.get(`/video_translate/${videoTranslateId}`);
-            return response.data.data;
+            // The 'eta' field is not officially documented, but we check for it here.
+            const statusData = response.data.data;
+            if (statusData.eta) {
+                console.log(`[${videoTranslateId}] ETA received: ${statusData.eta} seconds`);
+            }
+            return statusData;
         } catch (error) {
             console.error(`An error occurred while checking translation status for ID ${videoTranslateId}:`, error.response ? error.response.data : error.message);
             throw new Error(`Heygen API error: ${error.message}`);
