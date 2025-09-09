@@ -289,6 +289,9 @@ router.post('/translate-video', protect, translateVideo);
  */
 router.post('/process-translations', protect, processPendingTranslations);
 
+// TEMP: Add a GET route for manual testing
+router.get('/process-translations-manual', protect, processPendingTranslations);
+
 /**
  * @swagger
  * /api/ai/supported-languages:
