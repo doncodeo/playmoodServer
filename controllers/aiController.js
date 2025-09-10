@@ -187,87 +187,92 @@ const translateVideo = asyncHandler(async (req, res) => {
 // @route   POST /api/ai/process-translations
 // @access  Private (or protected by a secret key if called by a cron job)
 const processPendingTranslations = asyncHandler(async (req, res) => {
-    console.log('Starting to process pending and running video translations...');
+    // Immediately respond that the process has started
+    res.status(202).json({ message: "Translation processing initiated." });
 
-    const contentsToProcess = await contentSchema.find({
-        'translatedVideos.status': { $in: ['pending', 'running'] }
-    });
+    (async () => {
+        console.log('Starting to process pending and running video translations...');
 
-    if (contentsToProcess.length === 0) {
-        console.log('No pending or running translations found.');
-        return res.status(200).json({ message: 'No pending or running translations to process.' });
-    }
+        const contentsToProcess = await contentSchema.find({
+            'translatedVideos.status': { $in: ['pending', 'running'] }
+        });
 
-    let processedCount = 0;
-    let successCount = 0;
-    let failedCount = 0;
-    let runningCount = 0;
+        if (contentsToProcess.length === 0) {
+            console.log('No pending or running translations found.');
+            return;
+        }
 
-    for (const content of contentsToProcess) {
-        let needsSave = false;
-        for (const translation of content.translatedVideos) {
-            if (translation.status === 'pending' || translation.status === 'running') {
-                processedCount++;
-                try {
-                    if (!translation.videoTranslateId) {
-                        throw new Error('Missing videoTranslateId. Cannot check status.');
-                    }
+        let processedCount = 0;
+        let successCount = 0;
+        let failedCount = 0;
+        let runningCount = 0;
 
-                    const statusData = await aiService.checkTranslationStatus(translation.videoTranslateId);
+        for (const content of contentsToProcess) {
+            let needsSave = false;
+            for (const translation of content.translatedVideos) {
+                if (translation.status === 'pending' || translation.status === 'running') {
+                    processedCount++;
+                    try {
+                        if (!translation.videoTranslateId) {
+                            throw new Error('Missing videoTranslateId. Cannot check status.');
+                        }
 
-                    let etaInfo = statusData.eta ? ` ETA: ${statusData.eta}s.` : '';
-                    console.log(`[${content._id}] Status for ${translation.language} (${translation.videoTranslateId}): ${statusData.status}.${etaInfo}`);
+                        const statusData = await aiService.checkTranslationStatus(translation.videoTranslateId);
 
-                    translation.status = statusData.status;
-                    translation.eta = statusData.eta; // This will be undefined if not present, which is fine
-                    needsSave = true;
+                        let etaInfo = statusData.eta ? ` ETA: ${statusData.eta}s.` : '';
+                        console.log(`[${content._id}] Status for ${translation.language} (${translation.videoTranslateId}): ${statusData.status}.${etaInfo}`);
 
-                    if (statusData.status === 'success') {
-                        const tempFileName = `${crypto.randomBytes(16).toString('hex')}.mp4`;
-                        const tempFilePath = path.join(os.tmpdir(), tempFileName);
-                        console.log(`[${content._id}] Downloading translated video from ${statusData.url} to ${tempFilePath}`);
-                        await downloadFile(statusData.url, tempFilePath);
+                        translation.status = statusData.status;
+                        translation.eta = statusData.eta; // This will be undefined if not present, which is fine
+                        needsSave = true;
 
-                        console.log(`[${content._id}] Uploading ${tempFilePath} to Cloudinary...`);
-                        const uploadResult = await cloudinary.uploader.upload(tempFilePath, {
-                            resource_type: 'video',
-                            folder: `translated_videos/${content._id}`
-                        });
-                        console.log(`[${content._id}] Successfully uploaded to Cloudinary. Public ID: ${uploadResult.public_id}`);
+                        if (statusData.status === 'success') {
+                            const tempFileName = `${crypto.randomBytes(16).toString('hex')}.mp4`;
+                            const tempFilePath = path.join(os.tmpdir(), tempFileName);
+                            console.log(`[${content._id}] Downloading translated video from ${statusData.url} to ${tempFilePath}`);
+                            await downloadFile(statusData.url, tempFilePath);
 
-                        await fsp.unlink(tempFilePath);
+                            console.log(`[${content._id}] Uploading ${tempFilePath} to Cloudinary...`);
+                            const uploadResult = await cloudinary.uploader.upload_large(tempFilePath, {
+                                resource_type: 'video',
+                                folder: `translated_videos/${content._id}`,
+                                chunk_size: 20000000 // 20MB
+                            });
+                            console.log(`[${content._id}] Successfully uploaded to Cloudinary. Public ID: ${uploadResult.public_id}`);
 
-                        translation.url = uploadResult.secure_url;
-                        translation.cloudinary_video_id = uploadResult.public_id;
-                        translation.eta = undefined; // Clear ETA on completion
-                        successCount++;
+                            await fsp.unlink(tempFilePath);
 
-                    } else if (statusData.status === 'failed') {
-                        console.error(`[${content._id}] Translation failed for ${translation.language}. Reason: ${statusData.message}`);
-                        translation.eta = undefined; // Clear ETA on failure
+                            translation.url = uploadResult.secure_url;
+                            translation.cloudinary_video_id = uploadResult.public_id;
+                            translation.eta = undefined; // Clear ETA on completion
+                            successCount++;
+
+                        } else if (statusData.status === 'failed') {
+                            console.error(`[${content._id}] Translation failed for ${translation.language}. Reason: ${statusData.message}`);
+                            translation.eta = undefined; // Clear ETA on failure
+                            failedCount++;
+                        } else if (statusData.status === 'running') {
+                            runningCount++;
+                        }
+
+                    } catch (error) {
+                        // This will catch the missing ID error, or any other errors from the try block
+                        console.error(`[${content._id}] CRITICAL ERROR processing translation for language ${translation.language}:`, error.message);
+                        translation.status = 'failed';
+                        translation.eta = undefined;
                         failedCount++;
-                    } else if (statusData.status === 'running') {
-                        runningCount++;
+                        needsSave = true;
                     }
-
-                } catch (error) {
-                    // This will catch the missing ID error, or any other errors from the try block
-                    console.error(`[${content._id}] CRITICAL ERROR processing translation for language ${translation.language}:`, error.message);
-                    translation.status = 'failed';
-                    translation.eta = undefined;
-                    failedCount++;
-                    needsSave = true;
                 }
             }
+            if (needsSave) {
+                await content.save();
+            }
         }
-        if (needsSave) {
-            await content.save();
-        }
-    }
 
-    const summary = `Processing complete. Processed: ${processedCount}, Succeeded: ${successCount}, Failed: ${failedCount}, Still Running: ${runningCount}.`;
-    console.log(summary);
-    res.status(200).json({ message: summary, processed: processedCount, success: successCount, failed: failedCount, running: runningCount });
+        const summary = `Processing complete. Processed: ${processedCount}, Succeeded: ${successCount}, Failed: ${failedCount}, Still Running: ${runningCount}.`;
+        console.log(summary);
+    })();
 });
 
 
