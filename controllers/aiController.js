@@ -8,6 +8,8 @@ const path = require('path');
 const crypto = require('crypto');
 const fsp = require('fs').promises;
 
+let isProcessing = false;
+
 // @desc    Generate captions for a video
 // @route   POST /api/ai/generate-captions
 // @access  Private
@@ -187,91 +189,124 @@ const translateVideo = asyncHandler(async (req, res) => {
 // @route   POST /api/ai/process-translations
 // @access  Private (or protected by a secret key if called by a cron job)
 const processPendingTranslations = asyncHandler(async (req, res) => {
+    if (isProcessing) {
+        console.log("Translation processing is already running. Skipping this run.");
+        return res.status(409).json({ message: "Translation processing is already in progress." });
+    }
+
+    isProcessing = true;
     // Immediately respond that the process has started
     res.status(202).json({ message: "Translation processing initiated." });
 
     (async () => {
-        console.log('Starting to process pending and running video translations...');
+        try {
+            console.log('Starting to process pending and running video translations...');
 
-        const contentsToProcess = await contentSchema.find({
-            'translatedVideos.status': { $in: ['pending', 'running'] }
-        });
-
-        if (contentsToProcess.length === 0) {
-            console.log('No pending or running translations found.');
-            return;
-        }
-
-        let processedCount = 0;
-        let successCount = 0;
-        let failedCount = 0;
-        let runningCount = 0;
-
-        for (const content of contentsToProcess) {
-            let needsSave = false;
-            for (const translation of content.translatedVideos) {
-                if (translation.status === 'pending' || translation.status === 'running') {
-                    processedCount++;
-                    try {
-                        if (!translation.videoTranslateId) {
-                            throw new Error('Missing videoTranslateId. Cannot check status.');
-                        }
-
-                        const statusData = await aiService.checkTranslationStatus(translation.videoTranslateId);
-
-                        let etaInfo = statusData.eta ? ` ETA: ${statusData.eta}s.` : '';
-                        console.log(`[${content._id}] Status for ${translation.language} (${translation.videoTranslateId}): ${statusData.status}.${etaInfo}`);
-
-                        translation.status = statusData.status;
-                        translation.eta = statusData.eta; // This will be undefined if not present, which is fine
-                        needsSave = true;
-
-                        if (statusData.status === 'success') {
-                            const tempFileName = `${crypto.randomBytes(16).toString('hex')}.mp4`;
-                            const tempFilePath = path.join(os.tmpdir(), tempFileName);
-                            console.log(`[${content._id}] Downloading translated video from ${statusData.url} to ${tempFilePath}`);
-                            await downloadFile(statusData.url, tempFilePath);
-
-                            console.log(`[${content._id}] Uploading ${tempFilePath} to Cloudinary...`);
-                            const uploadResult = await cloudinary.uploader.upload_large(tempFilePath, {
-                                resource_type: 'video',
-                                folder: `translated_videos/${content._id}`,
-                                chunk_size: 20000000 // 20MB
-                            });
-                            console.log(`[${content._id}] Successfully uploaded to Cloudinary. Public ID: ${uploadResult.public_id}`);
-
-                            await fsp.unlink(tempFilePath);
-
-                            translation.url = uploadResult.secure_url;
-                            translation.cloudinary_video_id = uploadResult.public_id;
-                            translation.eta = undefined; // Clear ETA on completion
-                            successCount++;
-
-                        } else if (statusData.status === 'failed') {
-                            console.error(`[${content._id}] Translation failed for ${translation.language}. Reason: ${statusData.message}`);
-                            translation.eta = undefined; // Clear ETA on failure
-                            failedCount++;
-                        } else if (statusData.status === 'running') {
-                            runningCount++;
-                        }
-
-                    } catch (error) {
-                        // This will catch the missing ID error, or any other errors from the try block
-                        console.error(`[${content._id}] CRITICAL ERROR processing translation for language ${translation.language}:`, error.message);
-                        translation.status = 'failed';
-                        translation.eta = undefined;
-                        failedCount++;
-                        needsSave = true;
+            const contentsToProcess = await contentSchema.find({
+                'translatedVideos': {
+                    '$elemMatch': {
+                        'status': { '$in': ['pending', 'running'] },
+                        'url': { '$exists': false }
                     }
                 }
-            }
-            if (needsSave) {
-                await content.save();
-            }
-        }
+            });
 
-        const summary = `Processing complete. Processed: ${processedCount}, Succeeded: ${successCount}, Failed: ${failedCount}, Still Running: ${runningCount}.`;
-        console.log(summary);
+            if (contentsToProcess.length === 0) {
+                console.log('No pending or running translations found.');
+                return;
+            }
+
+            let processedCount = 0;
+            let successCount = 0;
+            let failedCount = 0;
+            let runningCount = 0;
+
+            for (const content of contentsToProcess) {
+                let needsSave = false;
+                for (const translation of content.translatedVideos) {
+                    if (translation.status === 'pending' || translation.status === 'running') {
+                        processedCount++;
+                        try {
+                            if (!translation.videoTranslateId) {
+                                throw new Error('Missing videoTranslateId. Cannot check status.');
+                            }
+
+                            const statusData = await aiService.checkTranslationStatus(translation.videoTranslateId);
+
+                            let etaInfo = statusData.eta ? ` ETA: ${statusData.eta}s.` : '';
+                            console.log(`[${content._id}] Status for ${translation.language} (${translation.videoTranslateId}): ${statusData.status}.${etaInfo}`);
+
+                            translation.status = statusData.status;
+                            translation.eta = statusData.eta; // This will be undefined if not present, which is fine
+                            needsSave = true;
+
+                            if (statusData.status === 'success') {
+                                const tempFileName = `${crypto.randomBytes(16).toString('hex')}.mp4`;
+                                const tempFilePath = path.join(os.tmpdir(), tempFileName);
+
+                                try {
+                                    console.log(`[${content._id}] Downloading translated video from ${statusData.url} to ${tempFilePath}`);
+                                    await downloadFile(statusData.url, tempFilePath);
+
+                                    console.log(`[${content._id}] Uploading ${tempFilePath} to Cloudinary...`);
+                                    const uploadResult = await cloudinary.uploader.upload_large(tempFilePath, {
+                                        resource_type: 'video',
+                                        folder: `translated_videos/${content._id}`,
+                                        chunk_size: 20000000 // 20MB
+                                    });
+                                    console.log(`[${content._id}] Successfully uploaded to Cloudinary. Public ID: ${uploadResult.public_id}`);
+
+                                    translation.url = uploadResult.secure_url;
+                                    translation.cloudinary_video_id = uploadResult.public_id;
+                                    translation.eta = undefined; // Clear ETA on completion
+                                    successCount++;
+                                } finally {
+                                    // Ensure the temp file is deleted even if the upload fails
+                                    await fsp.unlink(tempFilePath).catch(err => console.error(`Failed to delete temp file ${tempFilePath}:`, err));
+                                }
+
+                            } else if (statusData.status === 'failed') {
+                                console.error(`[${content._id}] Translation failed for ${translation.language}. Reason: ${statusData.message}`);
+                                translation.eta = undefined; // Clear ETA on failure
+                                failedCount++;
+                            } else if (statusData.status === 'running') {
+                                runningCount++;
+                            }
+
+                        } catch (error) {
+                            // This will catch the missing ID error, or any other errors from the try block
+                            console.error(`[${content._id}] CRITICAL ERROR processing translation for language ${translation.language}:`, error.message);
+                            translation.status = 'failed';
+                            translation.eta = undefined;
+                            failedCount++;
+                            needsSave = true;
+                        }
+                    }
+                }
+                if (needsSave) {
+                    const updateQuery = { _id: content._id, "translatedVideos.videoTranslateId": translation.videoTranslateId };
+                    const updateOperation = {
+                        "$set": {
+                            "translatedVideos.$.status": translation.status,
+                            "translatedVideos.$.url": translation.url,
+                            "translatedVideos.$.cloudinary_video_id": translation.cloudinary_video_id,
+                        },
+                        "$unset": {
+                            "translatedVideos.$.eta": ""
+                        }
+                    };
+                    await contentSchema.updateOne(updateQuery, updateOperation);
+                }
+            }
+
+            const summary = `Processing complete. Processed: ${processedCount}, Succeeded: ${successCount}, Failed: ${failedCount}, Still Running: ${runningCount}.`;
+            console.log(summary);
+        } catch (error) {
+            console.error("An unexpected error occurred in the translation processing job:", error);
+        } finally {
+            isProcessing = false;
+            console.log("Translation processing finished. Releasing lock.");
+        }
     })();
 });
 
