@@ -159,10 +159,19 @@ const translateVideo = asyncHandler(async (req, res) => {
         return res.status(404).json({ error: 'Content not found or video URL is missing' });
     }
 
-    // Check if a translation for this language is already pending or successful
-    const existingTranslation = content.translatedVideos.find(v => v.language === language && (v.status === 'pending' || v.status === 'success'));
-    if (existingTranslation) {
-        return res.status(409).json({ message: `A translation for language '${language}' already exists or is in progress.` });
+    // Check for an existing translation for this language
+    const existingTranslationIndex = content.translatedVideos.findIndex(v => v.language === language);
+
+    if (existingTranslationIndex !== -1) {
+        const existingTranslation = content.translatedVideos[existingTranslationIndex];
+        // If it's pending or successful, prevent a new one
+        if (existingTranslation.status === 'pending' || existingTranslation.status === 'success' || existingTranslation.status === 'running') {
+            return res.status(409).json({ message: `A translation for language '${language}' already exists or is in progress.` });
+        }
+        // If it failed, remove it so it can be retried
+        if (existingTranslation.status === 'failed') {
+            content.translatedVideos.splice(existingTranslationIndex, 1);
+        }
     }
 
     try {
