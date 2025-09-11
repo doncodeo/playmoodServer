@@ -231,9 +231,9 @@ const processPendingTranslations = asyncHandler(async (req, res) => {
             let runningCount = 0;
 
             for (const content of contentsToProcess) {
-                let needsSave = false;
                 for (const translation of content.translatedVideos) {
                     if (translation.status === 'pending' || translation.status === 'running') {
+                        let needsSave = false;
                         processedCount++;
                         try {
                             if (!translation.videoTranslateId) {
@@ -269,6 +269,12 @@ const processPendingTranslations = asyncHandler(async (req, res) => {
                                     translation.cloudinary_video_id = uploadResult.public_id;
                                     translation.eta = undefined; // Clear ETA on completion
                                     successCount++;
+                                } catch (processingError) {
+                                    console.error(`[${content._id}] FAILED to process successful translation for language ${translation.language}. Error:`, processingError);
+                                    // If download/upload fails, we need to mark this specific translation as failed.
+                                    // This overwrites the 'success' status we got from Heygen.
+                                    translation.status = 'failed';
+                                    failedCount++; // This is important for the final summary log.
                                 } finally {
                                     // Ensure the temp file is deleted even if the upload fails
                                     await fsp.unlink(tempFilePath).catch(err => console.error(`Failed to delete temp file ${tempFilePath}:`, err));
@@ -290,21 +296,22 @@ const processPendingTranslations = asyncHandler(async (req, res) => {
                             failedCount++;
                             needsSave = true;
                         }
-                    }
-                }
-                if (needsSave) {
-                    const updateQuery = { _id: content._id, "translatedVideos.videoTranslateId": translation.videoTranslateId };
-                    const updateOperation = {
-                        "$set": {
-                            "translatedVideos.$.status": translation.status,
-                            "translatedVideos.$.url": translation.url,
-                            "translatedVideos.$.cloudinary_video_id": translation.cloudinary_video_id,
-                        },
-                        "$unset": {
-                            "translatedVideos.$.eta": ""
+
+                        if (needsSave) {
+                            const updateQuery = { _id: content._id, "translatedVideos.videoTranslateId": translation.videoTranslateId };
+                            const updateOperation = {
+                                "$set": {
+                                    "translatedVideos.$.status": translation.status,
+                                    "translatedVideos.$.url": translation.url,
+                                    "translatedVideos.$.cloudinary_video_id": translation.cloudinary_video_id,
+                                },
+                                "$unset": {
+                                    "translatedVideos.$.eta": ""
+                                }
+                            };
+                            await contentSchema.updateOne(updateQuery, updateOperation);
                         }
-                    };
-                    await contentSchema.updateOne(updateQuery, updateOperation);
+                    }
                 }
             }
 
