@@ -258,17 +258,26 @@ const processPendingTranslations = asyncHandler(async (req, res) => {
                                     await downloadFile(statusData.url, tempFilePath);
 
                                     console.log(`[${content._id}] Uploading ${tempFilePath} to Cloudinary...`);
-                                    const uploadResult = await cloudinary.uploader.upload_large(tempFilePath, {
-                                        resource_type: 'video',
-                                        folder: `translated_videos/${content._id}`,
-                                        chunk_size: 20000000 // 20MB
-                                    });
-                                    console.log(`[${content._id}] Successfully uploaded to Cloudinary. Public ID: ${uploadResult.public_id}`);
+                                    await new Promise((resolve, reject) => {
+                                        cloudinary.uploader.upload_large(tempFilePath, {
+                                            resource_type: 'video',
+                                            folder: `translated_videos/${content._id}`,
+                                            chunk_size: 20000000 // 20MB
+                                        }, (error, result) => {
+                                            if (error || !result || !result.public_id) {
+                                                // Reject the promise if there's an error from Cloudinary or if the result is invalid.
+                                                return reject(error || new Error('Cloudinary upload failed: Invalid result'));
+                                            }
 
-                                    translation.url = uploadResult.secure_url;
-                                    translation.cloudinary_video_id = uploadResult.public_id;
-                                    translation.eta = undefined; // Clear ETA on completion
-                                    successCount++;
+                                            // On success, update the translation object and increment counters
+                                            console.log(`[${content._id}] Successfully uploaded to Cloudinary. Public ID: ${result.public_id}`);
+                                            translation.url = result.secure_url;
+                                            translation.cloudinary_video_id = result.public_id;
+                                            translation.eta = undefined; // Clear ETA on completion
+                                            successCount++;
+                                            resolve(result); // Resolve the promise to signal completion
+                                        });
+                                    });
                                 } catch (processingError) {
                                     console.error(`[${content._id}] FAILED to process successful translation for language ${translation.language}. Error:`, processingError);
                                     // If download/upload fails, we need to mark this specific translation as failed.
