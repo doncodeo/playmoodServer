@@ -30,8 +30,7 @@ const createHighlight = asyncHandler(async (req, res) => {
         endTime,
     });
 
-    content.highlight = highlight._id;
-    await content.save();
+    await Content.findByIdAndUpdate(contentId, { highlight: highlight._id });
 
     res.status(201).json(highlight);
 });
