@@ -244,7 +244,7 @@ const getContentById = asyncHandler(async (req, res) => {
     const userId = req.user ? req.user._id : null;
     const viewerIP = req.ip;
 
-    const content = await contentSchema.findById(id).populate('user', 'name').populate('highlight');
+    const content = await contentSchema.findById(id).populate('user', 'name');
     if (!content) {
         return res.status(404).json({ error: 'Content not found' });
     }
@@ -277,7 +277,11 @@ const getContentById = asyncHandler(async (req, res) => {
 
     const contentData = content.toObject();
     if (content.highlight) {
-        contentData.highlightUrl = `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/video/upload/so_${content.highlight.startTime},eo_${content.highlight.endTime}/${content.cloudinary_video_id}.mp4`;
+        const highlight = await Highlight.findById(content.highlight);
+        if (highlight) {
+            contentData.highlight = highlight.toObject();
+            contentData.highlightUrl = `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/video/upload/so_${highlight.startTime},eo_${highlight.endTime}/${content.cloudinary_video_id}.mp4`;
+        }
     }
 
     res.status(200).json(contentData);
