@@ -30,6 +30,9 @@ const createHighlight = asyncHandler(async (req, res) => {
         endTime,
     });
 
+    content.highlight = highlight._id;
+    await content.save();
+
     res.status(201).json(highlight);
 });
 
