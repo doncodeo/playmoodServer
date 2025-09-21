@@ -21,9 +21,72 @@ const {
     addWatchlist,
     getWatchlist,
     removeWatchlist,
+    combineVideosByIds,
 } = require('../controllers/contentController');
 const upload = require('../middleware/multer');
-const { protect } = require('../middleware/authmiddleware');
+const { protect, admin } = require('../middleware/authmiddleware');
+
+/**
+ * @swagger
+ * /api/content/combine-by-ids:
+ *   post:
+ *     summary: Combine existing videos and remove silences
+ *     description: Merges 2 to 5 existing video clips into a single video and removes silences. This is an admin-only feature that runs as a background process.
+ *     tags: [Content]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - title
+ *               - category
+ *               - description
+ *               - credit
+ *               - contentIds
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 example: Combined Existing Videos
+ *               category:
+ *                 type: string
+ *                 example: Education
+ *               description:
+ *                 type: string
+ *                 example: A great video combined from existing content.
+ *               credit:
+ *                 type: string
+ *                 example: Admin
+ *               contentIds:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: An array of 2 to 5 content IDs to be combined.
+ *                 example: ["65a6fc7b72128447ad32024e", "65a8025e3af4e7929b379e7b"]
+ *     responses:
+ *       202:
+ *         description: Accepted for processing. The video combination has started in the background. The user will be notified upon completion.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Video combination process started. You will be notified upon completion."
+ *       400:
+ *         description: Missing fields or invalid number of content IDs.
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Admin access required
+ *       500:
+ *         description: Server error
+ */
+router.route('/combine-by-ids').post(protect, admin, combineVideosByIds);
 
 /**
  * @swagger

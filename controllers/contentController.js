@@ -8,6 +8,7 @@ const mongoose = require('mongoose'); // Add mongoose import
 const fs = require('fs');
 const { setEtagAndCache } = require('../utils/responseHelpers');
 const aiService = require('../ai/ai-service');
+const path = require('path');
 
 const transporter = nodemailer.createTransport({
     service: 'Gmail',
@@ -1141,6 +1142,41 @@ const removeWatchlist = asyncHandler(async (req, res) => {
         res.status(500).json({ error: 'Server error' });
     }
 });
+const { fork } = require('child_process');
+
+const combineVideosByIds = asyncHandler(async (req, res) => {
+    const { title, category, description, credit, contentIds } = req.body;
+    const userId = req.user.id;
+
+    // 1. Validate input
+    if (!title || !category || !description || !credit) {
+        return res.status(400).json({ error: 'Important fields missing!' });
+    }
+
+    if (!contentIds || !Array.isArray(contentIds) || contentIds.length < 2 || contentIds.length > 5) {
+        return res.status(400).json({ error: 'Please provide between 2 and 5 content IDs.' });
+    }
+
+    // 2. Fork the worker process
+    const worker = fork(path.join(__dirname, '..', 'workers', 'videoProcessor.js'));
+
+    // 3. Send job data to the worker
+    worker.send({
+        contentIds,
+        title,
+        category,
+        description,
+        credit,
+        userId,
+    });
+
+    // 4. Respond to the user immediately
+    res.status(202).json({
+        message: 'Video combination process started. You will be notified by email upon completion.'
+    });
+});
+
+
 module.exports = {
     getContent,
     getRecentContent,
@@ -1162,4 +1198,5 @@ module.exports = {
     addWatchlist,
     getWatchlist,
     removeWatchlist,
+    combineVideosByIds,
 }
