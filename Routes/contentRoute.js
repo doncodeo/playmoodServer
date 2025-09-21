@@ -21,9 +21,68 @@ const {
     addWatchlist,
     getWatchlist,
     removeWatchlist,
+    combineVideos,
 } = require('../controllers/contentController');
 const upload = require('../middleware/multer');
-const { protect } = require('../middleware/authmiddleware');
+const { protect, admin } = require('../middleware/authmiddleware');
+
+/**
+ * @swagger
+ * /api/content/combine:
+ *   post:
+ *     summary: Combine multiple videos and remove silences
+ *     description: Merges 2 to 5 video clips into a single video and removes silences. This is an admin-only feature.
+ *     tags: [Content]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - title
+ *               - category
+ *               - description
+ *               - credit
+ *               - videos
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 example: Combined Awesome Video
+ *               category:
+ *                 type: string
+ *                 example: Entertainment
+ *               description:
+ *                 type: string
+ *                 example: A fun video combined from multiple clips.
+ *               credit:
+ *                 type: string
+ *                 example: Admin Productions
+ *               videos:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: binary
+ *                 description: 2 to 5 video files to be combined.
+ *     responses:
+ *       201:
+ *         description: Content combined and created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Content'
+ *       400:
+ *         description: Missing fields, invalid number of files, or invalid file types.
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Admin access required
+ *       500:
+ *         description: Server error
+ */
+router.route('/combine').post(protect, admin, upload.array('videos', 5), combineVideos);
 
 /**
  * @swagger
