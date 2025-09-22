@@ -86,6 +86,7 @@ const { protect, admin } = require('../middleware/authmiddleware');
  *       500:
  *         description: Server error
  */
+
 router.route('/combine-by-ids').post(protect, admin, combineVideosByIds);
 
 /**

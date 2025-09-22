@@ -1142,6 +1142,7 @@ const removeWatchlist = asyncHandler(async (req, res) => {
         res.status(500).json({ error: 'Server error' });
     }
 });
+
 const { fork } = require('child_process');
 
 const combineVideosByIds = asyncHandler(async (req, res) => {
@@ -1175,6 +1176,7 @@ const combineVideosByIds = asyncHandler(async (req, res) => {
         message: 'Video combination process started. You will be notified by email upon completion.'
     });
 });
+
 
 
 module.exports = {
