@@ -11,6 +11,7 @@ const compression = require('compression'); // Add compression
 const mongoSanitize = require('express-mongo-sanitize'); // Add input sanitizer
 
 const app = express();
+app.set('trust proxy', 1); // Trust the first proxy
 const passport = require('passport');
 const port = process.env.PORT || 5000;
 
