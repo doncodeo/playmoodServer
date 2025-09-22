@@ -97,14 +97,16 @@ app.use((err, req, res, next) => {
 
 let server;
 
-connectDB()
-  .then(() => {
-    server = app.listen(port, () => console.log(`Server started on port ${port}`));
-  })
-  .catch((error) => {
-    console.error('Failed to connect to MongoDB:', error.message);
-    process.exit(1);
-  });
+if (require.main === module) {
+  connectDB()
+    .then(() => {
+      server = app.listen(port, () => console.log(`Server started on port ${port}`));
+    })
+    .catch((error) => {
+      console.error('Failed to connect to MongoDB:', error.message);
+      process.exit(1);
+    });
+}
 
 // Graceful shutdown
 const shutdown = async () => {
@@ -123,10 +125,11 @@ const shutdown = async () => {
       }
     });
   } else {
-    process.exit(0); 
+    process.exit(0);
   }
 };
 
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
+module.exports = { app, server };

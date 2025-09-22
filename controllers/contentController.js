@@ -7,6 +7,7 @@ const nodemailer = require('nodemailer');
 const mongoose = require('mongoose'); // Add mongoose import
 const fs = require('fs');
 const { setEtagAndCache } = require('../utils/responseHelpers');
+const { compressVideo } = require('../utils/videoCompressor');
 const aiService = require('../ai/ai-service');
 const path = require('path');
 
@@ -350,8 +351,12 @@ const createContent = asyncHandler(async (req, res) => {
             // For now, we'll just log the error and continue without captions.
         }
 
+        // Compress video
+        const compressedVideoPath = path.join(path.dirname(videoFile.path), `compressed-${videoFile.filename}`);
+        await compressVideo(videoFile.path, compressedVideoPath);
+
         // Upload video to Cloudinary first
-        const videoResult = await cloudinary.uploader.upload(videoFile.path, {
+        const videoResult = await cloudinary.uploader.upload(compressedVideoPath, {
             resource_type: 'video',
             folder: 'videos',
             eager: [{
@@ -367,6 +372,7 @@ const createContent = asyncHandler(async (req, res) => {
         // Clean up video file immediately after upload
         try {
             fs.unlinkSync(videoFile.path);
+            fs.unlinkSync(compressedVideoPath);
         } catch (cleanupError) {
             console.warn('Failed to delete video temp file:', cleanupError.message);
         }
