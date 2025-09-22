@@ -108,7 +108,8 @@ const processVideo = async (jobData) => {
                 await new Promise((resolve, reject) => {
                     ffmpeg(videoPath)
                         .complexFilter(fullFilter)
-                        .map(['[v]', '[a]'])
+                        .map('[v]')
+                        .map('[a]')
                         .on('error', reject)
                         .on('end', () => resolve())
                         .save(processedPath);
