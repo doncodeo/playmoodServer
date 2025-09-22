@@ -100,9 +100,12 @@ const processVideo = async (jobData) => {
             const processedPath = path.join(tempDir, `processed-${path.basename(videoPath)}`);
             const { audibleParts } = await getSilentParts({ src: videoPath });
 
-            if (audibleParts.length > 0) {
-                const filterComplex = audibleParts.map((part, index) => `[0:v]trim=start=${part.startInSeconds}:end=${part.endInSeconds},setpts=PTS-STARTPTS[v${index}];[0:a]atrim=start=${part.startInSeconds}:end=${part.endInSeconds},asetpts=PTS-STARTPTS[a${index}]`).join(';');
-                const concatFilter = audibleParts.map((_, index) => `[v${index}][a${index}]`).join('') + `concat=n=${audibleParts.length}:v=1:a=1[v][a]`;
+            // Filter out any invalid segments to prevent ffmpeg errors
+            const validAudibleParts = audibleParts.filter(part => part.endInSeconds > part.startInSeconds);
+
+            if (validAudibleParts.length > 0) {
+                const filterComplex = validAudibleParts.map((part, index) => `[0:v]trim=start=${part.startInSeconds}:end=${part.endInSeconds},setpts=PTS-STARTPTS[v${index}];[0:a]atrim=start=${part.startInSeconds}:end=${part.endInSeconds},asetpts=PTS-STARTPTS[a${index}]`).join(';');
+                const concatFilter = validAudibleParts.map((_, index) => `[v${index}][a${index}]`).join('') + `concat=n=${validAudibleParts.length}:v=1:a=1[v][a]`;
                 const fullFilter = filterComplex + ';' + concatFilter;
 
                 await new Promise((resolve, reject) => {
