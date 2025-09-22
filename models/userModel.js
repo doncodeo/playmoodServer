@@ -15,7 +15,9 @@ const userSchema = new mongoose.Schema(
         },
         password: {
             type: String,
-            required: [true, 'Please enter your password'],
+        },
+        googleId: {
+            type: String,
         },
         role: {
             type: String,
