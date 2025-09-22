@@ -8,10 +8,7 @@ const mongoose = require('mongoose'); // Add mongoose import
 const fs = require('fs');
 const { setEtagAndCache } = require('../utils/responseHelpers');
 const aiService = require('../ai/ai-service');
-const { getSilentParts } = require('@remotion/renderer');
-const ffmpeg = require('fluent-ffmpeg');
 const path = require('path');
-
 
 const transporter = nodemailer.createTransport({
     service: 'Gmail',
@@ -1145,109 +1142,42 @@ const removeWatchlist = asyncHandler(async (req, res) => {
         res.status(500).json({ error: 'Server error' });
     }
 });
-const combineVideos = asyncHandler(async (req, res) => {
-    const { title, category, description, credit } = req.body;
-    const files = req.files;
 
+const { fork } = require('child_process');
+
+const combineVideosByIds = asyncHandler(async (req, res) => {
+    const { title, category, description, credit, contentIds } = req.body;
+    const userId = req.user.id;
+
+    // 1. Validate input
     if (!title || !category || !description || !credit) {
         return res.status(400).json({ error: 'Important fields missing!' });
     }
 
-    if (!files || files.length < 2 || files.length > 5) {
-        return res.status(400).json({ error: 'Please upload between 2 and 5 videos.' });
+    if (!contentIds || !Array.isArray(contentIds) || contentIds.length < 2 || contentIds.length > 5) {
+        return res.status(400).json({ error: 'Please provide between 2 and 5 content IDs.' });
     }
 
-    const videoPaths = files.map(file => file.path);
-    const tempDir = path.dirname(videoPaths[0]);
-    const mergedVideoPath = path.join(tempDir, `merged-${Date.now()}.mp4`);
-    const finalVideoPath = path.join(tempDir, `final-${Date.now()}.mp4`);
+    // 2. Fork the worker process
+    const worker = fork(path.join(__dirname, '..', 'workers', 'videoProcessor.js'));
 
-    try {
-        // 1. Merge videos
-        await new Promise((resolve, reject) => {
-            const command = ffmpeg();
-            videoPaths.forEach(p => command.input(p));
-            command
-                .on('error', reject)
-                .on('end', () => resolve())
-                .mergeToFile(mergedVideoPath, tempDir);
-        });
+    // 3. Send job data to the worker
+    worker.send({
+        contentIds,
+        title,
+        category,
+        description,
+        credit,
+        userId,
+    });
 
-        // 2. Detect audible parts
-        const { audibleParts } = await getSilentParts({
-            src: mergedVideoPath,
-        });
-
-        if (audibleParts.length === 0) {
-            return res.status(400).json({ error: 'No audible parts found in the video.' });
-        }
-
-        // 3. Generate ffmpeg filtergraph
-        const filterComplex = audibleParts.map((part, index) => {
-            return `[0:v]trim=start=${part.startInSeconds}:end=${part.endInSeconds},setpts=PTS-STARTPTS[v${index}];[0:a]atrim=start=${part.startInSeconds}:end=${part.endInSeconds},asetpts=PTS-STARTPTS[a${index}]`;
-        }).join(';');
-
-        const concatFilter = audibleParts.map((_, index) => `[v${index}][a${index}]`).join('') + `concat=n=${audibleParts.length}:v=1:a=1[v][a]`;
-
-        const fullFilter = filterComplex + ';' + concatFilter;
-
-        // 4. Execute ffmpeg with the filtergraph
-        await new Promise((resolve, reject) => {
-            ffmpeg(mergedVideoPath)
-                .complexFilter(fullFilter)
-                .map(['[v]', '[a]'])
-                .on('error', reject)
-                .on('end', () => resolve())
-                .save(finalVideoPath);
-        });
-
-        // 5. Upload to Cloudinary
-        const videoResult = await cloudinary.uploader.upload(finalVideoPath, {
-            resource_type: 'video',
-            folder: 'videos',
-            eager: [{
-                width: 1280,
-                height: 720,
-                crop: 'fill',
-                gravity: 'auto',
-                format: 'jpg',
-                start_offset: '2',
-            }],
-        });
-
-        const thumbnailUrl = videoResult.eager && videoResult.eager[0] ? videoResult.eager[0].secure_url : '';
-
-        // 6. Create content in DB
-        const content = await contentSchema.create({
-            user: req.user.id,
-            title,
-            category,
-            description,
-            credit,
-            thumbnail: thumbnailUrl,
-            video: videoResult.secure_url,
-            cloudinary_video_id: videoResult.public_id,
-            cloudinary_thumbnail_id: '',
-            isApproved: true,
-        });
-
-        res.status(201).json(content);
-
-    } catch (error) {
-        console.error('Error combining videos:', error);
-        res.status(500).json({ error: 'Failed to combine videos.', details: error.message });
-    } finally {
-        // 7. Cleanup
-        const allTempFiles = [...videoPaths, mergedVideoPath, finalVideoPath];
-        allTempFiles.forEach(filePath => {
-            if (fs.existsSync(filePath)) {
-                fs.unlink(filePath, (err) => {
-                    if (err) console.error(`Failed to delete temp file: ${filePath}`, err);
-                });
-            }
-        });
-    }
+    // 4. Respond to the user immediately
+    res.status(202).json({
+        message: 'Video combination process started. You will be notified by email upon completion.'
+    });
 });
+
+
 
 module.exports = {
     getContent,
@@ -1270,5 +1200,5 @@ module.exports = {
     addWatchlist,
     getWatchlist,
     removeWatchlist,
-    combineVideos,
+    combineVideosByIds,
 }

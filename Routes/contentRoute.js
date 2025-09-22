@@ -21,24 +21,24 @@ const {
     addWatchlist,
     getWatchlist,
     removeWatchlist,
-    combineVideos,
+    combineVideosByIds,
 } = require('../controllers/contentController');
 const upload = require('../middleware/multer');
 const { protect, admin } = require('../middleware/authmiddleware');
 
 /**
  * @swagger
- * /api/content/combine:
+ * /api/content/combine-by-ids:
  *   post:
- *     summary: Combine multiple videos and remove silences
- *     description: Merges 2 to 5 video clips into a single video and removes silences. This is an admin-only feature.
+ *     summary: Combine existing videos and remove silences
+ *     description: Merges 2 to 5 existing video clips into a single video and removes silences. This is an admin-only feature that runs as a background process.
  *     tags: [Content]
  *     security:
  *       - BearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
- *         multipart/form-data:
+ *         application/json:
  *           schema:
  *             type: object
  *             required:
@@ -46,35 +46,39 @@ const { protect, admin } = require('../middleware/authmiddleware');
  *               - category
  *               - description
  *               - credit
- *               - videos
+ *               - contentIds
  *             properties:
  *               title:
  *                 type: string
- *                 example: Combined Awesome Video
+ *                 example: Combined Existing Videos
  *               category:
  *                 type: string
- *                 example: Entertainment
+ *                 example: Education
  *               description:
  *                 type: string
- *                 example: A fun video combined from multiple clips.
+ *                 example: A great video combined from existing content.
  *               credit:
  *                 type: string
- *                 example: Admin Productions
- *               videos:
+ *                 example: Admin
+ *               contentIds:
  *                 type: array
  *                 items:
  *                   type: string
- *                   format: binary
- *                 description: 2 to 5 video files to be combined.
+ *                 description: An array of 2 to 5 content IDs to be combined.
+ *                 example: ["65a6fc7b72128447ad32024e", "65a8025e3af4e7929b379e7b"]
  *     responses:
- *       201:
- *         description: Content combined and created successfully
+ *       202:
+ *         description: Accepted for processing. The video combination has started in the background. The user will be notified upon completion.
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Content'
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Video combination process started. You will be notified upon completion."
  *       400:
- *         description: Missing fields, invalid number of files, or invalid file types.
+ *         description: Missing fields or invalid number of content IDs.
  *       401:
  *         description: Unauthorized
  *       403:
@@ -82,7 +86,8 @@ const { protect, admin } = require('../middleware/authmiddleware');
  *       500:
  *         description: Server error
  */
-router.route('/combine').post(protect, admin, upload.array('videos', 5), combineVideos);
+
+router.route('/combine-by-ids').post(protect, admin, combineVideosByIds);
 
 /**
  * @swagger
