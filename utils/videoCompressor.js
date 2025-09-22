@@ -22,7 +22,7 @@ function compressVideo(inputPath, outputPath) {
       '-preset',
       'medium', // Encoding speed/quality trade-off
       '-crf',
-      '28', // Constant Rate Factor (higher value = lower quality, smaller file)
+      '23', // Constant Rate Factor (lower value = higher quality)
       '-c:a',
       'aac', // Audio codec: AAC
       '-b:a',
