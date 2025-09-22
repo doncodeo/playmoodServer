@@ -1115,20 +1115,9 @@ const forgetPassword = async (req, res) => {
 };
 const googleAuthCallback = asyncHandler(async (req, res) => {
     const token = generateToken(req.user._id, req.user.role);
-    res.json({
-        _id: req.user._id,
-        name: req.user.name,
-        email: req.user.email,
-        role: req.user.role,
-        profileImage: req.user.profileImage,
-        cloudinary_id: req.user.cloudinary_id,
-        likes: req.user.likes,
-        watchlist: req.user.watchlist,
-        history: req.user.history,
-        verified: req.user.isEmailVerified,
-        hasReadPrivacyPolicy: req.user.hasReadPrivacyPolicy,
-        token: token
-    });
+    // Instead of responding with JSON, redirect to the frontend with the token
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    res.redirect(`${frontendUrl}/auth/callback?token=${token}`);
 });
  
  module.exports = {
