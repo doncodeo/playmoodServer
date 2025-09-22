@@ -75,6 +75,7 @@ const processVideo = async (jobData) => {
     const segmentPaths = []; // To store paths of individual audible segments
     const concatListPath = path.join(tempDir, 'concat-list.txt');
     const finalVideoPath = path.join(tempDir, `final-${Date.now()}.mp4`);
+    let compressedVideoPath = null; // To hold the path to the compressed video
 
     try {
         console.log('Worker started processing job for user:', userId);
@@ -137,6 +138,17 @@ const processVideo = async (jobData) => {
                     .on('end', () => resolve())
                     .save(finalVideoPath);
             });
+
+            // 4.5. Compress the final video
+            compressedVideoPath = path.join(tempDir, `compressed-${Date.now()}.mp4`);
+            await new Promise((resolve, reject) => {
+                ffmpeg(finalVideoPath)
+                    .outputOptions(['-crf 28']) // Using CRF for compression
+                    .on('error', reject)
+                    .on('end', resolve)
+                    .save(compressedVideoPath);
+            });
+
         } else {
             console.warn('No audible segments were found to create a video.');
             // Create an empty file to avoid crashing on upload
@@ -144,7 +156,8 @@ const processVideo = async (jobData) => {
         }
 
         // 5. Upload final video to Cloudinary
-        const videoResult = await cloudinary.uploader.upload(finalVideoPath, {
+        const uploadPath = compressedVideoPath ? compressedVideoPath : finalVideoPath;
+        const videoResult = await cloudinary.uploader.upload(uploadPath, {
             resource_type: 'video',
             folder: 'videos',
             eager: [{ width: 1280, height: 720, crop: 'fill', gravity: 'auto', format: 'jpg', start_offset: '2' }],
@@ -174,6 +187,9 @@ const processVideo = async (jobData) => {
     } finally {
         // Cleanup temp files
         const allTempFiles = [...downloadedPaths, ...segmentPaths, concatListPath, finalVideoPath];
+        if (compressedVideoPath) {
+            allTempFiles.push(compressedVideoPath);
+        }
         allTempFiles.forEach(filePath => {
             if (fs.existsSync(filePath)) {
                 fs.unlink(filePath, (err) => {
