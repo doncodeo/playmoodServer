@@ -72,7 +72,8 @@ const processVideo = async (jobData) => {
     }
 
     const downloadedPaths = [];
-    const processedPaths = [];
+    const segmentPaths = []; // To store paths of individual audible segments
+    const concatListPath = path.join(tempDir, 'concat-list.txt');
     const finalVideoPath = path.join(tempDir, `final-${Date.now()}.mp4`);
 
     try {
@@ -95,48 +96,49 @@ const processVideo = async (jobData) => {
             downloadedPaths.push(tempFilePath);
         }
 
-        // 3. Process each video to remove silence
+        // 3. For each downloaded video, extract its audible parts into separate segment files
+        let segmentIndex = 0;
         for (const videoPath of downloadedPaths) {
-            const processedPath = path.join(tempDir, `processed-${path.basename(videoPath)}`);
             const { audibleParts } = await getSilentParts({ src: videoPath });
-
-            // Filter out any invalid segments to prevent ffmpeg errors
             const validAudibleParts = audibleParts.filter(part => part.endInSeconds > part.startInSeconds);
 
-            if (validAudibleParts.length > 0) {
-                const filterComplex = validAudibleParts.map((part, index) => `[0:v]trim=start=${part.startInSeconds}:end=${part.endInSeconds},setpts=PTS-STARTPTS[v${index}];[0:a]atrim=start=${part.startInSeconds}:end=${part.endInSeconds},asetpts=PTS-STARTPTS[a${index}]`).join(';');
-                const concatFilter = validAudibleParts.map((_, index) => `[v${index}][a${index}]`).join('') + `concat=n=${validAudibleParts.length}:v=1:a=1[v][a]`;
-                const fullFilter = filterComplex + ';' + concatFilter;
+            if (validAudibleParts.length === 0) {
+                // If a whole clip is silent, we can choose to skip it.
+                console.log(`Skipping a video with no audible parts: ${videoPath}`);
+                continue;
+            }
 
+            for (const part of validAudibleParts) {
+                const segmentPath = path.join(tempDir, `segment-${segmentIndex++}.mp4`);
                 await new Promise((resolve, reject) => {
                     ffmpeg(videoPath)
-                        .complexFilter(fullFilter)
-                        .map('[v]')
-                        .map('[a]')
+                        .setStartTime(part.startInSeconds)
+                        .setDuration(part.endInSeconds - part.startInSeconds)
+                        .outputOptions('-c:v libx264', '-c:a aac') // Re-encode to avoid issues
                         .on('error', reject)
                         .on('end', () => resolve())
-                        .save(processedPath);
+                        .save(segmentPath);
                 });
-            } else {
-                // If no audible parts, just copy the original video
-                fs.copyFileSync(videoPath, processedPath);
+                segmentPaths.push(segmentPath);
             }
-            processedPaths.push(processedPath);
         }
 
-        // 4. Merge the processed videos
-        if (processedPaths.length > 0) {
+        // 4. If we have segments, concatenate them using the concat demuxer
+        if (segmentPaths.length > 0) {
+            const fileContent = segmentPaths.map(p => `file '${p.replace(/\\/g, '/')}'`).join('\n');
+            fs.writeFileSync(concatListPath, fileContent);
+
             await new Promise((resolve, reject) => {
-                const command = ffmpeg();
-                processedPaths.forEach(p => command.input(p));
-                command
+                ffmpeg()
+                    .input(concatListPath)
+                    .inputOptions(['-f concat', '-safe 0'])
+                    .outputOptions('-c copy') // The segments are already encoded, so we can just copy
                     .on('error', reject)
                     .on('end', () => resolve())
-                    .mergeToFile(finalVideoPath, tempDir);
+                    .save(finalVideoPath);
             });
         } else {
-             // This case should ideally not be reached if there were downloaded paths
-            console.warn('No videos were processed to merge.');
+            console.warn('No audible segments were found to create a video.');
             // Create an empty file to avoid crashing on upload
             fs.closeSync(fs.openSync(finalVideoPath, 'w'));
         }
@@ -171,7 +173,7 @@ const processVideo = async (jobData) => {
         sendEmail(adminEmail, 'Video Combination Failed', `<p>There was an error processing your video "${title}". Please try again.</p><p>Error: ${error.message}</p>`);
     } finally {
         // Cleanup temp files
-        const allTempFiles = [...downloadedPaths, ...processedPaths, finalVideoPath];
+        const allTempFiles = [...downloadedPaths, ...segmentPaths, concatListPath, finalVideoPath];
         allTempFiles.forEach(filePath => {
             if (fs.existsSync(filePath)) {
                 fs.unlink(filePath, (err) => {
