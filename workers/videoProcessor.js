@@ -114,7 +114,7 @@ const processVideo = async (jobData) => {
                     ffmpeg(videoPath)
                         .setStartTime(part.startInSeconds)
                         .setDuration(part.endInSeconds - part.startInSeconds)
-                        .outputOptions('-c:v libx264', '-c:a pcm_s16le') // Re-encode to raw audio to avoid encoder issues
+                        .outputOptions('-c copy') // Diagnostic step: copy codecs to get a new error
                         .on('error', reject)
                         .on('end', () => resolve())
                         .save(segmentPath);
