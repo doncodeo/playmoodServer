@@ -114,7 +114,7 @@ const processVideo = async (jobData) => {
                     ffmpeg(videoPath)
                         .setStartTime(part.startInSeconds)
                         .setDuration(part.endInSeconds - part.startInSeconds)
-                        .outputOptions('-c:v libx264', '-c:a aac') // Re-encode to avoid issues
+                        .outputOptions('-c:v libx264', '-c:a libmp3lame') // Re-encode to avoid issues
                         .on('error', reject)
                         .on('end', () => resolve())
                         .save(segmentPath);
