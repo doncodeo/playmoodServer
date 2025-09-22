@@ -781,7 +781,7 @@ router.route('/policy/:userId').patch(protect, markPrivacyPolicyAsRead);
  */
 router.post('/forget-password', forgetPassword);
 
-router.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+router.get('/auth/google', passport.authenticate('google', { scope: 'profile email' }));
 
 router.get(
   '/auth/google/callback',
