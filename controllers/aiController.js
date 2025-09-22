@@ -2,6 +2,7 @@ const asyncHandler = require('express-async-handler');
 const aiService = require('../ai/ai-service');
 const contentSchema = require('../models/contentModel');
 const { downloadFile } = require('../utils/fileHelpers');
+const { compressVideo } = require('../utils/videoCompressor');
 const cloudinary = require('../config/cloudinary');
 const os = require('os');
 const path = require('path');
@@ -253,13 +254,21 @@ const processPendingTranslations = asyncHandler(async (req, res) => {
                                 const tempFileName = `${crypto.randomBytes(16).toString('hex')}.mp4`;
                                 const tempFilePath = path.join(os.tmpdir(), tempFileName);
 
+                                const compressedTempFilePath = path.join(os.tmpdir(), `compressed_${tempFileName}`);
+                                let fileToUploadPath = tempFilePath;
                                 try {
                                     console.log(`[${content._id}] Downloading translated video from ${statusData.url} to ${tempFilePath}`);
                                     await downloadFile(statusData.url, tempFilePath);
 
-                                    console.log(`[${content._id}] Uploading ${tempFilePath} to Cloudinary...`);
+                                     // Compress the video
+                                    console.log(`[${content._id}] Compressing video: ${tempFilePath}`);
+                                    await compressVideo(tempFilePath, compressedTempFilePath);
+                                    console.log(`[${content._id}] Video compressed successfully: ${compressedTempFilePath}`);
+                                    fileToUploadPath = compressedTempFilePath;
+
+                                    console.log(`[${content._id}] Uploading ${fileToUploadPath} to Cloudinary...`);
                                     await new Promise((resolve, reject) => {
-                                        cloudinary.uploader.upload_large(tempFilePath, {
+                                        cloudinary.uploader.upload_large(fileToUploadPath, {
                                             resource_type: 'video',
                                             folder: `translated_videos/${content._id}`,
                                             chunk_size: 20000000 // 20MB
@@ -285,8 +294,17 @@ const processPendingTranslations = asyncHandler(async (req, res) => {
                                     translation.status = 'failed';
                                     failedCount++; // This is important for the final summary log.
                                 } finally {
-                                    // Ensure the temp file is deleted even if the upload fails
-                                    await fsp.unlink(tempFilePath).catch(err => console.error(`Failed to delete temp file ${tempFilePath}:`, err));
+                                    // Ensure both temp files are deleted even if the upload fails
+                                    for (const p of [tempFilePath, compressedTempFilePath]) {
+                                        if (p) { // Check if path is defined
+                                            await fsp.unlink(p).catch(err => {
+                                                // Ignore ENOENT (file not found) errors, but log others
+                                                if (err.code !== 'ENOENT') {
+                                                    console.error(`Failed to delete temp file ${p}:`, err);
+                                                }
+                                            });
+                                        }
+                                    }
                                 }
 
                             } else if (statusData.status === 'failed') {
