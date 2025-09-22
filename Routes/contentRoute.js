@@ -28,7 +28,7 @@ const { protect, admin } = require('../middleware/authmiddleware');
 
 /**
  * @swagger
- * /api/content/combine-by-ids:
+ * /api/content/combine:
  *   post:
  *     summary: Combine existing videos and remove silences
  *     description: Merges 2 to 5 existing video clips into a single video and removes silences. This is an admin-only feature that runs as a background process.
@@ -87,7 +87,7 @@ const { protect, admin } = require('../middleware/authmiddleware');
  *         description: Server error
  */
 
-router.route('/combine-by-ids').post(protect, admin, combineVideosByIds);
+router.route('/combine').post(protect, admin, combineVideosByIds);
 
 /**
  * @swagger
