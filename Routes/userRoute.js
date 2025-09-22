@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const passport = require('passport');
 
 const upload = require('../middleware/multer');
 const {
@@ -20,6 +21,7 @@ const {
   getUserHistory,
   markPrivacyPolicyAsRead,
   forgetPassword,
+  googleAuthCallback,
 } = require('../controllers/userController');
 const { protect } = require('../middleware/authmiddleware');
 
@@ -778,5 +780,13 @@ router.route('/policy/:userId').patch(protect, markPrivacyPolicyAsRead);
  *         description: Server error
  */
 router.post('/forget-password', forgetPassword);
+
+router.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+
+router.get(
+  '/auth/google/callback',
+  passport.authenticate('google', { failureRedirect: '/', session: false }),
+  googleAuthCallback
+);
 
 module.exports = router;

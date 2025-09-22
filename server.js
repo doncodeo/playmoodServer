@@ -11,7 +11,13 @@ const compression = require('compression'); // Add compression
 const mongoSanitize = require('express-mongo-sanitize'); // Add input sanitizer
 
 const app = express();
+const passport = require('passport');
 const port = process.env.PORT || 5000;
+
+// Passport config
+require('./config/passport')(passport);
+
+app.use(passport.initialize());
 
 // Security: Set secure HTTP headers
 app.use(helmet());
