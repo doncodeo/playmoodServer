@@ -114,7 +114,7 @@ const processVideo = async (jobData) => {
                     ffmpeg(videoPath)
                         .setStartTime(part.startInSeconds)
                         .setDuration(part.endInSeconds - part.startInSeconds)
-                        .outputOptions('-c copy') // Diagnostic step: copy codecs to get a new error
+                        .outputOptions(['-c', 'copy', '-map', '0:v', '-map', '0:a?']) // Explicitly map video and optional audio
                         .on('error', reject)
                         .on('end', () => resolve())
                         .save(segmentPath);
@@ -132,7 +132,7 @@ const processVideo = async (jobData) => {
                 ffmpeg()
                     .input(concatListPath)
                     .inputOptions(['-f concat', '-safe 0'])
-                    .outputOptions('-c copy') // The segments are already encoded, so we can just copy
+                    .outputOptions('-c copy') // The segments are already uniform, so we can just copy
                     .on('error', reject)
                     .on('end', () => resolve())
                     .save(finalVideoPath);
@@ -143,35 +143,30 @@ const processVideo = async (jobData) => {
             fs.closeSync(fs.openSync(finalVideoPath, 'w'));
         }
 
-        // 5. Upload final video to Cloudinary - SKIPPED FOR VERIFICATION
-        console.log(`\n\n--- VERIFICATION STEP ---`);
-        console.log(`Video processing successful. Final file created at: ${finalVideoPath}`);
-        console.log(`This file was NOT uploaded to Cloudinary or saved to the database.`);
-        console.log(`--- END VERIFICATION ---\n\n`);
+        // 5. Upload final video to Cloudinary
+        const videoResult = await cloudinary.uploader.upload(finalVideoPath, {
+            resource_type: 'video',
+            folder: 'videos',
+            eager: [{ width: 1280, height: 720, crop: 'fill', gravity: 'auto', format: 'jpg', start_offset: '2' }],
+        });
+        const thumbnailUrl = videoResult.eager && videoResult.eager[0] ? videoResult.eager[0].secure_url : '';
 
-        // const videoResult = await cloudinary.uploader.upload(finalVideoPath, {
-        //     resource_type: 'video',
-        //     folder: 'videos',
-        //     eager: [{ width: 1280, height: 720, crop: 'fill', gravity: 'auto', format: 'jpg', start_offset: '2' }],
-        // });
-        // const thumbnailUrl = videoResult.eager && videoResult.eager[0] ? videoResult.eager[0].secure_url : '';
+        // 6. Create new content document
+        await contentSchema.create({
+            user: userId,
+            title,
+            category,
+            description,
+            credit,
+            thumbnail: thumbnailUrl,
+            video: videoResult.secure_url,
+            cloudinary_video_id: videoResult.public_id,
+            cloudinary_thumbnail_id: '',
+            isApproved: true,
+        });
 
-        // // 6. Create new content document
-        // await contentSchema.create({
-        //     user: userId,
-        //     title,
-        //     category,
-        //     description,
-        //     credit,
-        //     thumbnail: thumbnailUrl,
-        //     video: videoResult.secure_url,
-        //     cloudinary_video_id: videoResult.public_id,
-        //     cloudinary_thumbnail_id: '',
-        //     isApproved: true,
-        // });
-
-        // sendEmail(adminEmail, 'Video Combination Complete', `<p>Your video "${title}" has been successfully combined and is now available.</p>`);
-        console.log('Worker finished processing job (verification mode).');
+        sendEmail(adminEmail, 'Video Combination Complete', `<p>Your video "${title}" has been successfully combined and is now available.</p>`);
+        console.log('Worker finished processing job.');
 
     } catch (error) {
         console.error('Error in video processing worker:', error);
