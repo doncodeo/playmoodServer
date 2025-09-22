@@ -8,6 +8,10 @@ const fs = require('fs');
 const axios = require('axios');
 const { getSilentParts } = require('@remotion/renderer');
 const ffmpeg = require('fluent-ffmpeg');
+const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
+const ffprobePath = require('@ffprobe-installer/ffprobe').path;
+ffmpeg.setFfmpegPath(ffmpegPath);
+ffmpeg.setFfprobePath(ffprobePath);
 const cloudinary = require('../config/cloudinary');
 const contentSchema = require('../models/contentModel');
 const userSchema = require('../models/userModel');
@@ -19,8 +23,6 @@ dotenv.config({ path: path.join(__dirname, '..', '.env') });
 const connectDB = async () => {
     try {
         const conn = await mongoose.connect(process.env.MONGO_URI, {
-            useNewUrlParser: true,
-            useUnifiedTopology: true,
         });
         console.log(`MongoDB Connected in worker: ${conn.connection.host}`);
     } catch (error) {
