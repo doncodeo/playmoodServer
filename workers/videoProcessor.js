@@ -72,7 +72,7 @@ const processVideo = async (jobData) => {
     }
 
     const downloadedPaths = [];
-    const mergedVideoPath = path.join(tempDir, `merged-${Date.now()}.mp4`);
+    const processedPaths = [];
     const finalVideoPath = path.join(tempDir, `final-${Date.now()}.mp4`);
 
     try {
@@ -95,35 +95,46 @@ const processVideo = async (jobData) => {
             downloadedPaths.push(tempFilePath);
         }
 
-        // 3. Merge videos
-        await new Promise((resolve, reject) => {
-            const command = ffmpeg();
-            downloadedPaths.forEach(p => command.input(p));
-            command
-                .on('error', reject)
-                .on('end', () => resolve())
-                .mergeToFile(mergedVideoPath, tempDir);
-        });
+        // 3. Process each video to remove silence
+        for (const videoPath of downloadedPaths) {
+            const processedPath = path.join(tempDir, `processed-${path.basename(videoPath)}`);
+            const { audibleParts } = await getSilentParts({ src: videoPath });
 
-        // 4. Detect audible parts and remove silence
-        const { audibleParts } = await getSilentParts({ src: mergedVideoPath });
+            if (audibleParts.length > 0) {
+                const filterComplex = audibleParts.map((part, index) => `[0:v]trim=start=${part.startInSeconds}:end=${part.endInSeconds},setpts=PTS-STARTPTS[v${index}];[0:a]atrim=start=${part.startInSeconds}:end=${part.endInSeconds},asetpts=PTS-STARTPTS[a${index}]`).join(';');
+                const concatFilter = audibleParts.map((_, index) => `[v${index}][a${index}]`).join('') + `concat=n=${audibleParts.length}:v=1:a=1[v][a]`;
+                const fullFilter = filterComplex + ';' + concatFilter;
 
-        if (audibleParts.length > 0) {
-            const filterComplex = audibleParts.map((part, index) => `[0:v]trim=start=${part.startInSeconds}:end=${part.endInSeconds},setpts=PTS-STARTPTS[v${index}];[0:a]atrim=start=${part.startInSeconds}:end=${part.endInSeconds},asetpts=PTS-STARTPTS[a${index}]`).join(';');
-            const concatFilter = audibleParts.map((_, index) => `[v${index}][a${index}]`).join('') + `concat=n=${audibleParts.length}:v=1:a=1[v][a]`;
-            const fullFilter = filterComplex + ';' + concatFilter;
+                await new Promise((resolve, reject) => {
+                    ffmpeg(videoPath)
+                        .complexFilter(fullFilter)
+                        .map(['[v]', '[a]'])
+                        .on('error', reject)
+                        .on('end', () => resolve())
+                        .save(processedPath);
+                });
+            } else {
+                // If no audible parts, just copy the original video
+                fs.copyFileSync(videoPath, processedPath);
+            }
+            processedPaths.push(processedPath);
+        }
 
+        // 4. Merge the processed videos
+        if (processedPaths.length > 0) {
             await new Promise((resolve, reject) => {
-                ffmpeg(mergedVideoPath)
-                    .complexFilter(fullFilter)
-                    .map(['[v]', '[a]'])
+                const command = ffmpeg();
+                processedPaths.forEach(p => command.input(p));
+                command
                     .on('error', reject)
                     .on('end', () => resolve())
-                    .save(finalVideoPath);
+                    .mergeToFile(finalVideoPath, tempDir);
             });
         } else {
-            // If no audible parts, just use the merged video
-            fs.copyFileSync(mergedVideoPath, finalVideoPath);
+             // This case should ideally not be reached if there were downloaded paths
+            console.warn('No videos were processed to merge.');
+            // Create an empty file to avoid crashing on upload
+            fs.closeSync(fs.openSync(finalVideoPath, 'w'));
         }
 
         // 5. Upload final video to Cloudinary
@@ -156,7 +167,7 @@ const processVideo = async (jobData) => {
         sendEmail(adminEmail, 'Video Combination Failed', `<p>There was an error processing your video "${title}". Please try again.</p><p>Error: ${error.message}</p>`);
     } finally {
         // Cleanup temp files
-        const allTempFiles = [...downloadedPaths, mergedVideoPath, finalVideoPath];
+        const allTempFiles = [...downloadedPaths, ...processedPaths, finalVideoPath];
         allTempFiles.forEach(filePath => {
             if (fs.existsSync(filePath)) {
                 fs.unlink(filePath, (err) => {
