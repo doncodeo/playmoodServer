@@ -12,7 +12,7 @@ module.exports = function(passport) {
         scope: ['profile', 'email'],
       },
       async (accessToken, refreshToken, profile, done) => {
-        const newUser = {
+        const googleUser = {
           googleId: profile.id,
           name: profile.displayName,
           email: profile.emails[0].value,
@@ -20,16 +20,29 @@ module.exports = function(passport) {
         };
 
         try {
-          let user = await User.findOne({ googleId: profile.id });
+          // Find a user by googleId or email
+          let user = await User.findOne({
+            $or: [{ googleId: profile.id }, { email: googleUser.email }],
+          });
 
           if (user) {
-            done(null, user);
+            // User exists.
+            // If they don't have a googleId, it means they logged in via another method.
+            // Link their Google account.
+            if (!user.googleId) {
+              user.googleId = profile.id;
+              user.profileImage = user.profileImage || googleUser.profileImage; // Update image if they don't have one
+              await user.save();
+            }
+            return done(null, user);
           } else {
-            user = await User.create(newUser);
-            done(null, user);
+            // No user found, this is a new user.
+            user = await User.create(googleUser);
+            return done(null, user);
           }
         } catch (err) {
-          console.error(err);
+          console.error('Error in Google OAuth strategy:', err);
+          return done(err, null); // Pass the error to done()
         }
       }
     )
