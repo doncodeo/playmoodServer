@@ -344,18 +344,16 @@ const createContent = asyncHandler(async (req, res) => {
         });
 
         const jobData = {
-            videoFile: {
-                path: videoFile.path,
-                filename: videoFile.filename,
-                originalname: videoFile.originalname
-            },
-            thumbnailFile: thumbnailFile ? {
-                path: thumbnailFile.path,
-                filename: thumbnailFile.filename,
-                originalname: thumbnailFile.originalname
-            } : null,
             contentId: content._id,
             languageCode,
+            video: {
+                url: videoFile.path,
+                public_id: videoFile.filename,
+            },
+            thumbnail: thumbnailFile ? {
+                url: thumbnailFile.path,
+                public_id: thumbnailFile.filename,
+            } : null,
         };
 
         // 4. Add the job to the queue
@@ -372,16 +370,9 @@ const createContent = asyncHandler(async (req, res) => {
         // This catch block now only handles errors from the initial setup phase.
         // Worker errors are handled within the worker itself.
         console.error('Create content initial error:', error);
-        // Clean up temporary files if they exist from the multer upload
-        if (req.files) {
-            req.files.forEach(file => {
-                try {
-                    if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
-                } catch (cleanupError) {
-                    console.warn('Failed to delete temporary file on initial error:', cleanupError.message);
-                }
-            });
-        }
+        // With direct-to-Cloudinary uploads, there are no local temp files to clean up.
+        // If the initial content document was created, the worker's error handler
+        // will be responsible for cleaning up the database record.
         res.status(500).json({ error: 'Server error during upload initiation.', details: error.message });
     }
 });

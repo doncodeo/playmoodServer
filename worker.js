@@ -1,13 +1,9 @@
 const { Worker } = require('bullmq');
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
-const path = require('path');
-const fs = require('fs');
-const cloudinary = require('./config/cloudinary');
 const contentSchema = require('./models/contentModel');
 const userSchema = require('./models/userModel');
 const nodemailer = require('nodemailer');
-const { compressVideo } = require('./utils/videoCompressor');
 const aiService = require('./ai/ai-service');
 
 // Load environment variables from the root .env file
@@ -54,8 +50,7 @@ const sendEmail = (to, subject, html) => {
 
 // --- Job Processor Logic ---
 const processUpload = async (job) => {
-    const { videoFile, thumbnailFile, contentId, languageCode } = job.data;
-    let compressedVideoPath = null;
+    const { contentId, languageCode, video, thumbnail } = job.data;
     let content = null;
 
     try {
@@ -65,52 +60,27 @@ const processUpload = async (job) => {
             throw new Error(`Content record not found in worker for job ${job.id}.`);
         }
 
-        // 1. Compress video
-        const videoExtension = path.extname(videoFile.originalname);
-        // Ensure the temp directory exists from multer upload
-        const tempDir = path.dirname(videoFile.path);
-        if (!fs.existsSync(tempDir)) {
-            throw new Error(`Temporary directory ${tempDir} does not exist.`);
+        // The video and optional thumbnail are already uploaded to Cloudinary.
+        // The primary video URL is in `video.url`.
+        // The primary video public_id is in `video.public_id`.
+        // An optional thumbnail URL is in `thumbnail.url`.
+        // An optional thumbnail public_id is in `thumbnail.public_id`.
+
+        // A. Generate a thumbnail from the video if one wasn't uploaded.
+        let thumbnailUrl = thumbnail ? thumbnail.url : '';
+        let thumbnailPublicId = thumbnail ? thumbnail.public_id : '';
+
+        if (!thumbnailUrl) {
+            // This generates a URL for a thumbnail from the 2nd second of the video.
+            // It doesn't create a new asset, just a dynamically transformed URL.
+            thumbnailUrl = `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/video/upload/so_2/${video.public_id}.jpg`;
         }
-        compressedVideoPath = path.join(tempDir, `compressed-${videoFile.filename}${videoExtension}`);
-        await compressVideo(videoFile.path, compressedVideoPath);
-        console.log(`[Worker] Video compressed for job ${job.id}`);
 
-        // 2. Upload video to Cloudinary
-        const videoResult = await new Promise((resolve, reject) => {
-            cloudinary.uploader.upload_large(compressedVideoPath, {
-                resource_type: 'video',
-                folder: 'videos',
-                eager: [{ width: 1280, height: 720, crop: 'fill', gravity: 'auto', format: 'jpg', start_offset: '2' }],
-                chunk_size: 20000000, // 20 MB
-                timeout: 300000, // 5 minutes
-            }, (error, result) => {
-                if (error) return reject(error);
-                resolve(result);
-            });
-        });
-        console.log(`[Worker] Video uploaded to Cloudinary for job ${job.id}`);
-
-        // 3. Handle thumbnail
-        let thumbnailUrl = '';
-        let cloudinaryThumbnailId = '';
-        if (thumbnailFile) {
-            const thumbnailResult = await cloudinary.uploader.upload(thumbnailFile.path, {
-                folder: 'thumbnails',
-                transformation: [{ width: 1280, height: 720, crop: 'fill', gravity: 'auto' }],
-            });
-            thumbnailUrl = thumbnailResult.secure_url;
-            cloudinaryThumbnailId = thumbnailResult.public_id;
-        } else {
-            thumbnailUrl = videoResult.eager?.[0]?.secure_url || '';
-        }
-        console.log(`[Worker] Thumbnail processed for job ${job.id}`);
-
-        // 4. AI Processing
-        // These can be run in parallel to speed things up
+        // B. AI Processing (can run in parallel)
+        console.log(`[Worker] Starting AI processing for job ${job.id}`);
         const [captionResult, moderationResult, embeddingResult] = await Promise.allSettled([
-            aiService.generateCaptions(videoResult.secure_url, contentId, languageCode),
-            aiService.analyzeVideoForModeration(videoResult.secure_url),
+            aiService.generateCaptions(video.url, contentId, languageCode),
+            aiService.analyzeVideoForModeration(video.url),
             aiService.generateEmbeddings({ title: content.title, description: content.description, category: content.category })
         ]);
 
@@ -136,17 +106,18 @@ const processUpload = async (job) => {
         }
         console.log(`[Worker] AI processing complete for job ${job.id}`);
 
-        // 5. Update content document
+        // C. Update content document in the database
         content.status = 'completed';
-        content.video = videoResult.secure_url;
-        content.cloudinary_video_id = videoResult.public_id;
+        content.video = video.url;
+        content.cloudinary_video_id = video.public_id;
         content.thumbnail = thumbnailUrl;
-        content.cloudinary_thumbnail_id = cloudinaryThumbnailId;
+        content.cloudinary_thumbnail_id = thumbnailPublicId; // May be empty if thumbnail is derived
         content.captions = initialCaptions;
         content.aiModerationStatus = moderation.status;
         content.aiModerationLabels = moderation.labels;
         content.contentEmbedding = contentEmbedding;
 
+        // Determine approval status based on moderation
         let isApproved = content.user.role === 'admin';
         if (moderation.status === 'approved' && !isApproved) {
             isApproved = true;
@@ -159,10 +130,10 @@ const processUpload = async (job) => {
         await content.save();
         console.log(`[Worker] Content document updated for job ${job.id}`);
 
-        // 6. Send email notification
+        // D. Send email notification for content needing review
         if (content.user.role !== 'admin' && moderation.status !== 'rejected') {
             const admins = await userSchema.find({ role: 'admin' });
-            const previewUrl = `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/video/upload/so_${content.shortPreview.start},eo_${content.shortPreview.end}/${videoResult.public_id}.mp4`;
+            const previewUrl = `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/video/upload/so_${content.shortPreview.start},eo_${content.shortPreview.end}/${video.public_id}.mp4`;
             admins.forEach(admin => {
                 sendEmail(admin.email, 'New Content Approval Request', `<p>A new content titled "${content.title}" has been uploaded and requires your approval.</p><p><a href="${process.env.APP_URL}/admin/approve-content/${content._id}">Approve Content</a></p><p>Preview: <a href="${previewUrl}">View Preview</a></p>`);
             });
@@ -179,18 +150,8 @@ const processUpload = async (job) => {
         }
         // Re-throw the error to let BullMQ know the job has failed
         throw error;
-    } finally {
-        // 7. Cleanup temp files
-        const filesToDelete = [videoFile?.path, thumbnailFile?.path, compressedVideoPath];
-        filesToDelete.forEach(filePath => {
-            if (filePath && fs.existsSync(filePath)) {
-                fs.unlink(filePath, (err) => {
-                    if (err) console.error(`[Worker] Failed to delete temp file: ${filePath}`, err);
-                    else console.log(`[Worker] Deleted temp file: ${filePath}`);
-                });
-            }
-        });
     }
+    // No 'finally' block is needed for file cleanup anymore
 };
 
 // --- Worker Initialization ---

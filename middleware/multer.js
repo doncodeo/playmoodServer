@@ -1,41 +1,28 @@
 const multer = require('multer');
-const path = require('path');
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const cloudinary = require('../config/cloudinary'); // This should have the v2 config
+
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: (req, file) => {
+    // Determine folder based on file type
+    const isVideo = file.mimetype.startsWith('video');
+    const folder = isVideo ? 'videos' : 'thumbnails';
+
+    return {
+      folder: folder,
+      resource_type: 'auto', // Let Cloudinary auto-detect the resource type
+      allowed_formats: ['mp4', 'mov', 'avi', 'jpg', 'jpeg', 'png'],
+      public_id: file.originalname.split('.')[0] + '-' + Date.now(),
+    };
+  },
+});
 
 const upload = multer({
-    storage: multer.diskStorage({}),
-    fileFilter: (req, file, cb) => {
-        const ext = path.extname(file.originalname).toLowerCase();
-        const allowedExts = ['.mp4', '.mov', '.avi', '.jpg', '.jpeg', '.png'];
-        if (!allowedExts.includes(ext)) {
-            return cb(new Error('Only .mp4, .mov, .avi, .jpg, .jpeg, and .png files are allowed'));
-        }
-        cb(null, true);
-    },
-    limits: {
-        fileSize: 3 * 1024 * 1024 * 1024, // 3 GB
-    }
+  storage: storage,
+  limits: {
+    fileSize: 3 * 1024 * 1024 * 1024, // 3 GB
+  },
 });
 
 module.exports = upload;
-
-
-
-// const multer = require('multer');
-// const path = require('path');
-
-// // Multer config
-// const upload = multer({
-//     storage: multer.diskStorage({}),
-//     fileFilter: (req, file, cb) => {
-//         const ext = path.extname(file.originalname);
-//         if (ext !== '.mp4' && ext !== '.jpg' && ext !== '.jpeg' && ext !== '.png') {
-//             return cb(new Error('Only .mp4, .jpg, .jpeg, and .png files are allowed'));
-//         }
-//         cb(null, true);
-//     }
-// });
-
-// module.exports = upload;
-
-
-
