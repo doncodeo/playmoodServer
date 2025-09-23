@@ -76,6 +76,7 @@ const processUpload = async (jobData) => {
             chunk_size: 20000000, // 20 MB
         });
         console.log(`[Worker] Video uploaded to Cloudinary for content: ${contentId}`);
+        console.log('[Worker] Cloudinary videoResult:', videoResult);
 
         // 3. Handle thumbnail
         let thumbnailUrl = '';
