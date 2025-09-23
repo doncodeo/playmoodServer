@@ -155,9 +155,8 @@ const processUpload = async (jobData) => {
     } catch (error) {
         console.error(`[Worker] Job for content ${contentId} failed:`, error);
         if (content) {
-            content.status = 'failed';
-            content.rejectionReason = `Processing failed: ${error.message}`;
-            await content.save();
+            await contentSchema.findByIdAndDelete(contentId);
+            console.log(`[Worker] Deleted content document for failed job: ${contentId}`);
         }
     } finally {
         // 7. Cleanup temp files
@@ -169,11 +168,17 @@ const processUpload = async (jobData) => {
                 });
             }
         });
-        process.exit(0);
+        if (process.env.NODE_ENV !== 'test') {
+            process.exit(0);
+        }
     }
 };
 
-process.on('message', async (jobData) => {
-    await connectDB();
-    await processUpload(jobData);
-});
+if (require.main === module) {
+    process.on('message', async (jobData) => {
+        await connectDB();
+        await processUpload(jobData);
+    });
+}
+
+module.exports = { processUpload };
