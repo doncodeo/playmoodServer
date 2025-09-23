@@ -10,6 +10,8 @@ const { setEtagAndCache } = require('../utils/responseHelpers');
 const { compressVideo } = require('../utils/videoCompressor');
 const aiService = require('../ai/ai-service');
 const path = require('path');
+const { fork } = require('child_process');
+
 
 const transporter = nodemailer.createTransport({
     service: 'Gmail',
@@ -297,138 +299,28 @@ const createContent = asyncHandler(async (req, res) => {
     try {
         const { title, category, description, credit, userId, previewStart, previewEnd, languageCode } = req.body;
 
-        // Validate required fields
+        // 1. Initial Validation
         if (!title || !category || !description || !credit || !userId) {
             return res.status(400).json({ error: 'Important fields missing!' });
         }
-
-        // Validate preview timeline
-        const start = parseFloat(previewStart); 
+        const start = parseFloat(previewStart);
         const end = parseFloat(previewEnd);
-        if (isNaN(start) || isNaN(end)) {
-            return res.status(400).json({ error: 'Preview start and end times are required!' });
+        if (isNaN(start) || isNaN(end) || end - start !== 10 || start < 0) {
+            return res.status(400).json({ error: 'Invalid preview timeline. Must be a 10-second segment.' });
         }
-        if (end - start !== 10) {
-            return res.status(400).json({ error: 'Preview segment must be exactly 10 seconds!' });
-        }
-        if (start < 0) {
-            return res.status(400).json({ error: 'Preview start time cannot be negative!' });
-        }
-
-        // Validate files
         if (!req.files || req.files.length === 0) {
-            return res.status(400).json({ error: 'At least a video file is required!' });
+            return res.status(400).json({ error: 'At least one video file is required.' });
         }
 
+        // 2. Separate files and validate user
         let videoFile, thumbnailFile;
-
-        // Separate video and thumbnail files based on MIME type
         req.files.forEach(file => {
-            if (file.mimetype.toLowerCase().startsWith('video/')) {
-                videoFile = file;
-            } else if (file.mimetype.toLowerCase().startsWith('image/')) {
-                thumbnailFile = file;
-            }
+            if (file.mimetype.toLowerCase().startsWith('video/')) videoFile = file;
+            else if (file.mimetype.toLowerCase().startsWith('image/')) thumbnailFile = file;
         });
 
-        if (!videoFile) {
-            return res.status(400).json({ error: 'Video file is required!' });
-        }
+        if (!videoFile) return res.status(400).json({ error: 'A video file is required.' });
 
-        // Generate captions
-        let initialCaptions = [];
-        try {
-            const captionText = await aiService.generateCaptions(videoFile.path, null, languageCode);
-            if (captionText) {
-                initialCaptions.push({
-                    languageCode: languageCode || 'en_us',
-                    text: captionText,
-                });
-            }
-        } catch (captionError) {
-            console.error('Failed to generate initial captions:', captionError);
-            // We can decide if captioning failure should block the upload.
-            // For now, we'll just log the error and continue without captions.
-        }
-
-        // Compress video
-        const videoExtension = path.extname(videoFile.originalname);
-        const compressedVideoPath = path.join(path.dirname(videoFile.path), `compressed-${videoFile.filename}${videoExtension}`);
-        await compressVideo(videoFile.path, compressedVideoPath);
-
-        // Upload video to Cloudinary first
-        const videoResult = await cloudinary.uploader.upload(compressedVideoPath, {
-            resource_type: 'video',
-            folder: 'videos',
-            eager: [{
-                width: 1280,
-                height: 720,
-                crop: 'fill',
-                gravity: 'auto',
-                format: 'jpg',
-                start_offset: '2',
-            }],
-        });
-
-        // Clean up video file immediately after upload
-        try {
-            fs.unlinkSync(videoFile.path);
-            fs.unlinkSync(compressedVideoPath);
-        } catch (cleanupError) {
-            console.warn('Failed to delete video temp file:', cleanupError.message);
-        }
-
-        // AI Content Moderation
-        let moderationResult = { status: 'needs_review', labels: [] };
-        try {
-            moderationResult = await aiService.analyzeVideoForModeration(videoResult.secure_url);
-        } catch (moderationError) {
-            console.error('Failed to analyze video for moderation:', moderationError);
-        }
-
-        // Fetch video metadata to get duration
-        let videoDuration = Infinity; // Default to allow preview if metadata fetch fails
-        try {
-            const videoInfo = await cloudinary.api.resource(videoResult.public_id, {
-                resource_type: 'video',
-            });
-            videoDuration = videoInfo.duration; // Duration in seconds
-            console.log(`Video duration: ${videoDuration}s`);
-        } catch (metadataError) {
-            console.warn('Failed to fetch video metadata:', metadataError.message);
-            // Proceed without duration validation to avoid blocking upload
-        }
-
-        // Validate preview timeline against video duration
-        if (end > videoDuration) {
-            return res.status(400).json({
-                error: `Preview end time (${end}s) exceeds video duration (${videoDuration}s)!`,
-            });
-        }
-
-        let thumbnailUrl = '';
-        let cloudinaryThumbnailId = '';
-
-        // Upload manual thumbnail if provided
-        if (thumbnailFile) {
-            const thumbnailResult = await cloudinary.uploader.upload(thumbnailFile.path, {
-                folder: 'thumbnails',
-                transformation: [
-                    { width: 1280, height: 720, crop: 'fill', gravity: 'auto' },
-                ],
-            });
-            try {
-                fs.unlinkSync(thumbnailFile.path);
-            } catch (cleanupError) {
-                console.warn('Failed to delete thumbnail temp file:', cleanupError.message);
-            }
-            thumbnailUrl = thumbnailResult.secure_url;
-            cloudinaryThumbnailId = thumbnailResult.public_id;
-        } else {
-            thumbnailUrl = videoResult.eager?.[0]?.secure_url || '';
-        }
-
-        // Validate user
         const user = await userSchema.findById(userId);
         if (!user || (user.role !== 'creator' && user.role !== 'admin')) {
             return res.status(403).json({ error: 'Unauthorized to create content' });
@@ -437,120 +329,64 @@ const createContent = asyncHandler(async (req, res) => {
             return res.status(403).json({ error: 'Cannot create content for another user!' });
         }
 
-        let isApproved = user.role === 'admin';
-        let rejectionReason = '';
-
-        if (moderationResult.status === 'approved' && user.role !== 'admin') {
-            isApproved = true;
-        } else if (moderationResult.status === 'rejected') {
-            isApproved = false;
-            rejectionReason = `Content automatically rejected by AI due to: ${moderationResult.labels.join(', ')}`;
-        }
-
-
-        // Generate content embeddings
-        let contentEmbedding = [];
-        try {
-            contentEmbedding = await aiService.generateEmbeddings({ title, description, category });
-        } catch (embeddingError) {
-            console.error('Failed to generate content embeddings:', embeddingError);
-            // We can decide if this failure should block the upload.
-            // For now, we'll just log the error and continue.
-        }
-
-        // Create content with preview timeline
+        // 3. Create initial content document with 'processing' status
         const content = await contentSchema.create({
             user: userId,
             title,
             category,
             description,
             credit,
-            thumbnail: thumbnailUrl,
-            video: videoResult.secure_url,
-            cloudinary_video_id: videoResult.public_id,
-            cloudinary_thumbnail_id: cloudinaryThumbnailId,
             shortPreview: { start, end },
-            isApproved,
-            rejectionReason: rejectionReason || undefined,
-            captions: initialCaptions,
-            contentEmbedding,
-            aiModerationStatus: moderationResult.status,
-            aiModerationLabels: moderationResult.labels,
+            status: 'processing',
+            // Add placeholder values for required fields that the worker will fill in
+            video: 'processing',
+            thumbnail: 'processing',
         });
 
-        // Generate preview URL
-        const previewUrl = `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/video/upload/so_${start},eo_${end}/${videoResult.public_id}.mp4`;
+        // 4. Fork the worker process
+        const worker = fork(path.join(__dirname, '..', 'workers', 'uploadProcessor.js'));
 
-        // Send email to admins if not approved
-        if (!isApproved) {
-            const admins = await userSchema.find({ role: 'admin' });
-            admins.forEach(admin => {
-                const mailOptions = {
-                    from: `"PlaymoodTV 📺" <${process.env.EMAIL_USERNAME}>`,
-                    to: admin.email,
-                    subject: 'New Content Approval Request',
-                    html: `
-                        <html>
-                            <head>
-                                <style>
-                                    body { font-family: Arial, sans-serif; background-color: #f0f0f0; color: #333; padding: 20px; }
-                                    .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1); }
-                                    .header { background-color: tomato; color: white; padding: 10px; text-align: center; border-top-left-radius: 8px; border-top-right-radius: 8px; }
-                                    .content { padding: 20px; }
-                                    .approve-button { display: inline-block; padding: 10px 20px; background-color: tomato; color: white; text-decoration: none; border-radius: 5px; }
-                                    .footer { margin-top: 20px; text-align: center; color: #666; font-size: 12px; }
-                                </style>
-                            </head>
-                            <body>
-                                <div class="container">
-                                    <div class="header">
-                                        <h2>New Content Approval Request</h2>
-                                    </div>
-                                    <div class="content">
-                                        <p>Dear ${admin.name},</p>
-                                        <p>A new content titled "${title}" has been created and requires your approval.</p>
-                                        <p>Preview: <a href="${previewUrl}" target="_blank">View 10-second Preview</a></p>
-                                        <p>Please use the following button to approve the content:</p>
-                                        <a class="approve-button" href="${process.env.APP_URL}/admin/approve-content/${content._id}" target="_blank">Approve Content</a>
-                                        <p>Thank you for your attention.</p>
-                                    </div>
-                                    <div class="footer">
-                                        <p>Best regards,</p>
-                                        <p>The PlaymoodTV Team</p>
-                                    </div>
-                                </div>
-                            </body>
-                        </html>
-                    `,
-                };
+        // 5. Send job data to the worker
+        // We can't send the whole file objects as they are complex.
+        // Send paths and other necessary info.
+        const jobData = {
+            videoFile: {
+                path: videoFile.path,
+                filename: videoFile.filename,
+                originalname: videoFile.originalname
+            },
+            thumbnailFile: thumbnailFile ? {
+                path: thumbnailFile.path,
+                filename: thumbnailFile.filename,
+                originalname: thumbnailFile.originalname
+            } : null,
+            contentId: content._id,
+            languageCode,
+        };
+        worker.send(jobData);
 
-                transporter.sendMail(mailOptions, (error, info) => {
-                    if (error) {
-                        console.error('Error sending email:', error);
-                    } else {
-                        console.log('Email sent:', info.response);
-                    }
-                });
-            });
-        }
-
-        res.status(201).json({
-            ...content._doc,
-            previewUrl,
+        // 6. Respond to the user immediately
+        res.status(202).json({
+            message: 'Upload received and is being processed. You will be notified upon completion.',
+            contentId: content._id,
+            status: 'processing'
         });
+
     } catch (error) {
-        // Clean up temporary files in case of error
+        // This catch block now only handles errors from the initial setup phase.
+        // Worker errors are handled within the worker itself.
+        console.error('Create content initial error:', error);
+        // Clean up temporary files if they exist from the multer upload
         if (req.files) {
             req.files.forEach(file => {
                 try {
-                    fs.unlinkSync(file.path);
+                    if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
                 } catch (cleanupError) {
-                    console.warn('Failed to delete temporary file:', cleanupError.message);
+                    console.warn('Failed to delete temporary file on initial error:', cleanupError.message);
                 }
             });
         }
-        console.error('Create content error:', JSON.stringify(error, null, 2));
-        res.status(500).json({ error: 'Server error', details: error.message });
+        res.status(500).json({ error: 'Server error during upload initiation.', details: error.message });
     }
 });
 
