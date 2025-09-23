@@ -69,10 +69,11 @@ const processUpload = async (jobData) => {
         console.log(`[Worker] Video compressed for content: ${contentId}`);
 
         // 2. Upload video to Cloudinary
-        const videoResult = await cloudinary.uploader.upload(compressedVideoPath, {
+        const videoResult = await cloudinary.uploader.upload_large(compressedVideoPath, {
             resource_type: 'video',
             folder: 'videos',
             eager: [{ width: 1280, height: 720, crop: 'fill', gravity: 'auto', format: 'jpg', start_offset: '2' }],
+            chunk_size: 20000000, // 20 MB
         });
         console.log(`[Worker] Video uploaded to Cloudinary for content: ${contentId}`);
 
