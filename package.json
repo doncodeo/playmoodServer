@@ -4,7 +4,7 @@
   "description": "Server application for Playmood",
   "main": "server.js",
   "scripts": {
-    "test": "mocha test/content.test.js",
+    "test": "NODE_ENV=test JWT_SECRET=test GOOGLE_CLIENT_ID=test GOOGLE_CLIENT_SECRET=test GOOGLE_CALLBACK_URL=test mocha test/content.test.js",
     "start": "nodemon server.js",
     "server": "server.js"
   },
@@ -45,6 +45,7 @@
   },
   "devDependencies": {
     "mocha": "^11.7.2",
+    "mongodb-memory-server": "^10.2.1",
     "supertest": "^7.1.4"
   }
 }

@@ -55,8 +55,8 @@ app.use(compression());
 app.use(express.static(path.join(__dirname, 'public'))); 
 
 // Middleware for JSON and URL-encoded data
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '3gb' }));
+app.use(express.urlencoded({ extended: true, limit: '3gb' }));
 
 // Serve Swagger UI at /api-docs
 // Serve Swagger UI at /api-docs with custom options

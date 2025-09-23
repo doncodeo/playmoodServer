@@ -343,12 +343,6 @@ const createContent = asyncHandler(async (req, res) => {
             thumbnail: 'processing',
         });
 
-        // 4. Fork the worker process
-        const worker = fork(path.join(__dirname, '..', 'workers', 'uploadProcessor.js'));
-
-        // 5. Send job data to the worker
-        // We can't send the whole file objects as they are complex.
-        // Send paths and other necessary info.
         const jobData = {
             videoFile: {
                 path: videoFile.path,
@@ -363,14 +357,24 @@ const createContent = asyncHandler(async (req, res) => {
             contentId: content._id,
             languageCode,
         };
-        worker.send(jobData);
 
-        // 6. Respond to the user immediately
-        res.status(202).json({
-            message: 'Upload received and is being processed. You will be notified upon completion.',
-            contentId: content._id,
-            status: 'processing'
-        });
+        if (process.env.NODE_ENV === 'test') {
+            const { processUpload } = require('../workers/uploadProcessor');
+            await processUpload(jobData);
+            const updatedContent = await contentSchema.findById(content._id);
+            return res.status(201).json(updatedContent);
+        } else {
+            // 4. Fork the worker process
+            const worker = fork(path.join(__dirname, '..', 'workers', 'uploadProcessor.js'));
+            // 5. Send job data to the worker
+            worker.send(jobData);
+            // 6. Respond to the user immediately
+            return res.status(202).json({
+                message: 'Upload received and is being processed. You will be notified upon completion.',
+                contentId: content._id,
+                status: 'processing'
+            });
+        }
 
     } catch (error) {
         // This catch block now only handles errors from the initial setup phase.

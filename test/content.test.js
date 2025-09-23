@@ -3,18 +3,57 @@ const { app, server } = require('../server');
 const path = require('path');
 const fs = require('fs');
 const mongoose = require('mongoose');
+const User = require('../models/userModel');
+const jwt = require('jsonwebtoken');
+
+const { MongoMemoryServer } = require('mongodb-memory-server');
 
 describe('Content API', function() {
   this.timeout(30000); // Set timeout to 30 seconds to allow for compression
 
+  let token;
+  let userId;
+  let mongoServer;
+
+  before(async () => {
+    mongoServer = await MongoMemoryServer.create();
+    const mongoUri = mongoServer.getUri();
+    await mongoose.connect(mongoUri);
+
+    // Create a test user
+    const user = await User.create({
+      name: 'Test User',
+      email: 'test@example.com',
+      password: 'password',
+      role: 'creator' // or whatever role is needed to upload content
+    });
+    userId = user._id;
+
+    // Generate a token
+    token = jwt.sign({ id: userId, role: user.role }, process.env.JWT_SECRET, {
+      expiresIn: '1h',
+    });
+  });
+
+  after(async () => {
+    // Clean up the test user
+    await User.findByIdAndDelete(userId);
+    // Close the server connection
+    server.close();
+    // Close the mongoose connection
+    await mongoose.disconnect();
+    await mongoServer.stop();
+  });
+
   it('should upload and compress a video', (done) => {
     request(app)
       .post('/api/content')
+      .set('Authorization', `Bearer ${token}`)
       .field('title', 'Test Video')
       .field('category', 'Test')
       .field('description', 'A test video')
       .field('credit', 'Test User')
-      .field('userId', '60d5f2f5c7b8b7001f9b3e1d') // A dummy user ID
+      .field('userId', userId.toString())
       .field('previewStart', '0')
       .field('previewEnd', '10')
       .field('languageCode', 'en_us')
