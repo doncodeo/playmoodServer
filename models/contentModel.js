@@ -57,6 +57,11 @@ const contentSchema = new mongoose.Schema(
             trim: true,
             maxlength: [500, 'Rejection reason cannot exceed 500 characters'],
         },
+        status: {
+            type: String,
+            enum: ['processing', 'completed', 'failed'],
+            default: 'processing',
+        },
         captions: [
             {
                 languageCode: {

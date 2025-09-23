@@ -10,6 +10,9 @@ const upload = multer({
             return cb(new Error('Only .mp4, .mov, .avi, .jpg, .jpeg, and .png files are allowed'));
         }
         cb(null, true);
+    },
+    limits: {
+        fileSize: 3 * 1024 * 1024 * 1024, // 3 GB
     }
 });
 
