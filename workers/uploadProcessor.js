@@ -75,6 +75,7 @@ const processUpload = async (jobData) => {
                 folder: 'videos',
                 eager: [{ width: 1280, height: 720, crop: 'fill', gravity: 'auto', format: 'jpg', start_offset: '2' }],
                 chunk_size: 20000000, // 20 MB
+                timeout: 300000, // 5 minutes
             }, (error, result) => {
                 if (error) {
                     reject(error);
