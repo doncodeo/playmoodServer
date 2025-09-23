@@ -352,7 +352,8 @@ const createContent = asyncHandler(async (req, res) => {
         }
 
         // Compress video
-        const compressedVideoPath = path.join(path.dirname(videoFile.path), `compressed-${videoFile.filename}`);
+        const videoExtension = path.extname(videoFile.originalname);
+        const compressedVideoPath = path.join(path.dirname(videoFile.path), `compressed-${videoFile.filename}${videoExtension}`);
         await compressVideo(videoFile.path, compressedVideoPath);
 
         // Upload video to Cloudinary first
