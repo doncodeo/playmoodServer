@@ -10,7 +10,7 @@ const { setEtagAndCache } = require('../utils/responseHelpers');
 const { compressVideo } = require('../utils/videoCompressor');
 const aiService = require('../ai/ai-service');
 const path = require('path');
-const { fork } = require('child_process');
+const uploadQueue = require('../config/queue');
 
 
 const transporter = nodemailer.createTransport({
@@ -358,23 +358,15 @@ const createContent = asyncHandler(async (req, res) => {
             languageCode,
         };
 
-        if (process.env.NODE_ENV === 'test') {
-            const { processUpload } = require('../workers/uploadProcessor');
-            await processUpload(jobData);
-            const updatedContent = await contentSchema.findById(content._id);
-            return res.status(201).json(updatedContent);
-        } else {
-            // 4. Fork the worker process
-            const worker = fork(path.join(__dirname, '..', 'workers', 'uploadProcessor.js'));
-            // 5. Send job data to the worker
-            worker.send(jobData);
-            // 6. Respond to the user immediately
-            return res.status(202).json({
-                message: 'Upload received and is being processed. You will be notified upon completion.',
-                contentId: content._id,
-                status: 'processing'
-            });
-        }
+        // 4. Add the job to the queue
+        await uploadQueue.add('process-upload', jobData);
+
+        // 5. Respond to the user immediately
+        return res.status(202).json({
+            message: 'Upload received and is being processed. You will be notified upon completion.',
+            contentId: content._id,
+            status: 'processing'
+        });
 
     } catch (error) {
         // This catch block now only handles errors from the initial setup phase.
@@ -990,8 +982,6 @@ const removeWatchlist = asyncHandler(async (req, res) => {
     }
 });
 
-// const { fork } = require('child_process');
-
 const combineVideosByIds = asyncHandler(async (req, res) => {
     const { title, category, description, credit, contentIds } = req.body;
     const userId = req.user.id;
@@ -1005,11 +995,8 @@ const combineVideosByIds = asyncHandler(async (req, res) => {
         return res.status(400).json({ error: 'Please provide between 2 and 5 content IDs.' });
     }
 
-    // 2. Fork the worker process
-    const worker = fork(path.join(__dirname, '..', 'workers', 'videoProcessor.js'));
-
-    // 3. Send job data to the worker
-    worker.send({
+    // 2. Add job to the queue
+    await uploadQueue.add('combine-videos', {
         contentIds,
         title,
         category,
@@ -1018,7 +1005,7 @@ const combineVideosByIds = asyncHandler(async (req, res) => {
         userId,
     });
 
-    // 4. Respond to the user immediately
+    // 3. Respond to the user immediately
     res.status(202).json({
         message: 'Video combination process started. You will be notified by email upon completion.'
     });
