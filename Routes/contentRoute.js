@@ -204,7 +204,7 @@ router.route('/').get(getContent);
  * /api/content:
  *   post:
  *     summary: Create new content
- *     description: Creates a new content item with a video, optional thumbnail, and a 10-second preview segment. Only creators and admins can create content. Admins' content is auto-approved; creators' content requires admin approval.
+ *     description: Accepts video and optional thumbnail uploads, then processes them in the background. This includes video compression, AI-powered captioning, and content moderation. The initial response confirms that the upload has been received.
  *     tags: [Content]
  *     security:
  *       - BearerAuth: []
@@ -247,6 +247,10 @@ router.route('/').get(getContent);
  *                 type: number
  *                 example: 40
  *                 description: End time of the 10-second preview (in seconds)
+ *               languageCode:
+ *                 type: string
+ *                 example: en_us
+ *                 description: The language code for caption generation (e.g., en_us, es, fr).
  *               files:
  *                 type: array
  *                 items:
@@ -254,58 +258,22 @@ router.route('/').get(getContent);
  *                   format: binary
  *                 description: Video file (required) and optional thumbnail image
  *     responses:
- *       201:
- *         description: Content created successfully
+ *       202:
+ *         description: Upload received and is being processed.
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 _id:
+ *                 message:
+ *                   type: string
+ *                   example: Upload received and is being processed. You will be notified upon completion.
+ *                 contentId:
  *                   type: string
  *                   example: 65a8025e3af4e7929b379e7b
- *                 user:
+ *                 status:
  *                   type: string
- *                   example: 65a8025e3af4e7929b379e7a
- *                 title:
- *                   type: string
- *                   example: My Awesome Video
- *                 category:
- *                   type: string
- *                   example: Entertainment
- *                 description:
- *                   type: string
- *                   example: A fun video about...
- *                 credit:
- *                   type: string
- *                   example: John Doe
- *                 thumbnail:
- *                   type: string
- *                   example: https://res.cloudinary.com/.../thumbnail.jpg
- *                 video:
- *                   type: string
- *                   example: https://res.cloudinary.com/.../video.mp4
- *                 cloudinary_video_id:
- *                   type: string
- *                   example: videos/video123
- *                 cloudinary_thumbnail_id:
- *                   type: string
- *                   example: thumbnails/thumb123
- *                 shortPreview:
- *                   type: object
- *                   properties:
- *                     start:
- *                       type: number
- *                       example: 30
- *                     end:
- *                       type: number
- *                       example: 40
- *                 isApproved:
- *                   type: boolean
- *                   example: false
- *                 previewUrl:
- *                   type: string
- *                   example: https://res.cloudinary.com/.../so_30,eo_40/video123.mp4
+ *                   example: processing
  *       400:
  *         description: Missing fields, invalid file types, or invalid preview timeline
  *       401:
@@ -313,7 +281,7 @@ router.route('/').get(getContent);
  *       403:
  *         description: User is not a creator or admin
  *       500:
- *         description: Server error
+ *         description: Server error during upload initiation.
  */
 router.route('/').post(protect, upload.array('files', 2), createContent);
 

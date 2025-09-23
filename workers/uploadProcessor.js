@@ -152,7 +152,7 @@ const processUpload = async (jobData) => {
         console.log(`[Worker] Content document updated for: ${contentId}`);
 
         // 6. Send email notification if needed
-        if (!isApproved) {
+        if (content.user.role !== 'admin') {
             const admins = await userSchema.find({ role: 'admin' });
             const previewUrl = `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/video/upload/so_${content.shortPreview.start},eo_${content.shortPreview.end}/${videoResult.public_id}.mp4`;
             admins.forEach(admin => {

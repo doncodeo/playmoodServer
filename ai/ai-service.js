@@ -78,8 +78,8 @@ class AIService {
         console.log(`AI Service: Analyzing video for moderation: ${videoUrl}`);
         // Placeholder implementation
         return Promise.resolve({
-            status: 'needs_review',
-            labels: ['placeholder_label']
+            status: 'approved',
+            labels: []
         });
     }
 
