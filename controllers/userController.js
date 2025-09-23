@@ -799,6 +799,23 @@ const getUserprofile = asyncHandler(async (req, res) => {
         email: user.email,
         role: user.role,
         profileImage: user.profileImage,
+        country: user.country,
+        isEmailVerified: user.isEmailVerified,
+        likes: user.likes,
+        watchlist: user.watchlist,
+        history: user.history,
+        hasReadPrivacyPolicy: user.hasReadPrivacyPolicy,
+        subscriptions: user.subscriptions,
+        subscribers: user.subscribers,
+        about: user.about,
+        bannerImage: user.bannerImage,
+        communityPosts: user.communityPosts,
+        playlists: user.playlists,
+        videoProgress: user.videoProgress,
+        instagram: user.instagram,
+        tiktok: user.tiktok,
+        linkedin: user.linkedin,
+        twitter: user.twitter,
     });
 });
 
