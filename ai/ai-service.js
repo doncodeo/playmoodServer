@@ -7,10 +7,14 @@ const contentSchema = require('../models/contentModel');
 // to know the specifics of the underlying AI implementation.
 
 class AIService {
-    constructor() {`x`
-        this.assemblyai = new AssemblyAI({
-            apiKey: process.env.ASSEMBLYAI_API_KEY,
-        });
+    constructor() {
+        if (process.env.ASSEMBLYAI_API_KEY) {
+            this.assemblyai = new AssemblyAI({
+                apiKey: process.env.ASSEMBLYAI_API_KEY,
+            });
+        } else {
+            this.assemblyai = null;
+        }
         this.heygen = axios.create({
             baseURL: 'https://api.heygen.com/v2',
             headers: {
@@ -28,6 +32,10 @@ class AIService {
      * @returns {Promise<string>} The generated transcript.
      */
     async generateCaptions(url, contentId, languageCode = 'en_us') {
+        if (!this.assemblyai) {
+            console.warn(`[${contentId}] AssemblyAI service is not initialized due to missing API key. Skipping caption generation.`);
+            return null;
+        }
         console.log(`[${contentId}] AI Service: Starting caption generation for ${url} with language ${languageCode}`);
 
         try {

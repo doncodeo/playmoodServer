@@ -1,6 +1,8 @@
 const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
+
 
 function compressVideo(inputPath, outputPath) {
   return new Promise((resolve, reject) => {
@@ -30,7 +32,7 @@ function compressVideo(inputPath, outputPath) {
       outputPath,
     ];
 
-    const ffmpegProcess = spawn('ffmpeg', ffmpegArgs);
+    const ffmpegProcess = spawn(ffmpegPath, ffmpegArgs);
 
     let stderrOutput = '';
     ffmpegProcess.stderr.on('data', (data) => {
