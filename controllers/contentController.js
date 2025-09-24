@@ -297,10 +297,11 @@ const getContentById = asyncHandler(async (req, res) => {
 const createContent = asyncHandler(async (req, res) => {
     try {
         // The file data now comes from the client after a direct upload to Cloudinary
-        const { title, category, description, credit, userId, previewStart, previewEnd, languageCode, video, thumbnail } = req.body;
+        const { title, category, description, credit, previewStart, previewEnd, languageCode, video, thumbnail } = req.body;
+        const userId = req.user.id; // Use the authenticated user's ID
 
         // 1. Initial Validation
-        if (!title || !category || !description || !credit || !userId || !video) {
+        if (!title || !category || !description || !credit || !video) {
             return res.status(400).json({ error: 'Important fields, including video data, are missing!' });
         }
         if (!video.public_id || !video.url) {
@@ -316,9 +317,6 @@ const createContent = asyncHandler(async (req, res) => {
         const user = await userSchema.findById(userId);
         if (!user || (user.role !== 'creator' && user.role !== 'admin')) {
             return res.status(403).json({ error: 'Unauthorized to create content' });
-        }
-        if (userId !== req.user.id) {
-            return res.status(403).json({ error: 'Cannot create content for another user!' });
         }
 
         // 3. Create initial content document with 'processing' status
