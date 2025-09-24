@@ -35,7 +35,9 @@ const swaggerDefinition = {
     },
     {
       name: 'Content',
-      description: 'Endpoints for content management',
+      description: `Endpoints for content management. The content creation process is a two-step flow:
+      1. **Generate Signature**: The client first requests a secure signature from the server via the \`/api/content/signature\` endpoint.
+      2. **Direct Upload & Create Record**: The client uses this signature to upload the video file directly to Cloudinary. Once the upload is complete, the client sends the Cloudinary response (including the public_id and URL) along with other metadata to the \`/api/content\` endpoint to create the content record in the database.`,
     },
     {
       name: 'Authentication',

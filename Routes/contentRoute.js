@@ -203,14 +203,22 @@ router.route('/').get(getContent);
  * @swagger
  * /api/content/signature:
  *   post:
- *     summary: Generate a signature for direct client-side uploads
- *     description: Creates a secure, one-time signature that the client can use to upload a file directly to Cloudinary. This is the first step in the direct upload process.
+ *     summary: "Step 1: Generate Cloudinary Upload Signature"
+ *     description: "Generates a secure, one-time signature for direct client-side uploads to Cloudinary. This is the **first step** in the content creation process. The client must send an empty POST request to this endpoint to receive the signature, timestamp, and API key needed for the direct upload."
  *     tags: [Content]
  *     security:
  *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             description: "The request body should be an empty object."
+ *             example: {}
  *     responses:
  *       200:
- *         description: Signature generated successfully.
+ *         description: "Signature generated successfully. The client should use these details to upload the file directly to Cloudinary."
  *         content:
  *           application/json:
  *             schema:
@@ -226,9 +234,9 @@ router.route('/').get(getContent);
  *                   type: string
  *                   example: "123456789012345"
  *       401:
- *         description: Unauthorized
+ *         description: "Unauthorized - JWT token is missing or invalid."
  *       500:
- *         description: Server error
+ *         description: "Server error while generating the signature."
  */
 router.route('/signature').post(protect, generateUploadSignature);
 
@@ -236,8 +244,8 @@ router.route('/signature').post(protect, generateUploadSignature);
  * @swagger
  * /api/content:
  *   post:
- *     summary: Create new content record
- *     description: This is the second step of the upload process. After the client has uploaded the file directly to Cloudinary, it calls this endpoint with the Cloudinary response and other metadata. This creates the content record in the database and queues a background job for AI processing.
+ *     summary: "Step 2: Create Content Record After Direct Upload"
+ *     description: "This is the **second and final step** of the content creation process. After the client has successfully uploaded the video (and optionally, a thumbnail) directly to Cloudinary using the signature from Step 1, it must call this endpoint. The request should include the Cloudinary response (`public_id` and `url` for the video) and all other content metadata. The server will then create the content record in the database and queue a background job for video processing and AI analysis."
  *     tags: [Content]
  *     security:
  *       - BearerAuth: []
@@ -259,50 +267,60 @@ router.route('/signature').post(protect, generateUploadSignature);
  *             properties:
  *               title:
  *                 type: string
- *                 example: My Awesome Video
+ *                 example: "My Awesome Video"
  *               category:
  *                 type: string
- *                 example: Entertainment
+ *                 example: "Entertainment"
  *               description:
  *                 type: string
- *                 example: A fun video about...
+ *                 example: "A fun video about..."
  *               credit:
  *                 type: string
- *                 example: John Doe
+ *                 example: "John Doe"
  *               userId:
  *                 type: string
+ *                 description: "The ID of the user creating the content."
  *                 example: "65a8025e3af4e7929b379e7a"
  *               previewStart:
  *                 type: number
+ *                 description: "The start time (in seconds) for the 10-second video preview."
  *                 example: 30
  *               previewEnd:
  *                 type: number
+ *                 description: "The end time (in seconds) for the 10-second video preview. Must be exactly 10 seconds after previewStart."
  *                 example: 40
  *               languageCode:
  *                 type: string
- *                 example: en_us
+ *                 description: "Optional language code for the video (e.g., 'en-US')."
+ *                 example: "en-US"
  *               video:
  *                 type: object
+ *                 description: "The Cloudinary response object for the uploaded video. This is required."
  *                 required: [public_id, url]
  *                 properties:
  *                   public_id:
  *                     type: string
+ *                     description: "The public_id returned by Cloudinary after the video upload."
  *                     example: "videos/sample_video_123"
  *                   url:
  *                     type: string
+ *                     description: "The secure URL returned by Cloudinary after the video upload."
  *                     example: "https://res.cloudinary.com/.../video.mp4"
  *               thumbnail:
  *                 type: object
+ *                 description: "The Cloudinary response object for the uploaded thumbnail. This is optional. If not provided, a thumbnail will be generated automatically from the video."
  *                 properties:
  *                   public_id:
  *                     type: string
+ *                     description: "The public_id returned by Cloudinary after the thumbnail upload."
  *                     example: "thumbnails/sample_thumb_456"
  *                   url:
  *                     type: string
+ *                     description: "The secure URL returned by Cloudinary after the thumbnail upload."
  *                     example: "https://res.cloudinary.com/.../thumb.jpg"
  *     responses:
  *       202:
- *         description: Upload received and is being processed.
+ *         description: "Accepted. The upload has been received and is being processed in the background. The user will be notified upon completion."
  *         content:
  *           application/json:
  *             schema:
@@ -310,21 +328,22 @@ router.route('/signature').post(protect, generateUploadSignature);
  *               properties:
  *                 message:
  *                   type: string
- *                   example: Upload received and is being processed. You will be notified upon completion.
+ *                   example: "Upload received and is being processed. You will be notified upon completion."
  *                 contentId:
  *                   type: string
- *                   example: 65a8025e3af4e7929b379e7b
+ *                   description: "The ID of the newly created content record."
+ *                   example: "65a8025e3af4e7929b379e7b"
  *                 status:
  *                   type: string
- *                   example: processing
+ *                   example: "processing"
  *       400:
- *         description: Missing fields, invalid file types, or invalid preview timeline
+ *         description: "Bad Request - Missing required fields, invalid data (e.g., invalid preview timeline), or malformed Cloudinary data."
  *       401:
- *         description: Unauthorized
+ *         description: "Unauthorized - JWT token is missing or invalid."
  *       403:
- *         description: User is not a creator or admin
+ *         description: "Forbidden - The user does not have the 'creator' or 'admin' role."
  *       500:
- *         description: Server error during upload initiation.
+ *         description: "Server Error - An error occurred while initiating the upload process."
  */
 router.route('/').post(protect, createContent);
 
