@@ -1,6 +1,11 @@
 const { Worker } = require('bullmq');
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
+const fs = require('fs');
+const path = require('path');
+const axios = require('axios');
+const ffmpeg = require('fluent-ffmpeg');
+const cloudinary = require('./config/cloudinary');
 const contentSchema = require('./models/contentModel');
 const userSchema = require('./models/userModel');
 const nodemailer = require('nodemailer');
@@ -49,6 +54,119 @@ const sendEmail = (to, subject, html) => {
 };
 
 // --- Job Processor Logic ---
+
+const mainProcessor = async (job) => {
+    console.log(`[Worker] Received job ${job.id} with name ${job.name}`);
+    switch (job.name) {
+        case 'process-upload':
+            return await processUpload(job);
+        case 'combine-videos':
+            return await processVideoCombination(job);
+        default:
+            throw new Error(`Unknown job name: ${job.name}`);
+    }
+};
+
+const processVideoCombination = async (job) => {
+    const { contentIds, title, description, category, credit, userId } = job.data;
+    const tempDir = path.join(__dirname, 'temp', job.id);
+    const fileListPath = path.join(tempDir, 'filelist.txt');
+    const outputPath = path.join(tempDir, 'output.mp4');
+    let downloadedFiles = [];
+
+    try {
+        // 1. Create a temporary directory for this job
+        if (!fs.existsSync(tempDir)) {
+            fs.mkdirSync(tempDir, { recursive: true });
+        }
+
+        // 2. Fetch content documents and download video files
+        const contents = await contentSchema.find({ '_id': { $in: contentIds } });
+        if (contents.length !== contentIds.length) {
+            throw new Error("Could not find all content documents for the given IDs.");
+        }
+
+        let fileListContent = '';
+        for (const content of contents) {
+            const videoUrl = content.video;
+            const tempFilePath = path.join(tempDir, `${content._id}.mp4`);
+
+            console.log(`[Worker] Downloading video from ${videoUrl}`);
+            const response = await axios({
+                method: 'GET',
+                url: videoUrl,
+                responseType: 'stream',
+            });
+
+            const writer = fs.createWriteStream(tempFilePath);
+            response.data.pipe(writer);
+            await new Promise((resolve, reject) => {
+                writer.on('finish', resolve);
+                writer.on('error', reject);
+            });
+
+            downloadedFiles.push(tempFilePath);
+            fileListContent += `file '${tempFilePath}'\n`;
+        }
+
+        fs.writeFileSync(fileListPath, fileListContent);
+
+        // 3. Merge videos using ffmpeg
+        console.log(`[Worker] Merging ${downloadedFiles.length} videos...`);
+        await new Promise((resolve, reject) => {
+            ffmpeg()
+                .input(fileListPath)
+                .inputOptions(['-f concat', '-safe 0'])
+                .outputOptions('-c copy')
+                .on('end', resolve)
+                .on('error', (err) => reject(new Error(`FFmpeg error: ${err.message}`)))
+                .save(outputPath);
+        });
+
+        // 4. Upload the merged video to Cloudinary
+        console.log('[Worker] Uploading merged video to Cloudinary...');
+        const uploadResult = await cloudinary.uploader.upload(outputPath, {
+            resource_type: 'video',
+            folder: 'videos/combined',
+        });
+
+        // 5. Create a new content document for the merged video
+        const newContent = await contentSchema.create({
+            title,
+            description,
+            category,
+            credit,
+            user: userId,
+            video: uploadResult.secure_url,
+            cloudinary_video_id: uploadResult.public_id,
+            thumbnail: `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/video/upload/so_2/${uploadResult.public_id}.jpg`,
+            isApproved: true, // Combined videos are pre-approved
+            status: 'completed',
+        });
+        console.log(`[Worker] Created new content record for combined video: ${newContent._id}`);
+
+        // 6. (Optional) Send email notification to user
+        const user = await userSchema.findById(userId);
+        if (user) {
+            sendEmail(user.email, 'Your combined video is ready!', `<p>Your video "${title}" has been successfully created and is now available.</p>`);
+        }
+
+        return { newContentId: newContent._id, status: 'success' };
+
+    } catch (error) {
+        console.error(`[Worker] Video combination job ${job.id} failed:`, error);
+        throw error; // Re-throw to let BullMQ handle the failure
+    } finally {
+        // 7. Cleanup temporary files and directory
+        if (fs.existsSync(tempDir)) {
+            fs.rm(tempDir, { recursive: true, force: true }, (err) => {
+                if (err) console.error(`[Worker] Failed to clean up temp directory ${tempDir}:`, err);
+                else console.log(`[Worker] Cleaned up temp directory: ${tempDir}`);
+            });
+        }
+    }
+};
+
 const processUpload = async (job) => {
     const { contentId, languageCode, video, thumbnail } = job.data;
     let content = null;
@@ -168,7 +286,7 @@ let worker;
 const startWorker = async () => {
     await connectDB();
 
-    worker = new Worker('upload', processUpload, redisConnectionOpts);
+    worker = new Worker('upload', mainProcessor, redisConnectionOpts);
 
     worker.on('completed', (job, result) => {
         console.log(`[Worker] Job ${job.id} completed successfully. Result:`, result);

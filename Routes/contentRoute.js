@@ -24,7 +24,6 @@ const {
     removeWatchlist,
     combineVideosByIds,
 } = require('../controllers/contentController');
-const upload = require('../middleware/multer');
 const { protect, admin } = require('../middleware/authmiddleware');
 
 /**
@@ -237,15 +236,15 @@ router.route('/signature').post(protect, generateUploadSignature);
  * @swagger
  * /api/content:
  *   post:
- *     summary: Create new content
- *     description: Accepts video and optional thumbnail uploads, then processes them in the background. This includes video compression, AI-powered captioning, and content moderation. The initial response confirms that the upload has been received.
+ *     summary: Create new content record
+ *     description: This is the second step of the upload process. After the client has uploaded the file directly to Cloudinary, it calls this endpoint with the Cloudinary response and other metadata. This creates the content record in the database and queues a background job for AI processing.
  *     tags: [Content]
  *     security:
  *       - BearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
- *         multipart/form-data:
+ *         application/json:
  *           schema:
  *             type: object
  *             required:
@@ -254,7 +253,7 @@ router.route('/signature').post(protect, generateUploadSignature);
  *               - description
  *               - credit
  *               - userId
- *               - files
+ *               - video
  *               - previewStart
  *               - previewEnd
  *             properties:
@@ -272,25 +271,35 @@ router.route('/signature').post(protect, generateUploadSignature);
  *                 example: John Doe
  *               userId:
  *                 type: string
- *                 example: 65a8025e3af4e7929b379e7a
+ *                 example: "65a8025e3af4e7929b379e7a"
  *               previewStart:
  *                 type: number
  *                 example: 30
- *                 description: Start time of the 10-second preview (in seconds)
  *               previewEnd:
  *                 type: number
  *                 example: 40
- *                 description: End time of the 10-second preview (in seconds)
  *               languageCode:
  *                 type: string
  *                 example: en_us
- *                 description: The language code for caption generation (e.g., en_us, es, fr).
- *               files:
- *                 type: array
- *                 items:
- *                   type: string
- *                   format: binary
- *                 description: Video file (required) and optional thumbnail image
+ *               video:
+ *                 type: object
+ *                 required: [public_id, url]
+ *                 properties:
+ *                   public_id:
+ *                     type: string
+ *                     example: "videos/sample_video_123"
+ *                   url:
+ *                     type: string
+ *                     example: "https://res.cloudinary.com/.../video.mp4"
+ *               thumbnail:
+ *                 type: object
+ *                 properties:
+ *                   public_id:
+ *                     type: string
+ *                     example: "thumbnails/sample_thumb_456"
+ *                   url:
+ *                     type: string
+ *                     example: "https://res.cloudinary.com/.../thumb.jpg"
  *     responses:
  *       202:
  *         description: Upload received and is being processed.
@@ -753,7 +762,7 @@ router.route('/:id').get(getContentById);
  *       500:
  *         description: Server error
  */
-router.route('/:id').put(protect, upload.single('thumbnail'), updateContent);
+router.route('/:id').put(protect, updateContent);
 
 /**
  * @swagger
