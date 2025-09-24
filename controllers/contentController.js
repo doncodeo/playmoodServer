@@ -648,16 +648,10 @@ const updateContent = asyncHandler(async (req, res) => {
             return res.status(404).json({ error: 'Content not found' });
         }
 
-        if (req.file) {
-            const updatedCloudinaryResult = await cloudinary.uploader.upload(req.file.path, {
-                folder: 'contents',
-                public_id: content.cloudinary_thumbnail_id, // Use thumbnail ID
-            });
-
-            await cloudinary.uploader.destroy(content.cloudinary_thumbnail_id);
-            content.thumbnail = updatedCloudinaryResult.secure_url;
-            content.cloudinary_thumbnail_id = updatedCloudinaryResult.public_id;
-        }
+        // The thumbnail is now updated by providing a new URL in the request body.
+        // The direct upload flow applies to new content, not thumbnail updates in this function.
+        // For simplicity, we assume the client provides a new URL for the thumbnail if it needs changing.
+        // A more advanced implementation might involve a separate signature endpoint for thumbnail updates.
 
         content.title = title || content.title;
         content.category = category || content.category;
