@@ -178,21 +178,8 @@ const processUpload = async (job) => {
             throw new Error(`Content record not found in worker for job ${job.id}.`);
         }
 
-        // The video and optional thumbnail are already uploaded to Cloudinary.
-        // The primary video URL is in `video.url`.
-        // The primary video public_id is in `video.public_id`.
-        // An optional thumbnail URL is in `thumbnail.url`.
-        // An optional thumbnail public_id is in `thumbnail.public_id`.
-
-        // A. Generate a thumbnail from the video if one wasn't uploaded.
-        let thumbnailUrl = thumbnail ? thumbnail.url : '';
-        let thumbnailPublicId = thumbnail ? thumbnail.public_id : '';
-
-        if (!thumbnailUrl) {
-            // This generates a URL for a thumbnail from the 2nd second of the video.
-            // It doesn't create a new asset, just a dynamically transformed URL.
-            thumbnailUrl = `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/video/upload/so_2/${video.public_id}.jpg`;
-        }
+        // The video and thumbnail URLs are already set in the controller.
+        // The worker's job is to process the AI tasks and update the record.
 
         // B. AI Processing (can run in parallel)
         console.log(`[Worker] Starting AI processing for job ${job.id}`);
@@ -224,12 +211,7 @@ const processUpload = async (job) => {
         }
         console.log(`[Worker] AI processing complete for job ${job.id}`);
 
-        // C. Update content document in the database
-        content.status = 'completed';
-        content.video = video.url;
-        content.cloudinary_video_id = video.public_id;
-        content.thumbnail = thumbnailUrl;
-        content.cloudinary_thumbnail_id = thumbnailPublicId; // May be empty if thumbnail is derived
+        // C. Update content document in the database with AI results
         content.captions = initialCaptions;
         content.aiModerationStatus = moderation.status;
         content.aiModerationLabels = moderation.labels;
