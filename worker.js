@@ -210,16 +210,16 @@ const processUpload = async (job) => {
         }
 
         let moderation = { status: 'needs_review', labels: [] };
-        if (moderationResult.status === 'fulfilled') {
+        if (moderationResult.status === 'fulfilled' && moderationResult.value) {
             moderation = moderationResult.value;
-        } else {
+        } else if (moderationResult.status === 'rejected') {
             console.error(`[Worker] Failed to analyze video for moderation for ${contentId}:`, moderationResult.reason);
         }
 
         let contentEmbedding = [];
-        if (embeddingResult.status === 'fulfilled') {
+        if (embeddingResult.status === 'fulfilled' && embeddingResult.value) {
             contentEmbedding = embeddingResult.value;
-        } else {
+        } else if (embeddingResult.status === 'rejected') {
             console.error(`[Worker] Failed to generate content embeddings for ${contentId}:`, embeddingResult.reason);
         }
         console.log(`[Worker] AI processing complete for job ${job.id}`);
@@ -262,9 +262,10 @@ const processUpload = async (job) => {
     } catch (error) {
         console.error(`[Worker] Job ${job.id} for content ${contentId} failed:`, error);
         if (content) {
-            // If the job fails, delete the content record to avoid orphaned data
-            await contentSchema.findByIdAndDelete(contentId);
-            console.log(`[Worker] Deleted content document for failed job ${job.id}`);
+            content.status = 'failed';
+            content.rejectionReason = error.message || 'Worker process failed';
+            await content.save();
+            console.log(`[Worker] Marked content as 'failed' for job ${job.id}`);
         }
         // Re-throw the error to let BullMQ know the job has failed
         throw error;
