@@ -294,33 +294,25 @@ const getContentById = asyncHandler(async (req, res) => {
 // @desc Create Content
 // @route POST /api/content
 // @access Private 
-
 const createContent = asyncHandler(async (req, res) => {
     try {
-        const { title, category, description, credit, userId, previewStart, previewEnd, languageCode } = req.body;
+        // The file data now comes from the client after a direct upload to Cloudinary
+        const { title, category, description, credit, userId, previewStart, previewEnd, languageCode, video, thumbnail } = req.body;
 
         // 1. Initial Validation
-        if (!title || !category || !description || !credit || !userId) {
-            return res.status(400).json({ error: 'Important fields missing!' });
+        if (!title || !category || !description || !credit || !userId || !video) {
+            return res.status(400).json({ error: 'Important fields, including video data, are missing!' });
+        }
+        if (!video.public_id || !video.url) {
+            return res.status(400).json({ error: 'Video data must include a public_id and a url.' });
         }
         const start = parseFloat(previewStart);
         const end = parseFloat(previewEnd);
         if (isNaN(start) || isNaN(end) || end - start !== 10 || start < 0) {
             return res.status(400).json({ error: 'Invalid preview timeline. Must be a 10-second segment.' });
         }
-        if (!req.files || req.files.length === 0) {
-            return res.status(400).json({ error: 'At least one video file is required.' });
-        }
 
-        // 2. Separate files and validate user
-        let videoFile, thumbnailFile;
-        req.files.forEach(file => {
-            if (file.mimetype.toLowerCase().startsWith('video/')) videoFile = file;
-            else if (file.mimetype.toLowerCase().startsWith('image/')) thumbnailFile = file;
-        });
-
-        if (!videoFile) return res.status(400).json({ error: 'A video file is required.' });
-
+        // 2. Validate user
         const user = await userSchema.findById(userId);
         if (!user || (user.role !== 'creator' && user.role !== 'admin')) {
             return res.status(403).json({ error: 'Unauthorized to create content' });
@@ -338,28 +330,28 @@ const createContent = asyncHandler(async (req, res) => {
             credit,
             shortPreview: { start, end },
             status: 'processing',
-            // Add placeholder values for required fields that the worker will fill in
-            video: 'processing',
-            thumbnail: 'processing',
+            video: 'processing', // Placeholder
+            thumbnail: 'processing', // Placeholder
         });
 
+        // 4. Construct job data for the worker
         const jobData = {
             contentId: content._id,
             languageCode,
             video: {
-                url: videoFile.path,
-                public_id: videoFile.filename,
+                url: video.url,
+                public_id: video.public_id,
             },
-            thumbnail: thumbnailFile ? {
-                url: thumbnailFile.path,
-                public_id: thumbnailFile.filename,
+            thumbnail: thumbnail ? {
+                url: thumbnail.url,
+                public_id: thumbnail.public_id,
             } : null,
         };
 
-        // 4. Add the job to the queue
+        // 5. Add the job to the queue
         await uploadQueue.add('process-upload', jobData);
 
-        // 5. Respond to the user immediately
+        // 6. Respond to the user immediately
         return res.status(202).json({
             message: 'Upload received and is being processed. You will be notified upon completion.',
             contentId: content._id,
@@ -367,13 +359,30 @@ const createContent = asyncHandler(async (req, res) => {
         });
 
     } catch (error) {
-        // This catch block now only handles errors from the initial setup phase.
-        // Worker errors are handled within the worker itself.
         console.error('Create content initial error:', error);
-        // With direct-to-Cloudinary uploads, there are no local temp files to clean up.
-        // If the initial content document was created, the worker's error handler
-        // will be responsible for cleaning up the database record.
         res.status(500).json({ error: 'Server error during upload initiation.', details: error.message });
+    }
+});
+
+// @desc    Generate a signature for direct client-side uploads
+// @route   POST /api/content/signature
+// @access  Private
+const generateUploadSignature = asyncHandler(async (req, res) => {
+    try {
+        const timestamp = Math.round((new Date).getTime() / 1000);
+
+        const signature = cloudinary.utils.api_sign_request({
+            timestamp: timestamp,
+        }, process.env.CLOUDINARY_API_SECRET);
+
+        res.status(200).json({
+            signature,
+            timestamp,
+            api_key: process.env.CLOUDINARY_API_KEY,
+        });
+    } catch (error) {
+        console.error('Error generating Cloudinary signature:', error);
+        res.status(500).json({ error: 'Server error while generating upload signature.' });
     }
 });
 
@@ -1012,6 +1021,7 @@ module.exports = {
     getRecentCreatorContent,
     getContentById,
     createContent,
+    generateUploadSignature,
     addComment,
     getComments,
     updateContent,

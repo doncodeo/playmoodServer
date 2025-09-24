@@ -6,7 +6,8 @@ const {
     getTopTenContent,
     getRecommendedContent,
     getRecentCreatorContent,
-    createContent, 
+    createContent,
+    generateUploadSignature,
     addComment,
     getComments,
     updateContent, 
@@ -197,7 +198,40 @@ router.route('/combine').post(protect, admin, combineVideosByIds);
  *       500:
  *         description: Server error
  */
-router.route('/').get(getContent);    
+router.route('/').get(getContent);
+
+/**
+ * @swagger
+ * /api/content/signature:
+ *   post:
+ *     summary: Generate a signature for direct client-side uploads
+ *     description: Creates a secure, one-time signature that the client can use to upload a file directly to Cloudinary. This is the first step in the direct upload process.
+ *     tags: [Content]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Signature generated successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 signature:
+ *                   type: string
+ *                   example: "a1b2c3d4e5f6..."
+ *                 timestamp:
+ *                   type: number
+ *                   example: 1678886400
+ *                 api_key:
+ *                   type: string
+ *                   example: "123456789012345"
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
+router.route('/signature').post(protect, generateUploadSignature);
 
 /**
  * @swagger
@@ -283,7 +317,7 @@ router.route('/').get(getContent);
  *       500:
  *         description: Server error during upload initiation.
  */
-router.route('/').post(protect, upload.array('files', 2), createContent);
+router.route('/').post(protect, createContent);
 
 
 /**
