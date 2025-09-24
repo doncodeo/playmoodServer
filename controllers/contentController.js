@@ -319,7 +319,10 @@ const createContent = asyncHandler(async (req, res) => {
             return res.status(403).json({ error: 'Unauthorized to create content' });
         }
 
-        // 3. Create initial content document with 'processing' status
+        // 3. Create initial content document with 'completed' status and final URLs
+        let thumbnailUrl = thumbnail ? thumbnail.url : `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/video/upload/so_2/${video.public_id}.jpg`;
+        let thumbnailPublicId = thumbnail ? thumbnail.public_id : ''; // May be empty
+
         const content = await contentSchema.create({
             user: userId,
             title,
@@ -327,9 +330,13 @@ const createContent = asyncHandler(async (req, res) => {
             description,
             credit,
             shortPreview: { start, end },
-            status: 'processing',
-            video: 'processing', // Placeholder
-            thumbnail: 'processing', // Placeholder
+            status: 'completed', // Set status to completed immediately
+            video: video.url,
+            cloudinary_video_id: video.public_id,
+            thumbnail: thumbnailUrl,
+            cloudinary_thumbnail_id: thumbnailPublicId,
+            isApproved: user.role === 'admin', // Admins' content is auto-approved
+            aiModerationStatus: 'processing', // Set AI moderation status
         });
 
         // 4. Construct job data for the worker
