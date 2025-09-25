@@ -208,18 +208,18 @@ const processUpload = async (job) => {
         }
 
         let moderation = { status: 'needs_review', labels: [] };
-        if (moderationResult.status === 'fulfilled') {
+        if (moderationResult.status === 'fulfilled' && moderationResult.value) {
             console.log(`[Worker] [${job.id}] Task Status: Moderation analysis successful.`);
             moderation = moderationResult.value;
-        } else {
+        } else if (moderationResult.status === 'rejected') {
             console.error(`[Worker] [${job.id}] Task Status: Failed to analyze video for moderation for ${contentId}:`, moderationResult.reason);
         }
 
         let contentEmbedding = [];
-        if (embeddingResult.status === 'fulfilled') {
+        if (embeddingResult.status === 'fulfilled' && embeddingResult.value) {
             console.log(`[Worker] [${job.id}] Task Status: Content embedding generation successful.`);
             contentEmbedding = embeddingResult.value;
-        } else {
+        } else if (embeddingResult.status === 'rejected') {
             console.error(`[Worker] [${job.id}] Task Status: Failed to generate content embeddings for ${contentId}:`, embeddingResult.reason);
         }
         console.log(`[Worker] AI processing complete for job ${job.id}`);
