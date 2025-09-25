@@ -374,15 +374,30 @@ const createContent = asyncHandler(async (req, res) => {
 // @access  Private
 const generateUploadSignature = asyncHandler(async (req, res) => {
     try {
+        const { type } = req.body;
+        const userId = req.user.id;
+
+        // The 'type' parameter is expected from the client to specify the upload folder.
+        if (!type || !['videos', 'images'].includes(type)) {
+            return res.status(400).json({ error: "Request must include a 'type' property, which can be 'videos' or 'images'." });
+        }
+
+        const folder = `user-uploads/${userId}/${type}`;
         const timestamp = Math.round((new Date).getTime() / 1000);
 
-        const signature = cloudinary.utils.api_sign_request({
+        // Parameters to sign
+        const params_to_sign = {
             timestamp: timestamp,
-        }, process.env.CLOUDINARY_API_SECRET);
+            folder: folder,
+        };
 
+        const signature = cloudinary.utils.api_sign_request(params_to_sign, process.env.CLOUDINARY_API_SECRET);
+
+        // Respond with the signature and other necessary data
         res.status(200).json({
             signature,
             timestamp,
+            folder,
             api_key: process.env.CLOUDINARY_API_KEY,
         });
     } catch (error) {
