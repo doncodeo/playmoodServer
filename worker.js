@@ -183,31 +183,44 @@ const processUpload = async (job) => {
 
         // B. AI Processing (can run in parallel)
         console.log(`[Worker] Starting AI processing for job ${job.id}`);
+
+        console.log(`[Worker] [${job.id}] Task: Generating captions...`);
+        const captionPromise = aiService.generateCaptions(video.url, contentId, languageCode);
+
+        console.log(`[Worker] [${job.id}] Task: Analyzing video for moderation...`);
+        const moderationPromise = aiService.analyzeVideoForModeration(video.url);
+
+        console.log(`[Worker] [${job.id}] Task: Generating content embeddings...`);
+        const embeddingPromise = aiService.generateEmbeddings({ title: content.title, description: content.description, category: content.category });
+
         const [captionResult, moderationResult, embeddingResult] = await Promise.allSettled([
-            aiService.generateCaptions(video.url, contentId, languageCode),
-            aiService.analyzeVideoForModeration(video.url),
-            aiService.generateEmbeddings({ title: content.title, description: content.description, category: content.category })
+            captionPromise,
+            moderationPromise,
+            embeddingPromise
         ]);
 
         let initialCaptions = [];
         if (captionResult.status === 'fulfilled' && captionResult.value) {
+            console.log(`[Worker] [${job.id}] Task Status: Caption generation successful.`);
             initialCaptions.push({ languageCode: languageCode || 'en_us', text: captionResult.value });
         } else if (captionResult.status === 'rejected') {
-            console.error(`[Worker] Failed to generate captions for ${contentId}:`, captionResult.reason);
+            console.error(`[Worker] [${job.id}] Task Status: Failed to generate captions for ${contentId}:`, captionResult.reason);
         }
 
         let moderation = { status: 'needs_review', labels: [] };
         if (moderationResult.status === 'fulfilled') {
+            console.log(`[Worker] [${job.id}] Task Status: Moderation analysis successful.`);
             moderation = moderationResult.value;
         } else {
-            console.error(`[Worker] Failed to analyze video for moderation for ${contentId}:`, moderationResult.reason);
+            console.error(`[Worker] [${job.id}] Task Status: Failed to analyze video for moderation for ${contentId}:`, moderationResult.reason);
         }
 
         let contentEmbedding = [];
         if (embeddingResult.status === 'fulfilled') {
+            console.log(`[Worker] [${job.id}] Task Status: Content embedding generation successful.`);
             contentEmbedding = embeddingResult.value;
         } else {
-            console.error(`[Worker] Failed to generate content embeddings for ${contentId}:`, embeddingResult.reason);
+            console.error(`[Worker] [${job.id}] Task Status: Failed to generate content embeddings for ${contentId}:`, embeddingResult.reason);
         }
         console.log(`[Worker] AI processing complete for job ${job.id}`);
 
@@ -242,11 +255,13 @@ const processUpload = async (job) => {
         return { contentId: contentId, status: 'success' };
 
     } catch (error) {
-        console.error(`[Worker] Job ${job.id} for content ${contentId} failed:`, error);
+        console.error(`[Worker] Job ${job.id} for content ${contentId} failed catastrophically:`, error);
         if (content) {
-            // If the job fails, delete the content record to avoid orphaned data
-            await contentSchema.findByIdAndDelete(contentId);
-            console.log(`[Worker] Deleted content document for failed job ${job.id}`);
+            // If the job fails, update the status but do not delete the content.
+            console.log(`[Worker] [${job.id}] Updating content status to 'failed' due to error.`);
+            content.aiModerationStatus = 'failed';
+            await content.save();
+            console.log(`[Worker] [${job.id}] Content status updated to 'failed'.`);
         }
         // Re-throw the error to let BullMQ know the job has failed
         throw error;
