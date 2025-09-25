@@ -79,7 +79,7 @@ const contentSchema = new mongoose.Schema(
         },
         aiModerationStatus: {
             type: String,
-            enum: ['approved', 'rejected', 'needs_review', 'pending', 'processing'],
+            enum: ['approved', 'rejected', 'needs_review', 'pending', 'processing', 'failed'],
             default: 'pending',
         },
         aiModerationLabels: {
