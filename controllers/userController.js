@@ -8,18 +8,11 @@ const bcryptjs = require("bcryptjs");
 const cloudinary = require('../config/cloudinary');
 const Token = require("../models/token");
 const crypto = require("crypto");
+const transporter = require('../utils/mailer');
 // const { verifyEmail } = require('../middleware/authmiddleware');
 const nodemailer = require('nodemailer');
 const RoleChangeRequest = require('../models/roleChangeModel');
 const mongoose = require('mongoose');
-
-const transporter = nodemailer.createTransport({
-    service: 'Gmail',
-    auth: {
-      user: process.env.EMAIL_USERNAME,
-      pass: process.env.EMAIL_PASSWORD
-    }
-  });
 const generateToken = (id, role) => {
     return jwt.sign({ id, role }, process.env.JWT_SECRET, {
         expiresIn: '30d'
