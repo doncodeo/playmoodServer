@@ -1,17 +1,8 @@
 const asyncHandler = require('express-async-handler');
 const RoleChangeRequest = require('../models/roleChangeModel');
 const User = require('../models/userModel');
-const nodemailer = require('nodemailer');
+const transporter = require('../utils/mailer');
 const { sendToUser } = require('../websocket');
-
-// Configure nodemailer transporter
-const transporter = nodemailer.createTransport({
-    service: 'Gmail',
-    auth: {
-      user: process.env.EMAIL_USERNAME,
-      pass: process.env.EMAIL_PASSWORD
-    }
-  });
 
 // @desc Request role change to creator
 // @route POST /api/rolechange

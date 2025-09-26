@@ -8,7 +8,6 @@ const ffmpeg = require('fluent-ffmpeg');
 const cloudinary = require('./config/cloudinary');
 const contentSchema = require('./models/contentModel');
 const userSchema = require('./models/userModel');
-const nodemailer = require('nodemailer');
 const aiService = require('./ai/ai-service');
 
 // Load environment variables from the root .env file
@@ -28,13 +27,7 @@ const connectDB = async () => {
 };
 
 // --- Email Transport ---
-const transporter = nodemailer.createTransport({
-    service: 'Gmail',
-    auth: {
-        user: process.env.EMAIL_USERNAME,
-        pass: process.env.EMAIL_PASSWORD
-    }
-});
+const transporter = require('./utils/mailer');
 
 const sendEmail = (to, subject, html) => {
     const mailOptions = {
