@@ -3,7 +3,6 @@ const contentSchema = require('../models/contentModel');
 const Highlight = require('../models/highlightModel');
 const userSchema = require('../models/userModel');
 const cloudinary = require('../config/cloudinary');
-const nodemailer = require('nodemailer');
 const mongoose = require('mongoose'); // Add mongoose import
 const fs = require('fs');
 const { setEtagAndCache } = require('../utils/responseHelpers');
@@ -13,15 +12,6 @@ const path = require('path');
 const uploadQueue = require('../config/queue');
 const { getWss } = require('../websocket');
 const WebSocket = require('ws');
-
-
-const transporter = nodemailer.createTransport({
-    service: 'Gmail',
-    auth: {
-        user: process.env.EMAIL_USERNAME,
-        pass: process.env.EMAIL_PASSWORD
-    }
-});
 
 // @desc Get All Content
 // @route GET /api/content 
