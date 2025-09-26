@@ -21,6 +21,7 @@ const {
   getUserHistory,
   markPrivacyPolicyAsRead,
   forgetPassword,
+  getCreatorApplicationStatus,
   googleAuthCallback,
 } = require('../controllers/userController');
 const { protect } = require('../middleware/authmiddleware');
@@ -371,6 +372,35 @@ router.route('/login').post(loginUser);
  *         description: Server error
  */
 router.get('/profile', protect, getUserprofile);
+
+/**
+ * @swagger
+ * /api/users/creator-application-status:
+ *   get:
+ *     summary: Get creator application status
+ *     description: Retrieves the creator application status of the authenticated user.
+ *     tags: [Users]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Creator application status retrieved
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 creatorApplicationStatus:
+ *                   type: string
+ *                   example: "pending"
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: Server error
+ */
+router.get('/creator-application-status', protect, getCreatorApplicationStatus);
 
 /**
  * @swagger
