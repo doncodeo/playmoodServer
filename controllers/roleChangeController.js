@@ -2,6 +2,7 @@ const asyncHandler = require('express-async-handler');
 const RoleChangeRequest = require('../models/roleChangeModel');
 const User = require('../models/userModel');
 const nodemailer = require('nodemailer');
+const { sendToUser } = require('../websocket');
 
 // Configure nodemailer transporter
 const transporter = nodemailer.createTransport({
@@ -173,9 +174,26 @@ const approveRoleChange = asyncHandler(async (req, res) => {
         request.user.role = request.requestedRole;
         request.user.creatorApplicationStatus = 'approved';
         await request.user.save();
+
+        // Send WebSocket notification to the user
+        sendToUser(request.user._id, {
+            event: 'role_change_approved',
+            payload: {
+                newRole: request.requestedRole,
+                status: 'approved',
+            },
+        });
     } else if (status === 'rejected') {
         request.user.creatorApplicationStatus = 'rejected';
         await request.user.save();
+
+        // Send WebSocket notification to the user
+        sendToUser(request.user._id, {
+            event: 'role_change_rejected',
+            payload: {
+                status: 'rejected',
+            },
+        });
     }
 
     // Send email notification to the user
