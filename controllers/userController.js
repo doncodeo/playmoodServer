@@ -199,13 +199,12 @@ const resendVerificationCode = asyncHandler(async (req, res) => {
     try {
         const user = await userData.findOne({ email });
 
-        if (!user) {
-            return res.status(404).json({ error: 'User not found' });
+        if (!user || user.isEmailVerified) {
+            return res.status(200).json({
+                message: 'If your email is registered and unverified, you will receive a new verification code shortly.'
+            });
         }
 
-        if (user.isEmailVerified) {
-            return res.status(400).json({ error: 'Email is already verified' });
-        }
 
         // Generate new verification code and expiration
         const emailVerificationCode = crypto.randomBytes(3).toString('hex').toUpperCase();
@@ -238,7 +237,9 @@ const resendVerificationCode = asyncHandler(async (req, res) => {
                 console.error("Error sending email:", error);
                 return res.status(500).json({ error: 'Error sending email' });
             } else {
-                return res.status(200).json({ message: 'Verification code resent successfully' });
+                return res.status(200).json({
+                    message: 'If your email is registered and unverified, you will receive a new verification code shortly.'
+                });
             }
         });
     } catch (error) {
@@ -758,6 +759,13 @@ const loginUser = asyncHandler(async (req, res) => {
     // check for user email
     const user = await userData.findOne({email});
 
+    if (user && !user.password) {
+        return res.status(400).json({
+            error: 'You have previously signed in with Google. Please use Google Sign-In to continue.',
+            googleSignIn: true
+        });
+    }
+
 
     if(user && (await bcryptjs.compare(password, user.password))) {
 //   console.log('User found during login:', user); // Add this log statement
@@ -1081,7 +1089,11 @@ const forgetPassword = async (req, res) => {
     const user = await userData.findOne({ email });
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+
+      return res.status(200).json({
+        message:
+          "If your email is registered with us, you will receive a password reset link shortly.",
+      });
     }
 
     const token = await Token.findOne({ userId: user._id });
@@ -1103,16 +1115,8 @@ const forgetPassword = async (req, res) => {
 
     const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
 
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
-
     const mailOptions = {
-      from: process.env.EMAIL_USER,
+      from: `"PlaymoodTV 📺" <${process.env.EMAIL_USERNAME}>`,
       to: email,
       subject: "Password Reset",
       html: `
@@ -1125,12 +1129,21 @@ const forgetPassword = async (req, res) => {
 
     await transporter.sendMail(mailOptions);
 
-    res.status(200).json({ message: "Password reset link sent to your email" });
+    res.status(200).json({
+      message:
+        "If your email is registered with us, you will receive a password reset link shortly.",
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 const googleAuthCallback = asyncHandler(async (req, res) => {
+
+    if (req.user) {
+        req.user.isEmailVerified = true;
+        await req.user.save();
+    }
+
     const token = generateToken(req.user._id, req.user.role);
     // Instead of responding with JSON, redirect to the frontend with the token
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
