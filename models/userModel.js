@@ -136,6 +136,11 @@ const userSchema = new mongoose.Schema(
             default: '',
             trim: true,
         },
+        creatorApplicationStatus: {
+            type: String,
+            enum: ['none', 'pending', 'approved', 'rejected'],
+            default: 'none',
+        },
     },
     {
         timestamps: true,
