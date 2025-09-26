@@ -1,4 +1,5 @@
 const express = require('express');
+const http = require('http');
 const cors = require('cors');
 const dotenv = require('dotenv').config();
 const connectDB = require('./config/db');
@@ -9,8 +10,12 @@ const helmet = require('helmet'); // Add helmet
 const rateLimit = require('express-rate-limit'); // Add rate limiter
 const compression = require('compression'); // Add compression
 const mongoSanitize = require('express-mongo-sanitize'); // Add input sanitizer
+const { initWebSocket } = require('./websocket');
 
 const app = express();
+const server = http.createServer(app);
+initWebSocket(server);
+
 app.set('trust proxy', 1); // Trust the first proxy
 const passport = require('passport');
 const port = process.env.PORT || 5000;
@@ -102,12 +107,10 @@ app.use((err, req, res, next) => {
   res.status(500).send('Something broke!');
 });
 
-let server;
-
 if (require.main === module) {
   connectDB()
     .then(() => {
-      server = app.listen(port, () => console.log(`Server started on port ${port}`));
+      server.listen(port, () => console.log(`Server started on port ${port}`));
     })
     .catch((error) => {
       console.error('Failed to connect to MongoDB:', error.message);
