@@ -11,6 +11,8 @@ const { compressVideo } = require('../utils/videoCompressor');
 const aiService = require('../ai/ai-service');
 const path = require('path');
 const uploadQueue = require('../config/queue');
+const { getWss } = require('../websocket');
+const WebSocket = require('ws');
 
 
 const transporter = nodemailer.createTransport({
@@ -568,6 +570,17 @@ const approveContent = asyncHandler(async (req, res) => {
         // Populate user details
         const populatedContent = await contentSchema.findById(id).populate('user', 'name profileImage');
 
+        // Notify clients via WebSocket
+        const wss = getWss();
+        wss.clients.forEach((client) => {
+            if (client.readyState === WebSocket.OPEN) {
+                client.send(JSON.stringify({
+                    event: 'content_approved',
+                    payload: populatedContent,
+                }));
+            }
+        });
+
         res.status(200).json({
             message: 'Content approved and updated successfully',
             content: populatedContent,
@@ -633,6 +646,17 @@ const rejectContent = asyncHandler(async (req, res) => {
 
         // Populate user details
         const populatedContent = await contentSchema.findById(id).populate('user', 'name profileImage');
+
+        // Notify clients via WebSocket
+        const wss = getWss();
+        wss.clients.forEach((client) => {
+            if (client.readyState === WebSocket.OPEN) {
+                client.send(JSON.stringify({
+                    event: 'content_rejected',
+                    payload: populatedContent,
+                }));
+            }
+        });
 
         res.status(200).json({
             message: 'Content rejected successfully',
