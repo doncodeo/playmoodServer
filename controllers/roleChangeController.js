@@ -31,10 +31,19 @@ const requestRoleChange = asyncHandler(async (req, res) => {
             return res.status(400).json({ error: 'Role change request already approved, cannot request again' });
         }
 
+        // Check if the user already has a pending application
+        if (user.creatorApplicationStatus === 'pending') {
+            return res.status(400).json({ error: 'You already have a pending application.' });
+        }
+
         const newRequest = await RoleChangeRequest.create({
             user: userId,
             requestedRole
         });
+
+        // Update user's creatorApplicationStatus to 'pending'
+        user.creatorApplicationStatus = 'pending';
+        await user.save();
 
         // Fetch admin users
         const admins = await User.find({ role: 'admin' });
@@ -162,6 +171,10 @@ const approveRoleChange = asyncHandler(async (req, res) => {
     // Update user role if approved
     if (status === 'approved') {
         request.user.role = request.requestedRole;
+        request.user.creatorApplicationStatus = 'approved';
+        await request.user.save();
+    } else if (status === 'rejected') {
+        request.user.creatorApplicationStatus = 'rejected';
         await request.user.save();
     }
 

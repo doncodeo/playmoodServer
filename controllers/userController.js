@@ -1136,9 +1136,24 @@ const googleAuthCallback = asyncHandler(async (req, res) => {
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     res.redirect(`${frontendUrl}/auth/callback?token=${token}`);
 });
+// @desc Get creator application status
+// @route GET /api/user/creator-application-status
+// @access Private
+const getCreatorApplicationStatus = asyncHandler(async (req, res) => {
+    const userId = req.user.id;
+
+    const user = await userData.findById(userId);
+
+    if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.status(200).json({ creatorApplicationStatus: user.creatorApplicationStatus });
+});
  
  module.exports = {
     getUser,
+    getCreatorApplicationStatus,
     forgetPassword,
     registerUser,
     verifyEmail,
