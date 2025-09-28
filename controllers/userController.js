@@ -1116,6 +1116,7 @@ const forgetPassword = async (req, res) => {
         <p>You are receiving this email because you (or someone else) has requested the reset of the password for your account.</p>
         <p>Please click on the following link, or paste this into your browser to complete the process:</p>
         <p><a href="${resetUrl}">${resetUrl}</a></p>
+        <p>This link will expire in 15 minutes.</p>
         <p>If you did not request this, please ignore this email and your password will remain unchanged.</p>
       `,
     };
@@ -1130,6 +1131,75 @@ const forgetPassword = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+const resetPassword = asyncHandler(async (req, res) => {
+    try {
+        const { password } = req.body;
+        const { token } = req.params;
+
+        const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+        const tokenDoc = await Token.findOne({ token: hashedToken });
+
+        if (!tokenDoc) {
+            return res.status(400).json({ message: "Invalid or expired token." });
+        }
+
+        // Check if the token has expired (15 minutes)
+        const fifteenMinutes = 15 * 60 * 1000;
+        if (Date.now() - tokenDoc.createdAt > fifteenMinutes) {
+            await tokenDoc.deleteOne();
+            return res.status(400).json({ message: "Token has expired. Please request a new one." });
+        }
+
+        const user = await userData.findById(tokenDoc.userId);
+        if (!user) {
+            return res.status(404).json({ message: "User not found." });
+        }
+
+        const salt = await bcryptjs.genSalt(10);
+        const hashedPassword = await bcryptjs.hash(password, salt);
+
+        user.password = hashedPassword;
+        await user.save();
+
+        await tokenDoc.deleteOne();
+
+        res.status(200).json({ message: "Password has been reset successfully." });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+const changePassword = asyncHandler(async (req, res) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+        const userId = req.user.id;
+
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({ message: "Both current and new passwords are required." });
+        }
+
+        const user = await userData.findById(userId);
+        if (!user) {
+            return res.status(404).json({ message: "User not found." });
+        }
+
+        const isMatch = await bcryptjs.compare(currentPassword, user.password);
+        if (!isMatch) {
+            return res.status(400).json({ message: "Incorrect current password." });
+        }
+
+        const salt = await bcryptjs.genSalt(10);
+        const hashedPassword = await bcryptjs.hash(newPassword, salt);
+
+        user.password = hashedPassword;
+        await user.save();
+
+        res.status(200).json({ message: "Password changed successfully." });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
 const googleAuthCallback = asyncHandler(async (req, res) => {
 
     if (req.user) {
@@ -1161,6 +1231,7 @@ const getCreatorApplicationStatus = asyncHandler(async (req, res) => {
     getUser,
     getCreatorApplicationStatus,
     forgetPassword,
+    resetPassword,
     registerUser,
     verifyEmail,
     resendVerificationCode,
@@ -1176,5 +1247,6 @@ const getCreatorApplicationStatus = asyncHandler(async (req, res) => {
     saveContentToHistory,
     getUserHistory,
     markPrivacyPolicyAsRead,
-    googleAuthCallback
+    googleAuthCallback,
+    changePassword
  }
