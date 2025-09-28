@@ -23,6 +23,8 @@ const {
   forgetPassword,
   getCreatorApplicationStatus,
   googleAuthCallback,
+  resetPassword,
+  changePassword,
 } = require('../controllers/userController');
 const { protect } = require('../middleware/authmiddleware');
 
@@ -810,6 +812,99 @@ router.route('/policy/:userId').patch(protect, markPrivacyPolicyAsRead);
  *         description: Server error
  */
 router.post('/forget-password', forgetPassword);
+
+/**
+ * @swagger
+ * /api/users/reset-password/{token}:
+ *   post:
+ *     summary: Reset user password
+ *     description: Resets the user's password using a token from email.
+ *     tags: [Users]
+ *     parameters:
+ *       - in: path
+ *         name: token
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The password reset token from the email link.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - password
+ *             properties:
+ *               password:
+ *                 type: string
+ *                 example: NewPassword123
+ *     responses:
+ *       200:
+ *         description: Password has been reset successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Password has been reset successfully.
+ *       400:
+ *         description: Invalid or expired token.
+ *       404:
+ *         description: User not found.
+ *       500:
+ *         description: Server error.
+ */
+router.post('/reset-password/:token', resetPassword);
+
+/**
+ * @swagger
+ * /api/users/change-password:
+ *   post:
+ *     summary: Change user password from dashboard
+ *     description: Allows an authenticated user to change their password.
+ *     tags: [Users]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - currentPassword
+ *               - newPassword
+ *             properties:
+ *               currentPassword:
+ *                 type: string
+ *                 example: CurrentPassword123
+ *               newPassword:
+ *                 type: string
+ *                 example: NewStrongerPassword456
+ *     responses:
+ *       200:
+ *         description: Password changed successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Password changed successfully.
+ *       400:
+ *         description: Incorrect current password or missing fields.
+ *       401:
+ *         description: Unauthorized.
+ *       404:
+ *         description: User not found.
+ *       500:
+ *         description: Server error.
+ */
+router.post('/change-password', protect, changePassword);
 
 router.get('/auth/google', passport.authenticate('google', { scope: 'profile email' }));
 
