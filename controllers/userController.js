@@ -23,7 +23,7 @@ const generateToken = (id, role) => {
 
 const getUser = asyncHandler(async (req, res) => {
       
-    const users = await userData.find()
+    const users = await userData.find().populate('subscriptions', 'name email profileImage');
 
     res.status(200).json(users)
 })
@@ -757,7 +757,7 @@ const loginUser = asyncHandler(async (req, res) => {
 // @access Public
 
 const getUserprofile = asyncHandler(async (req, res) => {
-    const user = await userData.findById(req.user.id);
+    const user = await userData.findById(req.user.id).populate('subscriptions', 'name email profileImage');
 
     if (!user) {
         res.status(404);

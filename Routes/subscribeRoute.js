@@ -4,7 +4,8 @@ const {
     subscribe, 
     unsubscribe, 
     getSubscribedContent, 
-    getSubscribers 
+    getSubscribers,
+    getSubscribedCreators
 } = require('../controllers/subscribeController');
 const { protect } = require('../middleware/authmiddleware');
 
@@ -50,7 +51,7 @@ const { protect } = require('../middleware/authmiddleware');
  * /api/subscribe:
  *   post:
  *     summary: Subscribe to a creator
- *     description: Subscribes the authenticated user to a creator, updating both user profiles with subscription details.
+ *     description: Subscribes the authenticated user to a creator and returns the updated list of subscribed creators.
  *     tags: [Subscriptions]
  *     security:
  *       - BearerAuth: []
@@ -76,6 +77,10 @@ const { protect } = require('../middleware/authmiddleware');
  *                 message:
  *                   type: string
  *                   example: Subscribed successfully.
+ *                 subscriptions:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Subscriber'
  *       400:
  *         description: Already subscribed to this creator
  *       500:
@@ -88,7 +93,7 @@ router.route('/').post(protect, subscribe);
  * /api/subscribe:
  *   put:
  *     summary: Unsubscribe from a creator
- *     description: Unsubscribes the authenticated user from a creator, updating both user profiles.
+ *     description: Unsubscribes the authenticated user from a creator and returns the updated list of subscribed creators.
  *     tags: [Subscriptions]
  *     security:
  *       - BearerAuth: []
@@ -114,6 +119,10 @@ router.route('/').post(protect, subscribe);
  *                 message:
  *                   type: string
  *                   example: Unsubscribed successfully.
+ *                 subscriptions:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Subscriber'
  *       400:
  *         description: Not subscribed to this creator or missing creator ID
  *       500:
@@ -171,43 +180,31 @@ router.route('/content').get(protect, getSubscribedContent);
  */
 router.route('/subscribers').get(protect, getSubscribers);
 
+/**
+ * @swagger
+ * /api/subscribe/creators:
+ *   get:
+ *     summary: Get all creators the user is subscribed to
+ *     description: Retrieves a list of creators that the authenticated user is subscribed to, including their name, email, and profile image.
+ *     tags: [Subscriptions]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: A list of subscribed creators
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Subscriber'
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: Server error
+ */
+router.route('/creators').get(protect, getSubscribedCreators);
+
 module.exports = router;
-
-
-
-
-
-
-
-
-
-
-
-
-
-// const express = require('express');
-// const router = express.Router();
-// const { 
-//     subscribe, 
-//     unsubscribe, 
-//     getSubscribedContent, 
-//     getSubscribers 
-// } = require('../controllers/subscribeController');
-// const { protect } = require('../middleware/authmiddleware');
-
-// // Subscribe and unsubscribe using the root route
-// router.route('/')
-//     .post(protect, subscribe)     // Subscribe to a creator
-//     .put(protect, unsubscribe);  // Unsubscribe from a creator
-
-// // Fetch content from subscribed creators
-// router.route('/content')
-//     .get(protect, getSubscribedContent);
-
-// // Fetch all subscribers for a creator
-// router.route('/subscribers')
-//     .get(protect, getSubscribers);
-
-// module.exports = router;
 
 
