@@ -489,10 +489,13 @@ const updateUser = asyncHandler(async (req, res) => {
         }
     }
 
+    const updatedFields = [];
+
     // Update fields from req.body
     allowedFields.forEach(field => {
         if (req.body[field] !== undefined) {
             user[field] = req.body[field];
+            updatedFields.push(field);
         }
     });
 
@@ -546,6 +549,7 @@ const updateUser = asyncHandler(async (req, res) => {
             // Update profile image and Cloudinary ID
             user.profileImage = result.secure_url;
             user.cloudinary_id = result.public_id;
+            updatedFields.push('profileImage');
         } catch (error) {
             // Handle specific Cloudinary errors
             let errorMessage = 'Failed to upload profile image.';
@@ -573,9 +577,9 @@ const updateUser = asyncHandler(async (req, res) => {
     try {
         updatedUser = await user.save();
         console.log(
-            `[${getTimestamp()}] INFO: User updated successfully - userId: ${userId}, updatedFields: ${Object.keys(
-                req.body
-            ).join(', ')}${req.file ? ', profileImage' : ''}`
+            `[${getTimestamp()}] INFO: User updated successfully - userId: ${userId}, updatedFields: ${updatedFields.join(
+                ', '
+            )}`
         );
     } catch (error) {
         console.error(
