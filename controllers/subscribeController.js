@@ -25,14 +25,19 @@ const subscribe = async (req, res) => {
         await User.findByIdAndUpdate(subscriberId, { $push: { subscriptions: creatorId } });
         await User.findByIdAndUpdate(creatorId, { $push: { subscribers: subscriberId } });
 
-        res.status(201).json({ message: 'Subscribed successfully.' });
+        // Fetch updated subscriptions
+        const user = await User.findById(subscriberId).populate('subscriptions', 'name email profileImage');
+
+        res.status(201).json({
+            message: 'Subscribed successfully.',
+            subscriptions: user.subscriptions
+        });
     } catch (error) {
         res.status(500).json({ message: 'Server error', error });
     }
 };
 
 // Unsubscribe from a creator
-
 const unsubscribe = async (req, res) => {
     const { creatorId } = req.body;
     const subscriberId = req.user._id; // Assuming `req.user` is populated by middleware
@@ -56,8 +61,14 @@ const unsubscribe = async (req, res) => {
         await User.findByIdAndUpdate(subscriberId, { $pull: { subscriptions: creatorId } });
         await User.findByIdAndUpdate(creatorId, { $pull: { subscribers: subscriberId } });
 
+        // Fetch updated subscriptions
+        const user = await User.findById(subscriberId).populate('subscriptions', 'name email profileImage');
+
         // Send response
-        return res.status(200).json({ message: 'Unsubscribed successfully.' });
+        return res.status(200).json({
+            message: 'Unsubscribed successfully.',
+            subscriptions: user.subscriptions
+        });
     } catch (error) {
         console.error('Unsubscribe Error:', error); // Log the error
         return res.status(500).json({ message: 'Server error', error });
@@ -99,9 +110,26 @@ const getSubscribers = async (req, res) => {
     }
 };
 
+// Get all creators a user is subscribed to
+const getSubscribedCreators = async (req, res) => {
+    const userId = req.user._id;
+
+    try {
+        const user = await User.findById(userId).populate('subscriptions', 'name email profileImage');
+        if (!user) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+
+        res.status(200).json(user.subscriptions);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error });
+    }
+};
+
 module.exports = {
     subscribe,
     unsubscribe,
     getSubscribedContent,
     getSubscribers,
+    getSubscribedCreators,
 };
