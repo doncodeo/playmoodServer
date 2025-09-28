@@ -4,10 +4,12 @@ const asyncHandler = require ('express-async-handler');
 const userData = require('../models/userModel');
 const contentSchema = require('../models/contentModel');
 const jwt = require("jsonwebtoken");
-const bcryptjs = require("bcryptjs");               
+const bcryptjs = require("bcryptjs");
 const cloudinary = require('../config/cloudinary');
 const Token = require("../models/token");
 const crypto = require("crypto");
+const DatauriParser = require('datauri/parser');
+const path = require('path');
 const transporter = require('../utils/mailer');
 // const { verifyEmail } = require('../middleware/authmiddleware');
 const nodemailer = require('nodemailer');
@@ -497,19 +499,17 @@ const updateUser = asyncHandler(async (req, res) => {
     // Handle profile image upload
     if (req.file) {
         try {
+            const parser = new DatauriParser();
+            const fileExtension = path.extname(req.file.originalname).toString();
+            const fileBuffer = req.file.buffer;
+            const file64 = parser.format(fileExtension, fileBuffer);
+
             // Validate file type
             const allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
-            if (!allowedTypes.includes(req.file.mimetype)) {
-                await fs.unlink(req.file.path).catch(err =>
-                    console.log(
-                        `[${getTimestamp()}] WARN: Failed to delete invalid file - path: ${
-                            req.file.path
-                        }, error: ${err.message}`
-                    )
-                );
+            if (!allowedTypes.includes(file64.mimetype)) {
                 console.log(
                     `[${getTimestamp()}] WARN: Invalid file type for profile image - userId: ${userId}, mimetype: ${
-                        req.file.mimetype
+                        file64.mimetype
                     }`
                 );
                 return res.status(400).json({
@@ -520,7 +520,7 @@ const updateUser = asyncHandler(async (req, res) => {
             }
 
             // Upload new image to Cloudinary
-            const result = await cloudinary.uploader.upload(req.file.path, {
+            const result = await cloudinary.uploader.upload(file64.content, {
                 folder: 'profile-images',
                 public_id: `${userId}-${Date.now()}`,
             });
@@ -546,20 +546,6 @@ const updateUser = asyncHandler(async (req, res) => {
             // Update profile image and Cloudinary ID
             user.profileImage = result.secure_url;
             user.cloudinary_id = result.public_id;
-
-            // Delete local file
-            try {
-                await fs.unlink(req.file.path);
-                console.log(
-                    `[${getTimestamp()}] INFO: Local file deleted after upload - path: ${req.file.path}`
-                );
-            } catch (error) {
-                console.log(
-                    `[${getTimestamp()}] WARN: Failed to delete local file after upload - path: ${
-                        req.file.path
-                    }, error: ${error.message}`
-                );
-            }
         } catch (error) {
             // Handle specific Cloudinary errors
             let errorMessage = 'Failed to upload profile image.';
@@ -569,25 +555,9 @@ const updateUser = asyncHandler(async (req, res) => {
                 errorMessage = 'Invalid image file provided to Cloudinary.';
             }
 
-            // Clean up local file on error
-            try {
-                await fs.unlink(req.file.path);
-                console.log(
-                    `[${getTimestamp()}] INFO: Local file deleted after Cloudinary error - path: ${
-                        req.file.path
-                    }`
-                );
-            } catch (unlinkError) {
-                console.log(
-                    `[${getTimestamp()}] WARN: Failed to delete local file after Cloudinary error - path: ${
-                        req.file.path
-                    }, error: ${unlinkError.message}`
-                );
-            }
-
             console.error(
                 `[${getTimestamp()}] ERROR: Cloudinary upload failed - userId: ${userId}, error: ${
-                    error.message
+                    error.message || 'Unknown error'
                 }, stack: ${error.stack}`
             );
             return res.status(500).json({
