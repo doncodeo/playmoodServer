@@ -2,8 +2,9 @@ const asyncHandler = require('express-async-handler');
 const User = require('../models/userModel');
 const Content = require('../models/contentModel');
 const cloudinary = require('../config/cloudinary');
-const fs = require('fs').promises;
 const mongoose = require('mongoose');
+const DatauriParser = require('datauri/parser');
+const path = require('path');
 
 
 
@@ -126,7 +127,12 @@ const updateChannelBannerImage = asyncHandler(async (req, res) => {
   let bannerImageUrl = user.bannerImage;
 
   if (req.file) {
-    const result = await cloudinary.uploader.upload(req.file.path, {
+    const parser = new DatauriParser();
+    const fileExtension = path.extname(req.file.originalname).toString();
+    const fileBuffer = req.file.buffer;
+    const file64 = parser.format(fileExtension, fileBuffer);
+
+    const result = await cloudinary.uploader.upload(file64.content, {
       folder: 'channel-banners',
       public_id: `${userId}-${Date.now()}`,
     });
@@ -138,11 +144,6 @@ const updateChannelBannerImage = asyncHandler(async (req, res) => {
     bannerImageUrl = result.secure_url;
     user.bannerImageId = result.public_id;
 
-    try {
-      await fs.unlink(req.file.path);
-    } catch (error) {
-      console.warn(`Failed to delete local file ${req.file.path}:`, error.message);
-    }
   } else {
     return res.status(400).json({ error: 'No file uploaded' });
   }
