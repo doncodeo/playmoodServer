@@ -139,7 +139,10 @@ const shutdown = async () => {
   }
 };
 
-process.on('SIGINT', shutdown);
-process.on('SIGTERM', shutdown);
+// Only attach signal handlers if not in test environment
+if (process.env.NODE_ENV !== 'test') {
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
+}
 
 module.exports = { app, server };
