@@ -14,7 +14,6 @@ const { initWebSocket } = require('./websocket');
 
 const app = express();
 const server = http.createServer(app);
-initWebSocket(server);
 
 app.set('trust proxy', 1); // Trust the first proxy
 const passport = require('passport');
@@ -108,6 +107,7 @@ app.use((err, req, res, next) => {
 });
 
 if (require.main === module) {
+  initWebSocket(server); // Initialize WebSocket only when running as the main module
   connectDB()
     .then(() => {
       server.listen(port, () => console.log(`Server started on port ${port}`));
