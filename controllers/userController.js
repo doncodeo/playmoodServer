@@ -1169,6 +1169,32 @@ const changePassword = asyncHandler(async (req, res) => {
         user.password = hashedPassword;
         await user.save();
 
+        // Send security alert email
+        const mailOptions = {
+            from: `"PlaymoodTV 📺" <${process.env.EMAIL_USERNAME}>`,
+            to: user.email,
+            subject: 'Security Alert: Password Changed',
+            html: `
+                <html>
+                    <body>
+                        <p>Hello ${user.name},</p>
+                        <p>Your password was recently changed. If this was you, you can safely disregard this email.</p>
+                        <p>If you did not make this change, please reach out to our support team immediately.</p>
+                        <p>Best regards,</p>
+                        <p>The PlaymoodTV Team</p>
+                    </body>
+                </html>
+            `,
+        };
+
+        transporter.sendMail(mailOptions, (error, info) => {
+            if (error) {
+                console.error("Error sending security alert email:", error);
+            } else {
+                console.log('Security alert email sent:', info.response);
+            }
+        });
+
         res.status(200).json({ message: "Password changed successfully." });
     } catch (error) {
         res.status(500).json({ message: error.message });
