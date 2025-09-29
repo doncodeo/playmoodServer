@@ -381,9 +381,11 @@ const generateUploadSignature = asyncHandler(async (req, res) => {
         const timestamp = Math.round((new Date).getTime() / 1000);
 
         // Parameters to sign
+        // The 'folder' parameter is intentionally excluded from the signature.
+        // The client-side upload is not including it in the signed request,
+        // which causes a signature mismatch.
         const params_to_sign = {
             timestamp: timestamp,
-            folder: folder,
         };
 
         const signature = cloudinary.utils.api_sign_request(params_to_sign, process.env.CLOUDINARY_API_SECRET);
