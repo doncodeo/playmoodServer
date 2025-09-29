@@ -8,6 +8,7 @@ const ffmpeg = require('fluent-ffmpeg');
 const cloudinary = require('./config/cloudinary');
 const contentSchema = require('./models/contentModel');
 const userSchema = require('./models/userModel');
+const Highlight = require('./models/highlightModel');
 const aiService = require('./ai/ai-service');
 
 // Load environment variables from the root .env file
@@ -233,10 +234,29 @@ const processUpload = async (job) => {
         }
         content.isApproved = isApproved;
 
+        // D. Generate highlight
+        try {
+            console.log(`[Worker] [${job.id}] Task: Generating highlight...`);
+            const duration = await aiService.getVideoDuration(video.public_id);
+            const { startTime, endTime } = aiService.generateHighlight(duration);
+
+            const highlight = await Highlight.create({
+                user: content.user._id,
+                content: content._id,
+                startTime,
+                endTime,
+            });
+
+            content.highlight = highlight._id;
+            console.log(`[Worker] [${job.id}] Task Status: Highlight generation successful.`);
+        } catch (error) {
+            console.error(`[Worker] [${job.id}] Task Status: Failed to generate highlight for ${contentId}:`, error);
+        }
+
         await content.save();
         console.log(`[Worker] Content document updated for job ${job.id}`);
 
-        // D. Send email notification for content needing review
+        // E. Send email notification for content needing review
         if (content.user.role !== 'admin' && moderation.status !== 'rejected') {
             const admins = await userSchema.find({ role: 'admin' });
             const previewUrl = `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/video/upload/so_${content.shortPreview.start},eo_${content.shortPreview.end}/${video.public_id}.mp4`;

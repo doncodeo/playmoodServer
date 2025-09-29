@@ -1,6 +1,7 @@
 const { AssemblyAI } = require('assemblyai');
 const axios = require('axios');
 const contentSchema = require('../models/contentModel');
+const cloudinary = require('../config/cloudinary');
 
 // This service will act as an abstraction layer for our AI models and services.
 // It will expose a set of functions that our application can use without needing
@@ -149,6 +150,53 @@ class AIService {
             console.error(`An error occurred while checking translation status for ID ${videoTranslateId}:`, error.response ? error.response.data : error.message);
             throw new Error(`Heygen API error: ${error.message}`);
         }
+    }
+
+    /**
+     * Gets the duration of a video from Cloudinary.
+     * @param {string} publicId - The public ID of the video in Cloudinary.
+     * @returns {Promise<number>} The duration of the video in seconds.
+     */
+    async getVideoDuration(publicId) {
+        console.log(`AI Service: Getting duration for video with public ID: ${publicId}`);
+        try {
+            const result = await cloudinary.api.resource(publicId, {
+                resource_type: 'video',
+            });
+            if (result && result.duration) {
+                console.log(`AI Service: Found duration: ${result.duration}`);
+                return result.duration;
+            }
+            throw new Error('Could not retrieve video duration from Cloudinary.');
+        } catch (error) {
+            console.error(`An error occurred while fetching video duration for ${publicId}:`, error);
+            throw new Error(`Cloudinary API error while fetching video duration: ${error.message}`);
+        }
+    }
+
+    /**
+     * Generates start and end times for a highlight clip based on video duration.
+     * The highlight will be between 10 and 30 seconds long.
+     * @param {number} duration - The total duration of the video in seconds.
+     * @returns {{startTime: number, endTime: number}} An object with start and end times.
+     */
+    generateHighlight(duration) {
+        console.log(`AI Service: Generating highlight for video with duration: ${duration}s`);
+        const minHighlightDuration = 10;
+        const maxHighlightDuration = 30;
+
+        if (duration <= minHighlightDuration) {
+            return { startTime: 0, endTime: duration };
+        }
+
+        let highlightDuration = Math.round(duration * 0.2);
+        highlightDuration = Math.max(minHighlightDuration, Math.min(maxHighlightDuration, highlightDuration));
+
+        const startTime = Math.max(0, (duration / 2) - (highlightDuration / 2));
+        const endTime = Math.min(duration, startTime + highlightDuration);
+
+        console.log(`AI Service: Generated highlight from ${startTime.toFixed(2)}s to ${endTime.toFixed(2)}s`);
+        return { startTime: parseFloat(startTime.toFixed(2)), endTime: parseFloat(endTime.toFixed(2)) };
     }
 }
 
