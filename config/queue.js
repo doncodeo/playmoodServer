@@ -1,14 +1,22 @@
 const { Queue } = require('bullmq');
 
-// The REDIS_URL will be provided by the Heroku Redis add-on in production.
-// For local development, it will fall back to a standard local Redis instance.
-const redisConnection = {
-  connection: {
-    url: process.env.REDIS_URL,
-    tls: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
-  },
-};
+let uploadQueue;
 
-const uploadQueue = new Queue('upload', redisConnection);
+if (process.env.NODE_ENV === 'test') {
+  // For tests, use a mock queue that doesn't connect to Redis.
+  uploadQueue = {
+    add: async (name, data) => {
+      // This is a mock implementation. In tests, it will be stubbed by Sinon.
+    },
+    // Add other methods that might be called if necessary.
+  };
+} else {
+  // In production and development, connect to Redis.
+  const redisConnection = {
+      url: process.env.REDIS_URL,
+      tls: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
+  };
+  uploadQueue = new Queue('upload', { connection: redisConnection });
+}
 
 module.exports = uploadQueue;

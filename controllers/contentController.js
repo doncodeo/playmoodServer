@@ -366,15 +366,18 @@ const createContent = asyncHandler(async (req, res) => {
 // @access  Private
 const generateUploadSignature = asyncHandler(async (req, res) => {
     try {
-        const { type } = req.body;
+        const { type } = req.body; // type is now optional
         const userId = req.user.id;
 
-        // The 'type' parameter is expected from the client to specify the upload folder.
-        if (!type || !['videos', 'images'].includes(type)) {
-            return res.status(400).json({ error: "Request must include a 'type' property, which can be 'videos' or 'images'." });
+        // The 'type' parameter is optional. If not provided, a generic folder is used.
+        let folder;
+        if (type && ['videos', 'images'].includes(type)) {
+            folder = `user-uploads/${userId}/${type}`;
+        } else {
+            // A generic folder for uploads where the type is not specified.
+            folder = `user-uploads/${userId}/mixed`;
         }
 
-        const folder = `user-uploads/${userId}/${type}`;
         const timestamp = Math.round((new Date).getTime() / 1000);
 
         // Parameters to sign

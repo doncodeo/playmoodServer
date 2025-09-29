@@ -7,7 +7,7 @@ const User = require('../models/userModel');
 const jwt = require('jsonwebtoken');
 
 const { MongoMemoryServer } = require('mongodb-memory-server');
-const { Queue } = require('bullmq');
+const uploadQueue = require('../config/queue');
 const sinon = require('sinon');
 
 describe('Content API', function() {
@@ -23,6 +23,7 @@ describe('Content API', function() {
     mongoServer = await MongoMemoryServer.create();
     const mongoUri = mongoServer.getUri();
     process.env.MONGO_URI = mongoUri;
+    await mongoose.connect(mongoUri);
 
     const user = await User.create({
       name: 'Test User',
@@ -37,7 +38,7 @@ describe('Content API', function() {
     });
 
     // Mock the queue
-    addStub = sinon.stub(Queue.prototype, 'add');
+    addStub = sinon.stub(uploadQueue, 'add');
 
     // Start the server for testing
     runningServer = app.listen(0);
@@ -49,7 +50,7 @@ describe('Content API', function() {
     await mongoServer.stop();
     addStub.restore(); // Restore the original method
     if (runningServer) {
-      runningServer.close();
+      await new Promise(resolve => runningServer.close(resolve));
     }
   });
 
@@ -87,5 +88,70 @@ describe('Content API', function() {
         }
         done();
       });
+  });
+
+  describe('POST /api/content/signature', () => {
+    it('should generate a signature for mixed content when no type is specified', (done) => {
+      request(app)
+        .post('/api/content/signature')
+        .set('Authorization', `Bearer ${token}`)
+        .send({})
+        .expect(200)
+        .end((err, res) => {
+          if (err) return done(err);
+          if (!res.body.signature || !res.body.timestamp || !res.body.folder || !res.body.api_key) {
+            return done(new Error('Missing required signature fields'));
+          }
+          if (res.body.folder !== `user-uploads/${userId}/mixed`) {
+            return done(new Error('Incorrect folder for mixed content'));
+          }
+          done();
+        });
+    });
+
+    it('should generate a signature for videos', (done) => {
+      request(app)
+        .post('/api/content/signature')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ type: 'videos' })
+        .expect(200)
+        .end((err, res) => {
+          if (err) return done(err);
+          if (res.body.folder !== `user-uploads/${userId}/videos`) {
+            return done(new Error('Incorrect folder for videos'));
+          }
+          done();
+        });
+    });
+
+    it('should generate a signature for images', (done) => {
+      request(app)
+        .post('/api/content/signature')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ type: 'images' })
+        .expect(200)
+        .end((err, res) => {
+          if (err) return done(err);
+          if (res.body.folder !== `user-uploads/${userId}/images`) {
+            return done(new Error('Incorrect folder for images'));
+          }
+          done();
+        });
+    });
+
+    it('should handle invalid type by defaulting to mixed', (done) => {
+      request(app)
+        .post('/api/content/signature')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ type: 'invalid' })
+        .expect(200)
+        .end((err, res) => {
+          if (err) return done(err);
+          if (res.body.folder !== `user-uploads/${userId}/mixed`) {
+            return done(new Error('Incorrect folder for invalid type'));
+          }
+          done();
+        });
+    });
   });
 });
