@@ -276,7 +276,7 @@ const getContentById = asyncHandler(async (req, res) => {
         const highlight = await Highlight.findById(content.highlight);
         if (highlight) {
             contentData.highlight = highlight.toObject();
-            contentData.highlightUrl = `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/video/upload/so_${highlight.startTime},eo_${highlight.endTime}/${content.cloudinary_video_id}.mp4`;
+            contentData.highlightUrl = `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/video/upload/e_accelerate:50,so_${highlight.startTime},eo_${highlight.endTime}/${content.cloudinary_video_id}.mp4`;
         }
     }
 
