@@ -11,9 +11,11 @@ const rateLimit = require('express-rate-limit'); // Add rate limiter
 const compression = require('compression'); // Add compression
 const mongoSanitize = require('express-mongo-sanitize'); // Add input sanitizer
 const { initWebSocket } = require('./websocket');
+const { startWorker } = require('./worker-manager');
 
 const app = express();
 const server = http.createServer(app);
+let workerInstance;
 
 app.set('trust proxy', 1); // Trust the first proxy
 const passport = require('passport');
@@ -107,9 +109,11 @@ app.use((err, req, res, next) => {
 });
 
 if (require.main === module) {
-  initWebSocket(server); // Initialize WebSocket only when running as the main module
   connectDB()
     .then(() => {
+      console.log('MongoDB connected successfully.');
+      initWebSocket(server); // Initialize WebSocket
+      workerInstance = startWorker(); // Start the worker
       server.listen(port, () => console.log(`Server started on port ${port}`));
     })
     .catch((error) => {
@@ -122,8 +126,12 @@ if (require.main === module) {
 const shutdown = async () => {
   console.log('\nGracefully shutting down...');
   if (server) {
-    server.close(() => {
+    server.close(async () => {
       console.log('HTTP server closed.');
+      if (workerInstance) {
+        await workerInstance.close();
+        console.log('Worker closed.');
+      }
       // Close MongoDB connection if using Mongoose
       if (typeof require('mongoose').connection.close === 'function') {
         require('mongoose').connection.close(false, () => {
