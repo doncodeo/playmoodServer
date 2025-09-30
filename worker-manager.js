@@ -1,6 +1,8 @@
+const dotenv = require('dotenv');
+dotenv.config();
+
 const { Worker } = require('bullmq');
 const mongoose = require('mongoose');
-const dotenv = require('dotenv');
 const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
@@ -10,8 +12,6 @@ const contentSchema = require('./models/contentModel');
 const userSchema = require('./models/userModel');
 const Highlight = require('./models/highlightModel');
 const aiService = require('./ai/ai-service');
-
-dotenv.config();
 
 const transporter = require('./utils/mailer');
 
