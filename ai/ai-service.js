@@ -162,6 +162,7 @@ class AIService {
         try {
             const result = await cloudinary.api.resource(publicId, {
                 resource_type: 'video',
+                image_metadata: true, // Requesting metadata to ensure duration is included
             });
             if (result && result.duration) {
                 console.log(`AI Service: Found duration: ${result.duration}`);
