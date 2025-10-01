@@ -13,7 +13,7 @@ const { protect } = require('../middleware/authmiddleware');
  * /api/highlights:
  *   post:
  *     summary: Create a new highlight
- *     description: Creates a new 30-second highlight for a video. This is only available to the owner of the content.
+ *     description: Creates a new highlight for a video, with a duration between 30 and 60 seconds. This is only available to the owner of the content.
  *     tags: [Highlights]
  *     security:
  *       - bearerAuth: []
@@ -36,12 +36,12 @@ const { protect } = require('../middleware/authmiddleware');
  *                 description: The start time of the highlight in seconds.
  *               endTime:
  *                 type: number
- *                 description: The end time of the highlight in seconds. The duration must be exactly 30 seconds.
+ *                 description: The end time of the highlight in seconds. The duration must be between 30 and 60 seconds.
  *     responses:
  *       201:
  *         description: Highlight created successfully.
  *       400:
- *         description: Invalid input, e.g., highlight is not 30 seconds, or a highlight already exists.
+ *         description: Invalid input, e.g., highlight duration is not between 30 and 60 seconds, or a highlight already exists.
  *       401:
  *         description: Unauthorized, token is missing or invalid.
  *       403:
