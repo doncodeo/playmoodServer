@@ -14,8 +14,9 @@ const createHighlight = asyncHandler(async (req, res) => {
         return res.status(400).json({ error: 'Start time and end time are required.' });
     }
 
-    if (endTime - startTime !== 30) {
-        return res.status(400).json({ error: 'Highlight must be exactly 30 seconds long.' });
+    const duration = endTime - startTime;
+    if (duration < 30 || duration > 60) {
+        return res.status(400).json({ error: 'Highlight duration must be between 30 and 60 seconds.' });
     }
 
     if (!mongoose.Types.ObjectId.isValid(contentId)) {
