@@ -1,25 +1,41 @@
 const request = require('supertest');
-const { app, server } = require('../server');
 const path = require('path');
 const fs = require('fs');
 const mongoose = require('mongoose');
 const User = require('../models/userModel');
+const Content = require('../models/contentModel');
+const Highlight = require('../models/highlightModel');
+const aiService = require('../ai/ai-service');
 const jwt = require('jsonwebtoken');
 
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const uploadQueue = require('../config/queue');
 const sinon = require('sinon');
+const websocket = require('../websocket');
 
 describe('Content API', function() {
   this.timeout(60000);
 
+  let app, server;
   let token;
+  let adminToken;
   let userId;
   let mongoServer;
   let runningServer;
   let addStub;
+  let getVideoDurationStub;
+  let generateHighlightStub;
+  let getWssStub;
 
   before(async () => {
+    // Stub WebSocket server *before* requiring the app
+    getWssStub = sinon.stub(websocket, 'getWss').returns({ clients: [] });
+
+    // Require the app after stubbing to ensure the stub is applied
+    const serverModule = require('../server');
+    app = serverModule.app;
+    server = serverModule.server;
+
     mongoServer = await MongoMemoryServer.create();
     const mongoUri = mongoServer.getUri();
     process.env.MONGO_URI = mongoUri;
@@ -37,18 +53,35 @@ describe('Content API', function() {
       expiresIn: '1h',
     });
 
+    const adminUser = await User.create({
+      name: 'Admin User',
+      email: 'admin@example.com',
+      password: 'password',
+      role: 'admin',
+    });
+    adminToken = jwt.sign({ id: adminUser._id, role: adminUser.role }, process.env.JWT_SECRET, {
+      expiresIn: '1h',
+    });
+
     // Mock the queue
     addStub = sinon.stub(uploadQueue, 'add');
+
+    // Stub AI service methods
+    getVideoDurationStub = sinon.stub(aiService, 'getVideoDuration').resolves(120);
+    generateHighlightStub = sinon.stub(aiService, 'generateHighlight').returns({ startTime: 10, endTime: 25 });
 
     // Start the server for testing
     runningServer = app.listen(0);
   });
 
   after(async () => {
-    await User.findByIdAndDelete(userId);
+    await User.deleteMany({});
     await mongoose.disconnect();
     await mongoServer.stop();
     addStub.restore(); // Restore the original method
+    getVideoDurationStub.restore();
+    generateHighlightStub.restore();
+    getWssStub.restore();
     if (runningServer) {
       await new Promise(resolve => runningServer.close(resolve));
     }
@@ -151,6 +184,68 @@ describe('Content API', function() {
             return done(new Error('Incorrect folder for invalid type'));
           }
           done();
+        });
+    });
+  });
+
+  describe('PUT /api/content/approve/:id', () => {
+    let unapprovedContent;
+
+    beforeEach(async () => {
+      unapprovedContent = await Content.create({
+        user: userId,
+        title: 'Unapproved Video',
+        category: 'Test',
+        description: 'An unapproved test video',
+        credit: 'Test User',
+        video: 'http://res.cloudinary.com/demo/video/upload/unapproved.mp4',
+        cloudinary_video_id: 'unapproved_video_id',
+        isApproved: false,
+      });
+    });
+
+    afterEach(async () => {
+      await Content.deleteMany({});
+      await Highlight.deleteMany({});
+    });
+
+    it('should approve content and create a highlight', (done) => {
+      request(app)
+        .put(`/api/content/approve/${unapprovedContent._id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ title: 'Approved Title' })
+        .expect(200)
+        .end(async (err, res) => {
+          if (err) return done(err);
+
+          try {
+            if (res.body.message !== 'Content approved and updated successfully') {
+                throw new Error('Incorrect approval message');
+            }
+            if (res.body.content.isApproved !== true) {
+                throw new Error('Content should be approved in response');
+            }
+
+            const updatedContent = await Content.findById(unapprovedContent._id);
+            if (!updatedContent.isApproved) {
+                throw new Error('Content not approved in DB');
+            }
+            if (!updatedContent.highlight) {
+                throw new Error('Highlight not linked in content');
+            }
+
+            const highlight = await Highlight.findById(updatedContent.highlight);
+            if (!highlight) {
+                throw new Error('Highlight document not created');
+            }
+            if(highlight.content.toString() !== updatedContent._id.toString()){
+                throw new Error('Highlight not linked correctly to content');
+            }
+
+            done();
+          } catch (e) {
+            done(e);
+          }
         });
     });
   });

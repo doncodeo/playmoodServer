@@ -12,6 +12,7 @@ const path = require('path');
 const uploadQueue = require('../config/queue');
 const { getWss } = require('../websocket');
 const WebSocket = require('ws');
+const { createHighlightForContent } = require('../worker-manager');
 
 // @desc Get All Content
 // @route GET /api/content 
@@ -561,6 +562,11 @@ const approveContent = asyncHandler(async (req, res) => {
         content.isApproved = true;
         content.rejectionReason = undefined; // Clear rejection reason
         await content.save();
+
+        // If the content is approved and does not already have a highlight, create one.
+        if (content.isApproved && !content.highlight) {
+            await createHighlightForContent(content);
+        }
 
         // Populate user details
         const populatedContent = await contentSchema.findById(id).populate('user', 'name profileImage');
