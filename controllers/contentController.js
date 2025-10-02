@@ -737,7 +737,7 @@ const deleteContent = asyncHandler(async (req, res) => {
 });
 
 
-// @desc    Update video progress
+// @desc    Update video progress for a user.
 // @route   POST /api/content/progress/:contentId
 // @access  Private
 const saveVideoProgress = asyncHandler(async (req, res) => {
@@ -753,8 +753,8 @@ const saveVideoProgress = asyncHandler(async (req, res) => {
     }
 
     try {
-        const user = await userData.findById(userId);
-        const content = await require('../models/contentModel').findById(contentId);
+        const user = await userSchema.findById(userId);
+        const content = await contentSchema.findById(contentId);
 
         if (!user) {
             return res.status(404).json({ error: 'User not found' });
@@ -785,17 +785,17 @@ const saveVideoProgress = asyncHandler(async (req, res) => {
         console.error('Update video progress error:', JSON.stringify(error, null, 2));
         res.status(500).json({ error: 'Server error', details: error.message });
     }
-})
+});
 
-// @desc Get Video Progress
-// @route GET /api/content/progress/:contentId
-// @access Private
+// @desc    Get video progress for a specific content.
+// @route   GET /api/content/progress/:contentId
+// @access  Private
 const getVideoProgress = asyncHandler(async (req, res) => {
-    const userId = req.user._id;
+    const userId = req.user.id;
     const { contentId } = req.params;
 
-    if (!contentId) {
-        return res.status(400).json({ error: 'Content ID is required' });
+    if (!mongoose.Types.ObjectId.isValid(contentId)) {
+        return res.status(400).json({ error: 'Invalid content ID' });
     }
 
     const user = await userSchema.findById(userId).populate('videoProgress.contentId');
@@ -804,12 +804,12 @@ const getVideoProgress = asyncHandler(async (req, res) => {
     }
 
     const progressRecord = user.videoProgress.find(
-        record => record.contentId._id.toString() === contentId.toString()
+        (record) => record.contentId && record.contentId.id === contentId
     );
 
     const progress = progressRecord ? progressRecord.progress : 0;
 
-    // Generate an ETag based on user ID and content ID
+    // Generate an ETag based on user ID, content ID, and progress
     const etag = `"progress-${userId}-${contentId}-${progress}"`;
 
     if (req.get('If-None-Match') === etag) {
@@ -824,55 +824,36 @@ const getVideoProgress = asyncHandler(async (req, res) => {
     res.status(200).json({ progress });
 });
 
-// @desc    Get all videos in user's continue watching list
+// @desc    Get all videos in the user's "Continue Watching" list.
 // @route   GET /api/content/continue-watching
 // @access  Private
 const ContinueWatching = asyncHandler(async (req, res) => {
-    const userId = req.user.id; // Use id instead of _id for consistency
-
-    console.log('Authenticated userId:', userId); // Debug
+    const userId = req.user.id;
 
     if (!mongoose.Types.ObjectId.isValid(userId)) {
-        console.error('Invalid userId format:', userId);
         return res.status(400).json({ error: 'Invalid user ID format' });
     }
 
     try {
-        // Fetch user with populated videoProgress
         const user = await userSchema.findById(userId).populate({
             path: 'videoProgress.contentId',
             select: 'title category description thumbnail video videoPreviewUrl duration views likes createdAt',
-            match: { isApproved: true }, // Optional: Only approved content
+            match: { isApproved: true },
         });
 
         if (!user) {
-            console.error('User not found for ID:', userId);
             return res.status(404).json({ error: 'User not found' });
         }
 
-        // Filter videos with progress > 0 and valid content
         const continueWatching = user.videoProgress
-            .filter(record => record.progress > 0 && record.contentId) // Exclude zero progress or invalid content
+            .filter(record => record.progress > 0 && record.contentId)
             .map(record => ({
-                contentId: record.contentId._id,
-                title: record.contentId.title,
-                category: record.contentId.category,
-                description: record.contentId.description,
-                thumbnail: record.contentId.thumbnail,
-                video: record.contentId.video,
-                videoPreviewUrl: record.contentId.videoPreviewUrl,
-                duration: record.contentId.duration,
-                views: record.contentId.views,
-                likes: record.contentId.likes,
-                createdAt: record.contentId.createdAt,
+                ...record.contentId.toObject(),
                 progress: record.progress,
             }))
-            .sort((a, b) => b.createdAt - a.createdAt); // Sort by creation date
+            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-        console.log('Continue watching count:', continueWatching.length); // Debug
-
-        // Generate ETag
-        const etag = `"continue-watching-${userId}-${JSON.stringify(continueWatching.map(v => `${v.contentId}-${v.progress}`))}"`;
+        const etag = `"continue-watching-${userId}-${JSON.stringify(continueWatching.map(v => `${v._id}-${v.progress}`))}"`;
 
         if (req.get('If-None-Match') === etag) {
             return res.status(304).end();
@@ -889,14 +870,11 @@ const ContinueWatching = asyncHandler(async (req, res) => {
         });
     } catch (error) {
         console.error('Continue watching error:', {
-            message: error.message || 'No message',
-            name: error.name || 'No name',
-            stack: error.stack || 'No stack',
+            message: error.message,
+            name: error.name,
+            stack: error.stack,
         });
-        if (error.name === 'CastError') {
-            return res.status(400).json({ error: 'Invalid video progress entry detected', details: error.message });
-        }
-        res.status(500).json({ error: 'Server error', details: error.message || 'Unknown error' });
+        res.status(500).json({ error: 'Server error', details: error.message });
     }
 });
 
