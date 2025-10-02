@@ -89,17 +89,16 @@ app.use('/api/community', require('./Routes/communityPostRoute'));
 app.use('/api/playlists', require('./Routes/playlistRoutes'));
 app.use('/api/highlights', require('./Routes/highlightRoute'));
 app.use('/api/ai', require('./Routes/aiRoute'));
+app.use('/api/analytics', require('./Routes/analyticsRoute'));
 
 // Serve login.html for /login route
 app.get('/login', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'login.html')); 
 });
 
-// Serve index.html for any other route (excluding OPTIONS method)
-app.get('*', (req, res) => {
-  if (req.method !== 'OPTIONS') {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-  }
+// Serve index.html for any non-API GET requests
+app.get(/^(?!\/api).*/, (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
 // Centralized error handling middleware
