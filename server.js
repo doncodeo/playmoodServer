@@ -116,7 +116,7 @@ if (require.main === module) {
       server.listen(port, () => console.log(`Server started on port ${port}`));
     })
     .catch((error) => {
-      console.error('Failed to connect to MongoDB:', error.message);
+      console.error('Failed to start server:', error);
       process.exit(1);
     });
 }
