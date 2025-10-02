@@ -5,8 +5,39 @@ const {
     getHighlightsByCreator,
     getRecentHighlights,
     getAllHighlights,
+    deleteHighlight,
 } = require('../controllers/highlightController');
 const { protect } = require('../middleware/authmiddleware');
+
+/**
+ * @swagger
+ * /api/highlights/{id}:
+ *   delete:
+ *     summary: Delete a highlight
+ *     description: Deletes a highlight by its ID. This is only available to the creator of the highlight or an admin.
+ *     tags: [Highlights]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The ID of the highlight to delete.
+ *     responses:
+ *       200:
+ *         description: Highlight deleted successfully.
+ *       400:
+ *         description: Invalid highlight ID.
+ *       401:
+ *         description: Unauthorized, token is missing or invalid.
+ *       403:
+ *         description: Forbidden, user is not the creator or an admin.
+ *       404:
+ *         description: Highlight not found.
+ */
+router.route('/:id').delete(protect, deleteHighlight);
 
 /**
  * @swagger
