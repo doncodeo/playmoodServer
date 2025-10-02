@@ -51,8 +51,95 @@ const processVideoCombination = async (job) => {
     // ... (existing implementation)
 };
 
+const createHighlightForContent = async (content) => {
+    try {
+        console.log(`[Worker] Creating highlight for content ID: ${content._id}`);
+        if (!content.cloudinary_video_id) {
+            throw new Error('Content does not have a Cloudinary video ID.');
+        }
+
+        // 1. Get video duration from Cloudinary
+        const duration = await aiService.getVideoDuration(content.cloudinary_video_id);
+        if (typeof duration !== 'number' || duration <= 0) {
+            throw new Error(`Invalid duration received from AI service: ${duration}`);
+        }
+        content.duration = duration; // Save duration to content
+
+        // 2. Generate highlight start and end times
+        const { startTime, endTime } = aiService.generateHighlight(duration);
+
+        // 3. Create and save the new highlight
+        const newHighlight = new Highlight({
+            user: content.user,
+            content: content._id,
+            startTime,
+            endTime,
+        });
+        await newHighlight.save();
+
+        // 4. Link the highlight to the content
+        content.highlight = newHighlight._id;
+        await content.save();
+
+        console.log(`[Worker] Successfully created highlight ${newHighlight._id} for content ${content._id}`);
+        return newHighlight;
+    } catch (error) {
+        console.error(`[Worker] Error creating highlight for content ${content._id}:`, error);
+        // We don't re-throw the error, as highlight creation failure shouldn't fail the entire job.
+        // The error is logged for monitoring.
+    }
+};
+
+
 const processUpload = async (job) => {
-    // ... (existing implementation)
+    const { contentId, languageCode } = job.data;
+    console.log(`[Worker] Starting 'process-upload' for content ID: ${contentId}`);
+
+    try {
+        const content = await contentSchema.findById(contentId).populate('user');
+        if (!content) {
+            throw new Error(`Content with ID ${contentId} not found.`);
+        }
+
+        // Generate highlight if the content is approved
+        if (content.isApproved) {
+            await createHighlightForContent(content);
+        }
+
+        // The rest of the original processing logic (e.g., captions, moderation) would go here.
+        // For example, generating captions:
+        if (languageCode) {
+            const captions = await aiService.generateCaptions(content.video, contentId, languageCode);
+            content.captions = captions;
+        }
+
+        // Mark as processed
+        content.status = 'processed';
+        await content.save();
+
+        console.log(`[Worker] Finished 'process-upload' for content ID: ${contentId}`);
+
+        // Notify user via email
+        if (content.user && content.user.email) {
+            const subject = 'Your Video Processing is Complete!';
+            const html = `<p>Hi ${content.user.name},</p>
+                        <p>Good news! Your video, "${content.title}", has been successfully processed and is now available on PlaymoodTV.</p>
+                        <p>Thank you for your contribution!</p>`;
+            sendEmail(content.user.email, subject, html);
+        }
+
+        return { success: true };
+    } catch (error) {
+        console.error(`[Worker] Error in 'process-upload' for job ${job.id}:`, error);
+        // Optionally, update content status to 'failed'
+        const content = await contentSchema.findById(contentId);
+        if (content) {
+            content.status = 'failed';
+            content.processingError = error.message;
+            await content.save();
+        }
+        throw error; // Re-throw to let BullMQ handle the job failure
+    }
 };
 
 const redisConnectionOpts = {
@@ -128,4 +215,4 @@ const gracefulShutdown = async () => {
     process.exit(0);
 };
 
-module.exports = { startWorker, gracefulShutdown };
+module.exports = { startWorker, gracefulShutdown, createHighlightForContent };
