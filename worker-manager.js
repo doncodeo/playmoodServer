@@ -113,8 +113,8 @@ const processUpload = async (job) => {
             content.captions = captions;
         }
 
-        // Mark as processed
-        content.status = 'processed';
+        // Mark as completed
+        content.status = 'completed';
         await content.save();
 
         console.log(`[Worker] Finished 'process-upload' for content ID: ${contentId}`);
