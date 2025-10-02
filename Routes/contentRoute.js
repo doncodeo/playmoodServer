@@ -678,6 +678,201 @@ router.route('/unapproved').get(protect, getUnapprovedContent);
 
 /**
  * @swagger
+ * /api/content/continue-watching:
+ *   get:
+ *     summary: Get continue watching list
+ *     description: Retrieves all videos the authenticated user has started watching, including video details and playback progress. Includes caching with ETag.
+ *     tags: [Content]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Continue watching list retrieved successfully
+ *         headers:
+ *           Cache-Control:
+ *             schema:
+ *               type: string
+ *               example: private, max-age=300
+ *           ETag:
+ *             schema:
+ *               type: string
+ *               example: "continue-watching-682fa4973b7d2a9c142724e3-[...]"
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Continue watching list retrieved successfully
+ *                 continueWatching:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       contentId:
+ *                         type: string
+ *                         example: 6835dd0b1d00e49b7470f471
+ *                       title:
+ *                         type: string
+ *                       category:
+ *                         type: string
+ *                       description:
+ *                         type: string
+ *                       thumbnail:
+ *                         type: string
+ *                       video:
+ *                         type: string
+ *                       videoPreviewUrl:
+ *                         type: string
+ *                       duration:
+ *                         type: number
+ *                       views:
+ *                         type: number
+ *                       likes:
+ *                         type: array
+ *                         items:
+ *                           type: string
+ *                       createdAt:
+ *                         type: string
+ *                         format: date-time
+ *                       progress:
+ *                         type: number
+ *       304:
+ *         description: Not Modified (ETag match)
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: Server error
+ */
+router.route('/continue-watching').get(protect, ContinueWatching);
+
+/**
+ * @swagger
+ * /api/content/watchlist/add:
+ *   post:
+ *     summary: Add content to watchlist
+ *     description: Adds a content ID to the authenticated user's watchlist.
+ *     tags: [Content]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - contentId
+ *             properties:
+ *               contentId:
+ *                 type: string
+ *                 example: "65a6fc7b72128447ad32024e"
+ *     responses:
+ *       200:
+ *         description: Content added to watchlist
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 contentId:
+ *                   type: string
+ *                   example: "65a6fc7b72128447ad32024e"
+ *                 message:
+ *                   type: string
+ *                   example: Content added to watchlist!
+ *       400:
+ *         description: Content already in watchlist or invalid ID
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: User or content not found
+ *       500:
+ *         description: Server error
+ */
+router.route('/watchlist/add').post(protect, addWatchlist);
+
+/**
+ * @swagger
+ * /api/content/watchlist/all:
+ *   get:
+ *     summary: Get user's watchlist
+ *     description: Retrieves the watchlist of the authenticated user.
+ *     tags: [Content]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: User's watchlist
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 watchList:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Content'
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: Server error
+ */
+router.route('/watchlist/all').get(protect, getWatchlist);
+
+/**
+ * @swagger
+ * /api/content/watchlist/remove:
+ *   post:
+ *     summary: Remove content from watchlist
+ *     description: Removes a content ID from the authenticated user's watchlist.
+ *     tags: [Content]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - contentId
+ *             properties:
+ *               contentId:
+ *                 type: string
+ *                 example: "65a6fc7b72128447ad32024e"
+ *     responses:
+ *       200:
+ *         description: Content removed from watchlist
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 contentId:
+ *                   type: string
+ *                   example: "65a6fc7b72128447ad32024e"
+ *                 message:
+ *                   type: string
+ *                   example: Content removed from watchlist!
+ *       400:
+ *         description: Content not in watchlist or invalid ID
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: User or content not found
+ *       500:
+ *         description: Server error
+ */
+router.route('/watchlist/remove').post(protect, removeWatchlist);
+
+/**
+ * @swagger
  * /{id}:
  *   get:
  *     summary: Get content by ID
@@ -1036,199 +1231,4 @@ router.route('/progress/:contentId').post(protect, saveVideoProgress);
  */
 router.route('/progress/:contentId').get(protect, getVideoProgress);
 
-/**
- * @swagger
- * /api/content/continue-watching:
- *   get:
- *     summary: Get continue watching list
- *     description: Retrieves all videos the authenticated user has started watching, including video details and playback progress. Includes caching with ETag.
- *     tags: [Content]
- *     security:
- *       - BearerAuth: []
- *     responses:
- *       200:
- *         description: Continue watching list retrieved successfully
- *         headers:
- *           Cache-Control:
- *             schema:
- *               type: string
- *               example: private, max-age=300
- *           ETag:
- *             schema:
- *               type: string
- *               example: "continue-watching-682fa4973b7d2a9c142724e3-[...]"
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: Continue watching list retrieved successfully
- *                 continueWatching:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       contentId:
- *                         type: string
- *                         example: 6835dd0b1d00e49b7470f471
- *                       title:
- *                         type: string
- *                       category:
- *                         type: string
- *                       description:
- *                         type: string
- *                       thumbnail:
- *                         type: string
- *                       video:
- *                         type: string
- *                       videoPreviewUrl:
- *                         type: string
- *                       duration:
- *                         type: number
- *                       views:
- *                         type: number
- *                       likes:
- *                         type: array
- *                         items:
- *                           type: string
- *                       createdAt:
- *                         type: string
- *                         format: date-time
- *                       progress:
- *                         type: number
- *       304:
- *         description: Not Modified (ETag match)
- *       401:
- *         description: Unauthorized
- *       404:
- *         description: User not found
- *       500:
- *         description: Server error
- */
-router.route('/continue-watching').get(protect, ContinueWatching);
-
-/**
- * @swagger
- * /api/content/watchlist/add:
- *   post:
- *     summary: Add content to watchlist
- *     description: Adds a content ID to the authenticated user's watchlist.
- *     tags: [Content]
- *     security:
- *       - BearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - contentId
- *             properties:
- *               contentId:
- *                 type: string
- *                 example: "65a6fc7b72128447ad32024e"
- *     responses:
- *       200:
- *         description: Content added to watchlist
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 contentId:
- *                   type: string
- *                   example: "65a6fc7b72128447ad32024e"
- *                 message:
- *                   type: string
- *                   example: Content added to watchlist!
- *       400:
- *         description: Content already in watchlist or invalid ID
- *       401:
- *         description: Unauthorized
- *       404:
- *         description: User or content not found
- *       500:
- *         description: Server error
- */
-router.route('/watchlist/add').post(protect, addWatchlist);
-
-/**
- * @swagger
- * /api/content/watchlist/all:
- *   get:
- *     summary: Get user's watchlist
- *     description: Retrieves the watchlist of the authenticated user.
- *     tags: [Content]
- *     security:
- *       - BearerAuth: []
- *     responses:
- *       200:
- *         description: User's watchlist
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 watchList:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/Content'
- *       401:
- *         description: Unauthorized
- *       404:
- *         description: User not found
- *       500:
- *         description: Server error
- */
-router.route('/watchlist/all').get(protect, getWatchlist);
-
-/**
- * @swagger 
- * /api/content/watchlist/remove:
- *   post:
- *     summary: Remove content from watchlist
- *     description: Removes a content ID from the authenticated user's watchlist.
- *     tags: [Content]
- *     security:
- *       - BearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - contentId
- *             properties:
- *               contentId:
- *                 type: string
- *                 example: "65a6fc7b72128447ad32024e"
- *     responses:
- *       200:
- *         description: Content removed from watchlist
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 contentId:
- *                   type: string
- *                   example: "65a6fc7b72128447ad32024e"
- *                 message:
- *                   type: string
- *                   example: Content removed from watchlist!
- *       400:
- *         description: Content not in watchlist or invalid ID
- *       401:
- *         description: Unauthorized
- *       404:
- *         description: User or content not found
- *       500:
- *         description: Server error
- */
-router.route('/watchlist/remove').post(protect, removeWatchlist);
-
-module.exports = router;     
+module.exports = router;
