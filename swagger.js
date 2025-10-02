@@ -63,6 +63,10 @@ const swaggerDefinition = {
       name: 'Playlists',
       description: 'Endpoints for playlist management',
     },
+    {
+      name: 'Analytics',
+      description: 'Endpoints for platform and creator analytics',
+    },
   ],
 };
 
@@ -82,6 +86,7 @@ const apiFiles = routeFiles.length > 0 ? routeFiles : [
   path.join(__dirname, 'Routes', 'channelRoute.js'),
   path.join(__dirname, 'Routes', 'communityPostRoute.js'),
   path.join(__dirname, 'Routes', 'playlistRoutes.js'),
+  path.join(__dirname, 'Routes', 'analyticsRoute.js'),
 
 ].filter((file) => {
   const exists = require('fs').existsSync(file);

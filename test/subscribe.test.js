@@ -1,5 +1,7 @@
 const assert = require('assert');
 const sinon = require('sinon');
+const mongoose = require('mongoose');
+const { MongoMemoryServer } = require('mongodb-memory-server');
 const User = require('../models/userModel');
 const Subscription = require('../models/subscribeModel');
 const { subscribe, unsubscribe, getSubscribedCreators } = require('../controllers/subscribeController');
@@ -7,8 +9,13 @@ const { subscribe, unsubscribe, getSubscribedCreators } = require('../controller
 describe('Subscription Controller Unit Tests', () => {
     let creator;
     let subscriber;
+    let mongoServer;
 
     before(async () => {
+        mongoServer = await MongoMemoryServer.create();
+        const mongoUri = mongoServer.getUri();
+        await mongoose.connect(mongoUri);
+
         // Create users for this test suite
         creator = new User({ name: 'Creator', email: 'creator.sub.test@example.com', password: 'password123' });
         subscriber = new User({ name: 'Subscriber', email: 'subscriber.sub.test@example.com', password: 'password123' });
@@ -19,6 +26,8 @@ describe('Subscription Controller Unit Tests', () => {
     after(async () => {
         // Clean up users created in this suite
         await User.deleteMany({ email: { $in: ['creator.sub.test@example.com', 'subscriber.sub.test@example.com'] } });
+        await mongoose.disconnect();
+        await mongoServer.stop();
     });
 
     afterEach(async () => {

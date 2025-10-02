@@ -34,7 +34,17 @@ const admin = (req, res, next) => {
     }
 };
 
+const creator = (req, res, next) => {
+    if (req.user && (req.user.role === 'creator' || req.user.role === 'admin')) {
+        next();
+    } else {
+        res.status(401);
+        throw new Error('Not authorized as a creator');
+    }
+};
+
 module.exports = { 
     protect, 
-    admin 
+    admin,
+    creator
 };
