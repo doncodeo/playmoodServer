@@ -59,7 +59,7 @@ const contentSchema = new mongoose.Schema(
         },
         status: {
             type: String,
-            enum: ['processing', 'completed', 'failed'],
+            enum: ['processing', 'processed', 'completed', 'failed'],
             default: 'processing',
         },
         captions: [
