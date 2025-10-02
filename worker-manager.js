@@ -1,7 +1,7 @@
 const dotenv = require('dotenv');
 dotenv.config();
 
-const { Worker, Queue, QueueScheduler } = require('bullmq');
+const { Worker, Queue } = require('bullmq');
 const mongoose = require('mongoose');
 const fs = require('fs');
 const path = require('path');
@@ -66,7 +66,6 @@ const redisConnectionOpts = {
 let uploadWorker;
 let analyticsWorker;
 let analyticsQueue;
-let analyticsScheduler;
 
 const startWorker = () => {
     if (uploadWorker) {
@@ -96,7 +95,6 @@ const startWorker = () => {
 
     // Schedule the analytics job
     analyticsQueue = new Queue('analytics', { connection: redisConnectionOpts.connection });
-    analyticsScheduler = new QueueScheduler('analytics', { connection: redisConnectionOpts.connection });
 
     // Remove any existing repeatable jobs to avoid duplicates
     analyticsQueue.getRepeatableJobs().then(jobs => {
@@ -126,7 +124,6 @@ const gracefulShutdown = async () => {
     if (uploadWorker) await uploadWorker.close();
     if (analyticsWorker) await analyticsWorker.close();
     if (analyticsQueue) await analyticsQueue.close();
-    if (analyticsScheduler) await analyticsScheduler.close();
     await mongoose.disconnect();
     process.exit(0);
 };
