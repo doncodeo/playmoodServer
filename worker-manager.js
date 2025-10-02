@@ -196,9 +196,7 @@ const processUpload = async (job) => {
         content.contentEmbedding = contentEmbedding;
 
         let isApproved = content.user.role === 'admin';
-        if (moderation.status === 'approved' && !isApproved) {
-            isApproved = true;
-        } else if (moderation.status === 'rejected') {
+        if (moderation.status === 'rejected') {
             isApproved = false;
             content.rejectionReason = `Content automatically rejected by AI due to: ${moderation.labels.join(', ')}`;
         }
