@@ -44,7 +44,7 @@ router.route('/:id').delete(protect, deleteHighlight);
  * /api/highlights:
  *   post:
  *     summary: Create a new highlight
- *     description: Creates a new highlight for a video, with a duration between 30 and 60 seconds. This is only available to the owner of the content.
+ *     description: Creates a new highlight for a video. This is available to the content creator or an admin. Timelines of highlights for the same content cannot overlap.
  *     tags: [Highlights]
  *     security:
  *       - bearerAuth: []
@@ -67,16 +67,16 @@ router.route('/:id').delete(protect, deleteHighlight);
  *                 description: The start time of the highlight in seconds.
  *               endTime:
  *                 type: number
- *                 description: The end time of the highlight in seconds. The duration must be between 30 and 60 seconds.
+ *                 description: The end time of the highlight in seconds.
  *     responses:
  *       201:
  *         description: Highlight created successfully.
  *       400:
- *         description: Invalid input, e.g., highlight duration is not between 30 and 60 seconds, or a highlight already exists.
+ *         description: Invalid input, e.g., overlapping timeline with an existing highlight.
  *       401:
  *         description: Unauthorized, token is missing or invalid.
  *       403:
- *         description: Forbidden, user does not own the content.
+ *         description: Forbidden, user is not the creator or an admin.
  *       404:
  *         description: Content not found.
  */

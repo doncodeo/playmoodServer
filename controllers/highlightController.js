@@ -5,38 +5,38 @@ const mongoose = require('mongoose');
 
 // @desc    Create a new highlight
 // @route   POST /api/highlights
-// @access  Private
+// @access  Private (Creator or Admin)
 const createHighlight = asyncHandler(async (req, res) => {
     const { contentId, startTime, endTime } = req.body;
     const userId = req.user.id;
+    const userRole = req.user.role;
 
-    if (typeof startTime === 'undefined' || typeof endTime === 'undefined') {
-        return res.status(400).json({ error: 'Start time and end time are required.' });
-    }
-
-    const duration = endTime - startTime;
-    if (duration < 30 || duration > 60) {
-        return res.status(400).json({ error: 'Highlight duration must be between 30 and 60 seconds.' });
+    if (typeof startTime === 'undefined' || typeof endTime === 'undefined' || startTime >= endTime) {
+        return res.status(400).json({ error: 'Valid start and end times are required.' });
     }
 
     if (!mongoose.Types.ObjectId.isValid(contentId)) {
         return res.status(400).json({ error: 'Invalid content ID.' });
     }
 
-    const content = await Content.findById(contentId);
+    const content = await Content.findById(contentId).populate('highlights');
 
     if (!content) {
         return res.status(404).json({ error: 'Content not found.' });
     }
 
-    // Ensure the user creating the highlight is the owner of the content
-    if (content.user.toString() !== userId) {
+    // Ensure the user is the content creator or an admin
+    if (content.user.toString() !== userId && userRole !== 'admin') {
         return res.status(403).json({ error: 'User not authorized to create a highlight for this content.' });
     }
 
-    // Check if a highlight already exists for this content
-    if (content.highlight) {
-        return res.status(400).json({ error: 'A highlight already exists for this content.' });
+    // Check for overlapping highlights
+    const isOverlapping = content.highlights.some(highlight =>
+        (startTime < highlight.endTime && endTime > highlight.startTime)
+    );
+
+    if (isOverlapping) {
+        return res.status(400).json({ error: 'Highlight timeline overlaps with an existing highlight.' });
     }
 
     const highlight = new Highlight({
@@ -48,7 +48,7 @@ const createHighlight = asyncHandler(async (req, res) => {
 
     const createdHighlight = await highlight.save();
 
-    content.highlight = createdHighlight._id;
+    content.highlights.push(createdHighlight._id);
     await content.save();
 
     res.status(201).json(createdHighlight);
@@ -104,7 +104,7 @@ const getAllHighlights = asyncHandler(async (req, res) => {
 
 // @desc    Delete a highlight
 // @route   DELETE /api/highlights/:id
-// @access  Private
+// @access  Private (Creator or Admin)
 const deleteHighlight = asyncHandler(async (req, res) => {
     const highlightId = req.params.id;
     const userId = req.user.id;
@@ -126,14 +126,12 @@ const deleteHighlight = asyncHandler(async (req, res) => {
     }
 
     // Find the content associated with the highlight and remove the reference
-    const content = await Content.findOne({ highlight: highlightId });
-    if (content) {
-        content.highlight = null;
-        await content.save();
-    }
+    await Content.updateOne(
+        { highlights: highlightId },
+        { $pull: { highlights: highlightId } }
+    );
 
     await Highlight.findByIdAndDelete(highlightId);
-
 
     res.status(200).json({ message: 'Highlight deleted successfully' });
 });

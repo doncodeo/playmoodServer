@@ -6,12 +6,12 @@ const User = require('../models/userModel');
 const Content = require('../models/contentModel');
 const Highlight = require('../models/highlightModel');
 const aiService = require('../ai/ai-service');
-const jwt = require('jsonwebtoken');
+const jwt =require('jsonwebtoken');
 
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const uploadQueue = require('../config/queue');
 const sinon = require('sinon');
-const websocket = require('../websocket');
+const { initWebSocket } = require('../websocket');
 
 describe('Content API', function() {
   this.timeout(60000);
@@ -25,21 +25,17 @@ describe('Content API', function() {
   let addStub;
   let getVideoDurationStub;
   let generateHighlightStub;
-  let getWssStub;
 
   before(async () => {
-    // Stub WebSocket server *before* requiring the app
-    getWssStub = sinon.stub(websocket, 'getWss').returns({ clients: [] });
-
-    // Require the app after stubbing to ensure the stub is applied
-    const serverModule = require('../server');
-    app = serverModule.app;
-    server = serverModule.server;
-
     mongoServer = await MongoMemoryServer.create();
     const mongoUri = mongoServer.getUri();
     process.env.MONGO_URI = mongoUri;
     await mongoose.connect(mongoUri);
+
+    const serverModule = require('../server');
+    app = serverModule.app;
+    server = serverModule.server;
+    initWebSocket(server);
 
     const user = await User.create({
       name: 'Test User',
@@ -70,8 +66,7 @@ describe('Content API', function() {
     getVideoDurationStub = sinon.stub(aiService, 'getVideoDuration').resolves(120);
     generateHighlightStub = sinon.stub(aiService, 'generateHighlight').returns({ startTime: 10, endTime: 25 });
 
-    // Start the server for testing
-    runningServer = app.listen(0);
+    runningServer = server;
   });
 
   after(async () => {
@@ -81,7 +76,6 @@ describe('Content API', function() {
     addStub.restore(); // Restore the original method
     getVideoDurationStub.restore();
     generateHighlightStub.restore();
-    getWssStub.restore();
     if (runningServer) {
       await new Promise(resolve => runningServer.close(resolve));
     }
@@ -226,19 +220,28 @@ describe('Content API', function() {
                 throw new Error('Content should be approved in response');
             }
 
-            const updatedContent = await Content.findById(unapprovedContent._id);
+            // Wait for the highlight to be created by the worker
+            let updatedContent;
+            for (let i = 0; i < 10; i++) {
+                updatedContent = await Content.findById(unapprovedContent._id);
+                if (updatedContent.highlights && updatedContent.highlights.length > 0) {
+                    break;
+                }
+                await new Promise(resolve => setTimeout(resolve, 200)); // Wait 200ms
+            }
+
             if (!updatedContent.isApproved) {
                 throw new Error('Content not approved in DB');
             }
-            if (!updatedContent.highlight) {
+            if (!updatedContent.highlights || updatedContent.highlights.length === 0) {
                 throw new Error('Highlight not linked in content');
             }
 
-            const highlight = await Highlight.findById(updatedContent.highlight);
+            const highlight = await Highlight.findById(updatedContent.highlights[0]);
             if (!highlight) {
                 throw new Error('Highlight document not created');
             }
-            if(highlight.content.toString() !== updatedContent._id.toString()){
+            if (highlight.content.toString() !== updatedContent._id.toString()) {
                 throw new Error('Highlight not linked correctly to content');
             }
 

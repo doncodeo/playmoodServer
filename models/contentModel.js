@@ -105,10 +105,10 @@ const contentSchema = new mongoose.Schema(
         },
         viewers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'profiles' }],
         viewerIPs: [{ type: String }],
-        highlight: {
+        highlights: [{
             type: mongoose.Schema.Types.ObjectId,
             ref: 'Highlights',
-        },
+        }],
         likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'profiles' }],
         comments: [
             {
