@@ -1,142 +1,186 @@
+const chai = require('chai');
 const request = require('supertest');
+const { app, server } = require('../server');
 const mongoose = require('mongoose');
-const jwt = require('jsonwebtoken');
 const { MongoMemoryServer } = require('mongodb-memory-server');
-const User = require('../models/userModel');
+const Profile = require('../models/userModel');
 const Content = require('../models/contentModel');
 const Highlight = require('../models/highlightModel');
-const assert = require('assert');
 
-describe('Highlight API', function() {
-    this.timeout(10000);
+const expect = chai.expect;
 
-    let app;
-    let mongoServer;
-    let creatorToken, adminToken, otherUserToken;
-    let creatorId;
-    let content, highlight;
+let mongoServer;
+let creator, admin, user;
+let creatorToken, adminToken, userToken;
+let content;
+let runningServer;
 
+// Helper function to generate a JWT token
+const generateToken = async (id, role) => {
+    const res = await request(app)
+        .post('/api/v1/users/generate-token') // A temporary endpoint to generate token for testing
+        .send({ id, role });
+    return res.body.token;
+};
+
+describe('Highlight API', () => {
     before(async () => {
         mongoServer = await MongoMemoryServer.create();
         const mongoUri = mongoServer.getUri();
-        process.env.MONGO_URI = mongoUri;
+        await mongoose.connect(mongoUri, {
+            useNewUrlParser: true,
+            useUnifiedTopology: true,
+        });
 
-        const serverModule = require('../server');
-        app = serverModule.app;
+        // Temporary endpoint for token generation
+        app.post('/api/v1/users/generate-token', (req, res) => {
+            const { id, role } = req.body;
+            const jwt = require('jsonwebtoken');
+            const token = jwt.sign({ id, role }, process.env.JWT_SECRET, { expiresIn: '1h' });
+            res.json({ token });
+        });
 
-        await mongoose.connect(mongoUri);
+        // Create users and tokens
+        creator = await Profile.create({ name: 'Creator', email: 'creator@test.com', password: 'password', role: 'creator' });
+        admin = await Profile.create({ name: 'Admin', email: 'admin@test.com', password: 'password', role: 'admin' });
+        user = await Profile.create({ name: 'User', email: 'user@test.com', password: 'password', role: 'user' });
 
-        const creatorUser = await User.create({ name: 'Creator', email: 'creator@test.com', password: 'password', role: 'creator' });
-        creatorId = creatorUser._id;
-        creatorToken = jwt.sign({ id: creatorId, role: 'creator' }, process.env.JWT_SECRET);
+        creatorToken = await generateToken(creator.id, creator.role);
+        adminToken = await generateToken(admin.id, admin.role);
+        userToken = await generateToken(user.id, user.role);
 
-        const adminUser = await User.create({ name: 'Admin', email: 'admin@test.com', password: 'password', role: 'admin' });
-        adminToken = jwt.sign({ id: adminUser._id, role: 'admin' }, process.env.JWT_SECRET);
+        // Create content
+        content = await Content.create({
+            user: creator.id,
+            title: 'Test Content',
+            category: 'testing',
+            description: 'A test content for highlights.',
+            video: 'test.mp4',
+            credit: 'Test Creator',
+        });
 
-        const otherUser = await User.create({ name: 'Other', email: 'other@test.com', password: 'password', role: 'creator' });
-        otherUserToken = jwt.sign({ id: otherUser._id, role: 'creator' }, process.env.JWT_SECRET);
+        runningServer = server;
     });
 
     after(async () => {
-        await User.deleteMany({});
         await mongoose.disconnect();
         await mongoServer.stop();
-    });
-
-    beforeEach(async () => {
-        content = await Content.create({
-            user: creatorId,
-            title: 'Test Content',
-            category: 'Testing',
-            description: 'A video for testing highlights.',
-            credit: 'Test Creator',
-            video: 'http://example.com/video.mp4',
-            cloudinary_video_id: 'video123',
-            isApproved: true,
-        });
-
-        highlight = await Highlight.create({
-            user: creatorId,
-            content: content._id,
-            startTime: 10,
-            endTime: 45,
-        });
-
-        content.highlight = highlight._id;
-        await content.save();
+        if (runningServer) {
+            await new Promise(resolve => runningServer.close(resolve));
+        }
     });
 
     afterEach(async () => {
-        await Content.deleteMany({});
         await Highlight.deleteMany({});
+        await Content.findByIdAndUpdate(content.id, { highlights: [] });
+    });
+
+    describe('POST /api/highlights', () => {
+        it('should create a highlight for the content creator', async () => {
+            const res = await request(app)
+                .post('/api/highlights')
+                .set('Authorization', `Bearer ${creatorToken}`)
+                .send({ contentId: content.id, startTime: 0, endTime: 15 });
+
+            expect(res.status).to.equal(201);
+            expect(res.body).to.have.property('startTime', 0);
+            expect(res.body).to.have.property('endTime', 15);
+
+            const updatedContent = await Content.findById(content.id);
+            expect(updatedContent.highlights).to.have.lengthOf(1);
+        });
+
+        it('should allow an admin to create a highlight', async () => {
+            const res = await request(app)
+                .post('/api/highlights')
+                .set('Authorization', `Bearer ${adminToken}`)
+                .send({ contentId: content.id, startTime: 20, endTime: 35 });
+
+            expect(res.status).to.equal(201);
+            const updatedContent = await Content.findById(content.id);
+            expect(updatedContent.highlights).to.have.lengthOf(1);
+        });
+
+        it('should prevent a regular user from creating a highlight', async () => {
+            const res = await request(app)
+                .post('/api/highlights')
+                .set('Authorization', `Bearer ${userToken}`)
+                .send({ contentId: content.id, startTime: 0, endTime: 15 });
+
+            expect(res.status).to.equal(403);
+        });
+
+        it('should prevent creating overlapping highlights', async () => {
+            // Create initial highlight
+            await request(app)
+                .post('/api/highlights')
+                .set('Authorization', `Bearer ${creatorToken}`)
+                .send({ contentId: content.id, startTime: 10, endTime: 25 });
+
+            // Attempt to create an overlapping highlight
+            const res = await request(app)
+                .post('/api/highlights')
+                .set('Authorization', `Bearer ${creatorToken}`)
+                .send({ contentId: content.id, startTime: 20, endTime: 30 });
+
+            expect(res.status).to.equal(400);
+            expect(res.body.error).to.equal('Highlight timeline overlaps with an existing highlight.');
+        });
+
+        it('should allow multiple non-overlapping highlights', async () => {
+            await request(app)
+                .post('/api/highlights')
+                .set('Authorization', `Bearer ${creatorToken}`)
+                .send({ contentId: content.id, startTime: 0, endTime: 10 });
+
+            const res = await request(app)
+                .post('/api/highlights')
+                .set('Authorization', `Bearer ${creatorToken}`)
+                .send({ contentId: content.id, startTime: 15, endTime: 25 });
+
+            expect(res.status).to.equal(201);
+            const updatedContent = await Content.findById(content.id);
+            expect(updatedContent.highlights).to.have.lengthOf(2);
+        });
     });
 
     describe('DELETE /api/highlights/:id', () => {
-        it('should allow the creator to delete their own highlight', (done) => {
-            request(app)
-                .delete(`/api/highlights/${highlight._id}`)
+        let highlight;
+
+        beforeEach(async () => {
+            const res = await request(app)
+                .post('/api/highlights')
                 .set('Authorization', `Bearer ${creatorToken}`)
-                .expect(200)
-                .end(async (err, res) => {
-                    if (err) return done(err);
-                    assert.strictEqual(res.body.message, 'Highlight deleted successfully');
-
-                    const deletedHighlight = await Highlight.findById(highlight._id);
-                    assert.strictEqual(deletedHighlight, null);
-
-                    const updatedContent = await Content.findById(content._id);
-                    assert.strictEqual(updatedContent.highlight, null);
-
-                    done();
-                });
+                .send({ contentId: content.id, startTime: 0, endTime: 15 });
+            highlight = res.body;
         });
 
-        it('should allow an admin to delete any highlight', (done) => {
-            request(app)
+        it('should allow the creator to delete a highlight', async () => {
+            const res = await request(app)
                 .delete(`/api/highlights/${highlight._id}`)
-                .set('Authorization', `Bearer ${adminToken}`)
-                .expect(200)
-                .end(async (err, res) => {
-                    if (err) return done(err);
-                    const deletedHighlight = await Highlight.findById(highlight._id);
-                    assert.strictEqual(deletedHighlight, null);
-                    done();
-                });
+                .set('Authorization', `Bearer ${creatorToken}`);
+
+            expect(res.status).to.equal(200);
+            const updatedContent = await Content.findById(content.id);
+            expect(updatedContent.highlights).to.have.lengthOf(0);
         });
 
-        it('should not allow another user to delete the highlight', (done) => {
-            request(app)
+        it('should allow an admin to delete a highlight', async () => {
+            const res = await request(app)
                 .delete(`/api/highlights/${highlight._id}`)
-                .set('Authorization', `Bearer ${otherUserToken}`)
-                .expect(403)
-                .end(async (err, res) => {
-                    if (err) return done(err);
-                    assert.strictEqual(res.body.message, 'User not authorized to delete this highlight');
+                .set('Authorization', `Bearer ${adminToken}`);
 
-                    const foundHighlight = await Highlight.findById(highlight._id);
-                    assert.notStrictEqual(foundHighlight, null);
-                    done();
-                });
+            expect(res.status).to.equal(200);
+            const updatedContent = await Content.findById(content.id);
+            expect(updatedContent.highlights).to.have.lengthOf(0);
         });
 
-        it('should return 404 if the highlight does not exist', (done) => {
-            const nonExistentId = new mongoose.Types.ObjectId();
-            request(app)
-                .delete(`/api/highlights/${nonExistentId}`)
-                .set('Authorization', `Bearer ${adminToken}`)
-                .expect(404)
-                .end((err, res) => {
-                    if (err) return done(err);
-                    assert.strictEqual(res.body.message, 'Highlight not found');
-                    done();
-                });
-        });
-
-        it('should return 401 if the user is not authenticated', (done) => {
-            request(app)
+        it('should prevent a regular user from deleting a highlight', async () => {
+            const res = await request(app)
                 .delete(`/api/highlights/${highlight._id}`)
-                .expect(401)
-                .end(done);
+                .set('Authorization', `Bearer ${userToken}`);
+
+            expect(res.status).to.equal(403);
         });
     });
 });

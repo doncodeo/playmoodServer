@@ -563,8 +563,8 @@ const approveContent = asyncHandler(async (req, res) => {
         content.rejectionReason = undefined; // Clear rejection reason
         await content.save();
 
-        // If the content is approved and does not already have a highlight, create one.
-        if (content.isApproved && !content.highlight) {
+        // If the content is approved and does not already have highlights, create one.
+        if (content.isApproved && (!content.highlights || content.highlights.length === 0)) {
             await createHighlightForContent(content);
         }
 

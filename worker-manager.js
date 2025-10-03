@@ -78,7 +78,10 @@ const createHighlightForContent = async (content) => {
         await newHighlight.save();
 
         // 4. Link the highlight to the content
-        content.highlight = newHighlight._id;
+        if (!content.highlights) {
+            content.highlights = [];
+        }
+        content.highlights.push(newHighlight._id);
         await content.save();
 
         console.log(`[Worker] Successfully created highlight ${newHighlight._id} for content ${content._id}`);
