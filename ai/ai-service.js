@@ -2,6 +2,10 @@ const { AssemblyAI } = require('assemblyai');
 const axios = require('axios');
 const contentSchema = require('../models/contentModel');
 const cloudinary = require('../config/cloudinary');
+const { pipeline, env } = require('@xenova/transformers');
+
+// Skip local model check
+env.allowLocalModels = false;
 
 // This service will act as an abstraction layer for our AI models and services.
 // It will expose a set of functions that our application can use without needing
@@ -63,10 +67,37 @@ class AIService {
      * @returns {Promise<Array<number>>} The generated embedding.
      */
     async generateEmbeddings(content) {
-        // TODO: Implement content embedding generation.
-        console.log(`AI Service: Generating embeddings for content: "${content.title}"`);
-        // Placeholder implementation
-        return Promise.resolve(Array(128).fill(Math.random()));
+        try {
+            console.log(`AI Service: Generating embeddings for content: "${content.title}"`);
+
+            // 1. Load the feature-extraction pipeline
+            const extractor = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
+
+            // 2. Prepare the text input
+            const textToEmbed = `${content.title || ''} ${content.description || ''} ${content.category || ''}`.trim();
+
+            if (!textToEmbed) {
+                console.warn(`[${content._id}] Content has no text fields (title, description, category) to generate embeddings from.`);
+                return [];
+            }
+
+            // 3. Generate the embedding
+            const output = await extractor(textToEmbed, {
+                pooling: 'mean',
+                normalize: true,
+            });
+
+            // 4. Convert the Float32Array to a regular array
+            const embedding = Array.from(output.data);
+
+            console.log(`[${content._id}] Successfully generated a ${embedding.length}-dimensional embedding.`);
+            return embedding;
+        } catch (error) {
+            console.error(`[${content._id}] An error occurred during embedding generation:`, error);
+            // In case of an error, we'll return an empty array to avoid breaking the entire process.
+            // The calling function should handle this case.
+            return [];
+        }
     }
 
     /**
