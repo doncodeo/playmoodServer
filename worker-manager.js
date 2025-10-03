@@ -106,6 +106,15 @@ const processUpload = async (job) => {
             await createHighlightForContent(content);
         }
 
+        // Generate content embeddings for recommendations
+        const embeddings = await aiService.generateEmbeddings(content);
+        if (embeddings && embeddings.length > 0) {
+            content.contentEmbedding = embeddings;
+            console.log(`[Worker] Successfully generated and attached embeddings for content ID: ${contentId}`);
+        } else {
+            console.warn(`[Worker] Embedding generation failed or returned empty for content ID: ${contentId}. Skipping update.`);
+        }
+
         // The rest of the original processing logic (e.g., captions, moderation) would go here.
         // For example, generating captions:
         if (languageCode) {
