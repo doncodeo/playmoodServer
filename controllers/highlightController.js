@@ -102,9 +102,46 @@ const getAllHighlights = asyncHandler(async (req, res) => {
     res.status(200).json(highlights);
 });
 
+// @desc    Delete a highlight
+// @route   DELETE /api/highlights/:id
+// @access  Private
+const deleteHighlight = asyncHandler(async (req, res) => {
+    const highlightId = req.params.id;
+    const userId = req.user.id;
+    const userRole = req.user.role;
+
+    if (!mongoose.Types.ObjectId.isValid(highlightId)) {
+        return res.status(400).json({ message: 'Invalid highlight ID' });
+    }
+
+    const highlight = await Highlight.findById(highlightId);
+
+    if (!highlight) {
+        return res.status(404).json({ message: 'Highlight not found' });
+    }
+
+    // Check if the user is the creator of the highlight or an admin
+    if (highlight.user.toString() !== userId && userRole !== 'admin') {
+        return res.status(403).json({ message: 'User not authorized to delete this highlight' });
+    }
+
+    // Find the content associated with the highlight and remove the reference
+    const content = await Content.findOne({ highlight: highlightId });
+    if (content) {
+        content.highlight = null;
+        await content.save();
+    }
+
+    await Highlight.findByIdAndDelete(highlightId);
+
+
+    res.status(200).json({ message: 'Highlight deleted successfully' });
+});
+
 module.exports = {
     createHighlight,
     getHighlightsByCreator,
     getRecentHighlights,
     getAllHighlights,
+    deleteHighlight,
 };
