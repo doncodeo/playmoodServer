@@ -78,7 +78,10 @@ const createHighlightForContent = async (content) => {
         await newHighlight.save();
 
         // 4. Link the highlight to the content
-        content.highlight = newHighlight._id;
+        if (!content.highlights) {
+            content.highlights = [];
+        }
+        content.highlights.push(newHighlight._id);
         await content.save();
 
         console.log(`[Worker] Successfully created highlight ${newHighlight._id} for content ${content._id}`);
@@ -104,15 +107,6 @@ const processUpload = async (job) => {
         // Generate highlight if the content is approved
         if (content.isApproved) {
             await createHighlightForContent(content);
-        }
-
-        // Generate content embeddings for recommendations
-        const embeddings = await aiService.generateEmbeddings(content);
-        if (embeddings && embeddings.length > 0) {
-            content.contentEmbedding = embeddings;
-            console.log(`[Worker] Successfully generated and attached embeddings for content ID: ${contentId}`);
-        } else {
-            console.warn(`[Worker] Embedding generation failed or returned empty for content ID: ${contentId}. Skipping update.`);
         }
 
         // The rest of the original processing logic (e.g., captions, moderation) would go here.
