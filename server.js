@@ -47,6 +47,7 @@ const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:5174',
   'https://playmoodtv.com',
+  "https://playmoodtv.netlify.app",
 ];
 app.use(cors({
   origin: allowedOrigins,
