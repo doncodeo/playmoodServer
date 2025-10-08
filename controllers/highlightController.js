@@ -68,7 +68,8 @@ const getHighlightsByCreator = asyncHandler(async (req, res) => {
     const approvedContentIds = await Content.find({ user: creatorId, isApproved: true }).distinct('_id');
 
     const highlights = await Highlight.find({ user: creatorId, content: { $in: approvedContentIds } })
-        .populate('content', 'title thumbnail');
+        .populate('content', 'title thumbnail')
+        .populate('user', 'name profileImage');
 
     res.status(200).json(highlights);
 });
@@ -83,7 +84,8 @@ const getRecentHighlights = asyncHandler(async (req, res) => {
     const highlights = await Highlight.find({ content: { $in: approvedContentIds } })
         .sort({ createdAt: -1 })
         .limit(10)
-        .populate('content', 'title thumbnail');
+        .populate('content', 'title thumbnail')
+        .populate('user', 'name profileImage');
 
     res.status(200).json(highlights);
 });
@@ -97,7 +99,8 @@ const getAllHighlights = asyncHandler(async (req, res) => {
 
     const highlights = await Highlight.find({ content: { $in: approvedContentIds } })
         .sort({ createdAt: -1 })
-        .populate('content', 'title thumbnail');
+        .populate('content', 'title thumbnail')
+        .populate('user', 'name profileImage');
 
     res.status(200).json(highlights);
 });
