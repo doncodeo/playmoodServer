@@ -41,7 +41,7 @@ describe('Highlight API', () => {
         });
 
         // Create users and tokens
-        creator = await Profile.create({ name: 'Creator', email: 'creator@test.com', password: 'password', role: 'creator' });
+        creator = await Profile.create({ name: 'Creator', email: 'creator@test.com', password: 'password', role: 'creator', profileImage: 'https://example.com/profile.jpg' });
         admin = await Profile.create({ name: 'Admin', email: 'admin@test.com', password: 'password', role: 'admin' });
         user = await Profile.create({ name: 'User', email: 'user@test.com', password: 'password', role: 'user' });
 
@@ -181,6 +181,60 @@ describe('Highlight API', () => {
                 .set('Authorization', `Bearer ${userToken}`);
 
             expect(res.status).to.equal(403);
+        });
+    });
+
+    describe('GET /api/highlights', () => {
+        let highlight;
+
+        beforeEach(async () => {
+            // Create approved content
+            content = await Content.create({
+                user: creator.id,
+                title: 'Approved Content',
+                category: 'testing',
+                description: 'Approved content for highlight testing.',
+                video: 'test.mp4',
+                credit: 'Test Creator',
+                isApproved: true,
+            });
+
+            // Create a highlight for the approved content
+            const res = await request(app)
+                .post('/api/highlights')
+                .set('Authorization', `Bearer ${creatorToken}`)
+                .send({ contentId: content.id, startTime: 0, endTime: 15 });
+            highlight = res.body;
+        });
+
+        it('should get highlights by creator with user info', async () => {
+            const res = await request(app)
+                .get(`/api/highlights/creator/${creator.id}`);
+
+            expect(res.status).to.equal(200);
+            expect(res.body).to.be.an('array');
+            expect(res.body[0].user).to.have.property('name', creator.name);
+            expect(res.body[0].user).to.have.property('profileImage');
+        });
+
+        it('should get recent highlights with user info', async () => {
+            const res = await request(app)
+                .get('/api/highlights/recent');
+
+            expect(res.status).to.equal(200);
+            expect(res.body).to.be.an('array');
+            expect(res.body[0].user).to.have.property('name');
+            expect(res.body[0].user).to.have.property('profileImage');
+        });
+
+        it('should get all highlights with user info', async () => {
+            const res = await request(app)
+                .get('/api/highlights/all');
+
+            expect(res.status).to.equal(200);
+            expect(res.body).to.be.an('array');
+            expect(res.body[0].user).to.have.property('name');
+            expect(res.body[0].user).to.have.property('profileImage');
         });
     });
 });
