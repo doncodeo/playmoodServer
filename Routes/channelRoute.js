@@ -285,7 +285,7 @@ router.route('/:userId').put(protect, updateChannelInfo);
  *       500:
  *         description: Server error
  */
-router.route('/:userId/banner').put(protect, upload.single('image'), updateChannelBannerImage);
+router.route('/:userId/banner').put(protect, updateChannelBannerImage);
 
 /**
  * @swagger

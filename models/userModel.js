@@ -87,6 +87,9 @@ const userSchema = new mongoose.Schema(
             type: String,
             default: 'https://img.freepik.com/free-vector/gradient-colored-youtube-banner_23-2149209334.jpg',
         },
+        bannerImageId: {
+            type: String,
+        },
         communityPosts: [
             {
                 type: mongoose.Schema.Types.ObjectId,
