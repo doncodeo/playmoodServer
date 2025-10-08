@@ -106,12 +106,13 @@ const updateChannelInfo = asyncHandler(async (req, res) => {
 // @access Private (authenticated, creator only)
 const updateChannelBannerImage = asyncHandler(async (req, res) => {
   const { userId } = req.params;
+  const { image } = req.body;
 
   if (!userId) {
     return res.status(400).json({ error: 'User ID is required' });
   }
 
-  if (!userId.match(/^[0-9a-fA-F]{24}$/)) {
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
     return res.status(400).json({ error: 'Invalid user ID' });
   }
 
@@ -125,34 +126,23 @@ const updateChannelBannerImage = asyncHandler(async (req, res) => {
     return res.status(403).json({ error: 'You are not authorized to update this channel' });
   }
 
-  let bannerImageUrl = user.bannerImage;
-
-  if (req.file) {
-    const parser = new DatauriParser();
-    const fileExtension = path.extname(req.file.originalname).toString();
-    const fileBuffer = req.file.buffer;
-    const file64 = parser.format(fileExtension, fileBuffer);
-
-    const result = await cloudinary.uploader.upload(file64.content, {
-      folder: 'channel-banners',
-      public_id: `${userId}-${Date.now()}`,
-    });
-
-    if (user.bannerImageId) {
-      await cloudinary.uploader.destroy(user.bannerImageId);
-    }
-
-    bannerImageUrl = result.secure_url;
-    user.bannerImageId = result.public_id;
-
-  } else {
-    return res.status(400).json({ error: 'No file uploaded' });
+  if (!image || !image.url || !image.public_id) {
+    return res.status(400).json({ error: 'Image URL and public_id are required' });
   }
 
-  user.bannerImage = bannerImageUrl || process.env.DEFAULT_BANNER_IMAGE_URL || 'https://example.com/default-banner.jpg';
+  // If there's an old banner, delete it from Cloudinary
+  if (user.bannerImageId) {
+    await cloudinary.uploader.destroy(user.bannerImageId);
+  }
+
+  user.bannerImage = image.url;
+  user.bannerImageId = image.public_id;
   await user.save();
 
-  res.status(200).json({ message: 'Channel banner image updated successfully', bannerImage: user.bannerImage });
+  res.status(200).json({
+    message: 'Channel banner image updated successfully',
+    bannerImage: user.bannerImage,
+  });
 });
 
 // @desc Get all creator channels
