@@ -250,16 +250,21 @@ router.route('/:userId').put(protect, updateChannelInfo);
  *     requestBody:
  *       required: true
  *       content:
- *         multipart/form-data:
+ *         application/json:
  *           schema:
  *             type: object
  *             required:
- *               - image
+ *               - url
+ *               - public_id
  *             properties:
- *               image:
+ *               url:
  *                 type: string
- *                 format: binary
- *                 description: New banner image file
+ *                 description: The new banner image URL from Cloudinary
+ *                 example: https://res.cloudinary.com/.../banner.jpg
+ *               public_id:
+ *                 type: string
+ *                 description: The public_id of the new banner image from Cloudinary
+ *                 example: user-uploads/6873bd41369264c373b0373a/mixed/random_id
  *     responses:
  *       200:
  *         description: Channel banner image updated successfully
