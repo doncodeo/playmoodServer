@@ -106,7 +106,7 @@ const updateChannelInfo = asyncHandler(async (req, res) => {
 // @access Private (authenticated, creator only)
 const updateChannelBannerImage = asyncHandler(async (req, res) => {
   const { userId } = req.params;
-  const { image } = req.body;
+  const { url, public_id } = req.body;
 
   if (!userId) {
     return res.status(400).json({ error: 'User ID is required' });
@@ -126,7 +126,7 @@ const updateChannelBannerImage = asyncHandler(async (req, res) => {
     return res.status(403).json({ error: 'You are not authorized to update this channel' });
   }
 
-  if (!image || !image.url || !image.public_id) {
+  if (!url || !public_id) {
     return res.status(400).json({ error: 'Image URL and public_id are required' });
   }
 
@@ -135,8 +135,8 @@ const updateChannelBannerImage = asyncHandler(async (req, res) => {
     await cloudinary.uploader.destroy(user.bannerImageId);
   }
 
-  user.bannerImage = image.url;
-  user.bannerImageId = image.public_id;
+  user.bannerImage = url;
+  user.bannerImageId = public_id;
   await user.save();
 
   res.status(200).json({

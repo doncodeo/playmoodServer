@@ -59,7 +59,7 @@ describe('Channel Controller - Integration Tests', () => {
             const res = await chai.request(app)
                 .put(`/api/channel/${creator._id}/banner`)
                 .set('Authorization', `Bearer ${token}`)
-                .send({ image: newImageData });
+                .send(newImageData);
 
             expect(res).to.have.status(200);
             expect(res.body).to.have.property('message', 'Channel banner image updated successfully');
@@ -97,7 +97,7 @@ describe('Channel Controller - Integration Tests', () => {
             const res = await chai.request(app)
                 .put(`/api/channel/${creator._id}/banner`)
                 .set('Authorization', `Bearer ${otherToken}`)
-                .send({ image: newImageData });
+                .send(newImageData);
 
             expect(res).to.have.status(403);
             expect(res.body).to.have.property('error', 'You are not authorized to update this channel');
