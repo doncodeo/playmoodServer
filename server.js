@@ -7,7 +7,7 @@ const path = require('path');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./swagger');
 const helmet = require('helmet'); // Add helmet
-const rateLimit = require('express-rate-limit'); // Add rate limiter
+const { generalLimiter } = require('./middleware/rateLimiter');
 const compression = require('compression'); // Add compression
 const mongoSanitize = require('express-mongo-sanitize'); // Add input sanitizer
 const { initWebSocket } = require('./websocket');
@@ -33,11 +33,7 @@ app.use(helmet());
 app.use(mongoSanitize());
 
 // Security: Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-});
-app.use(limiter);
+app.use(generalLimiter);
 
 // Security: Hide X-Powered-By header
 app.disable('x-powered-by');
