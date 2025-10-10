@@ -145,12 +145,12 @@ contentSchema.pre('save', function (next) {
 
 // Virtual for likes count
 contentSchema.virtual('likesCount').get(function () {
-    return this.likes.length;
+    return this.likes ? this.likes.length : 0;
 });
 
 // Virtual for comments count
 contentSchema.virtual('commentsCount').get(function () {
-    return this.comments.length;
+    return this.comments ? this.comments.length : 0;
 });
 
 // Ensure virtual fields are included in toJSON output
