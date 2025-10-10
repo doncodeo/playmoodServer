@@ -27,6 +27,7 @@ const {
   changePassword,
 } = require('../controllers/userController');
 const { protect } = require('../middleware/authmiddleware');
+const { loginLimiter } = require('../middleware/rateLimiter');
 
 /**
  * @swagger
@@ -348,7 +349,7 @@ router.route('/create').post(protect, createUser);
  *       500:
  *         description: Server error
  */
-router.route('/login').post(loginUser);
+router.route('/login').post(loginLimiter, loginUser);
 
 /**
  * @swagger
