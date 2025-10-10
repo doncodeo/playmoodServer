@@ -70,7 +70,7 @@ const getHighlightsByCreator = asyncHandler(async (req, res) => {
     const highlights = await Highlight.find({ user: creatorId, content: { $in: approvedContentIds } })
         .populate({
             path: 'content',
-            select: 'title thumbnail views description category createdAt likesCount commentsCount comments',
+            select: 'title thumbnail views description category createdAt likesCount commentsCount comments likes',
             populate: {
                 path: 'comments.user',
                 select: 'name profileImage'
@@ -93,7 +93,7 @@ const getRecentHighlights = asyncHandler(async (req, res) => {
         .limit(10)
         .populate({
             path: 'content',
-            select: 'title thumbnail views description category createdAt likesCount commentsCount comments',
+            select: 'title thumbnail views description category createdAt likesCount commentsCount comments likes',
             populate: {
                 path: 'comments.user',
                 select: 'name profileImage'
@@ -115,7 +115,7 @@ const getAllHighlights = asyncHandler(async (req, res) => {
         .sort({ createdAt: -1 })
         .populate({
             path: 'content',
-            select: 'title thumbnail views description category createdAt likesCount commentsCount comments',
+            select: 'title thumbnail views description category createdAt likesCount commentsCount comments likes',
             populate: {
                 path: 'comments.user',
                 select: 'name profileImage'
