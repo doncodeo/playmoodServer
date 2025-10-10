@@ -98,7 +98,13 @@ router.route('/').post(protect, createHighlight);
  *         description: The ID of the creator.
  *     responses:
  *       200:
- *         description: A list of highlights.
+ *         description: A list of highlights with populated content details.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Highlight'
  *       400:
  *         description: Invalid creator ID.
  */
@@ -109,11 +115,17 @@ router.route('/creator/:creatorId').get(getHighlightsByCreator);
  * /api/highlights/recent:
  *   get:
  *     summary: Get recent highlights
- *     description: Retrieves the 10 most recent highlights.
+ *     description: Retrieves the 10 most recent highlights with populated content details.
  *     tags: [Highlights]
  *     responses:
  *       200:
  *         description: A list of recent highlights.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Highlight'
  */
 router.route('/recent').get(getRecentHighlights);
 
@@ -122,11 +134,17 @@ router.route('/recent').get(getRecentHighlights);
  * /api/highlights/all:
  *   get:
  *     summary: Get all highlights
- *     description: Retrieves all highlights.
+ *     description: Retrieves all highlights with populated content details.
  *     tags: [Highlights]
  *     responses:
  *       200:
  *         description: A list of all highlights.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Highlight'
  */
 router.route('/all').get(getAllHighlights);
 

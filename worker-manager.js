@@ -163,6 +163,18 @@ const startWorker = () => {
         return { uploadWorker, analyticsWorker };
     }
 
+    // In development, use a mock worker to avoid Redis connection issues
+    if (process.env.NODE_ENV === 'development') {
+        console.log('[Worker] Using mock workers for development.');
+        const mockWorker = {
+            on: () => {}, // Mock 'on' event listener
+            close: async () => {}, // Mock 'close' method
+        };
+        uploadWorker = mockWorker;
+        analyticsWorker = mockWorker;
+        return { uploadWorker, analyticsWorker };
+    }
+
     console.log('[Worker] Initializing workers...');
     uploadWorker = new Worker('upload', mainProcessor, redisConnectionOpts);
     analyticsWorker = new Worker('analytics', mainProcessor, redisConnectionOpts);

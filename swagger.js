@@ -27,6 +27,59 @@ const swaggerDefinition = {
         bearerFormat: 'JWT',
       },
     },
+    schemas: {
+      Highlight: {
+        type: 'object',
+        properties: {
+          _id: { type: 'string', description: 'The highlight ID.' },
+          startTime: { type: 'number', description: 'Start time of the highlight in seconds.' },
+          endTime: { type: 'number', description: 'End time of the highlight in seconds.' },
+          user: {
+            type: 'object',
+            properties: {
+              _id: { type: 'string' },
+              name: { type: 'string' },
+              profileImage: { type: 'string' },
+            },
+            description: 'The user who created the highlight.',
+          },
+          content: {
+            type: 'object',
+            properties: {
+              _id: { type: 'string' },
+              title: { type: 'string' },
+              thumbnail: { type: 'string' },
+              views: { type: 'number' },
+              description: { type: 'string' },
+              category: { type: 'string' },
+              createdAt: { type: 'string', format: 'date-time' },
+              likesCount: { type: 'number' },
+              commentsCount: { type: 'number' },
+              comments: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    _id: { type: 'string' },
+                    text: { type: 'string' },
+                    createdAt: { type: 'string', format: 'date-time' },
+                    user: {
+                      type: 'object',
+                      properties: {
+                        _id: { type: 'string' },
+                        name: { type: 'string' },
+                        profileImage: { type: 'string' },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            description: 'The original content from which the highlight was created.',
+          },
+        },
+      },
+    },
   },
   tags: [
     {
@@ -38,6 +91,10 @@ const swaggerDefinition = {
       description: `Endpoints for content management. The content creation process is a two-step flow:
       1. **Generate Signature**: The client first requests a secure signature from the server via the \`/api/content/signature\` endpoint.
       2. **Direct Upload & Create Record**: The client uses this signature to upload the video file directly to Cloudinary. Once the upload is complete, the client sends the Cloudinary response (including the public_id and URL) along with other metadata to the \`/api/content\` endpoint to create the content record in the database.`,
+    },
+    {
+      name: 'Highlights',
+      description: 'Endpoints for creating and retrieving video highlights.',
     },
     {
       name: 'Authentication',
@@ -87,6 +144,7 @@ const apiFiles = routeFiles.length > 0 ? routeFiles : [
   path.join(__dirname, 'Routes', 'communityPostRoute.js'),
   path.join(__dirname, 'Routes', 'playlistRoutes.js'),
   path.join(__dirname, 'Routes', 'analyticsRoute.js'),
+  path.join(__dirname, 'Routes', 'highlightRoute.js'),
 
 ].filter((file) => {
   const exists = require('fs').existsSync(file);

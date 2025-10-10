@@ -143,4 +143,18 @@ contentSchema.pre('save', function (next) {
     next();
 });
 
+// Virtual for likes count
+contentSchema.virtual('likesCount').get(function () {
+    return this.likes.length;
+});
+
+// Virtual for comments count
+contentSchema.virtual('commentsCount').get(function () {
+    return this.comments.length;
+});
+
+// Ensure virtual fields are included in toJSON output
+contentSchema.set('toJSON', { virtuals: true });
+contentSchema.set('toObject', { virtuals: true });
+
 module.exports = mongoose.model('Contents', contentSchema);
