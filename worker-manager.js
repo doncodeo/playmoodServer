@@ -74,6 +74,7 @@ const createHighlightForContent = async (content) => {
             content: content._id,
             startTime,
             endTime,
+            title: content.title,
         });
         await newHighlight.save();
 

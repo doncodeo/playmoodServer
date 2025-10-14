@@ -12,6 +12,9 @@ const highlightSchema = new mongoose.Schema(
             ref: 'Contents',
             required: true,
         },
+        title: {
+            type: String,
+        },
         startTime: {
             type: Number,
             required: true,

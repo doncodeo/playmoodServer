@@ -7,7 +7,7 @@ const mongoose = require('mongoose');
 // @route   POST /api/highlights
 // @access  Private (Creator or Admin)
 const createHighlight = asyncHandler(async (req, res) => {
-    const { contentId, startTime, endTime } = req.body;
+    const { contentId, startTime, endTime, title } = req.body;
     const userId = req.user.id;
     const userRole = req.user.role;
 
@@ -44,6 +44,7 @@ const createHighlight = asyncHandler(async (req, res) => {
         content: contentId,
         startTime,
         endTime,
+        title: title || content.title,
     });
 
     const createdHighlight = await highlight.save();

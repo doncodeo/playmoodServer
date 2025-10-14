@@ -142,6 +142,27 @@ describe('Highlight API', () => {
             const updatedContent = await Content.findById(content.id);
             expect(updatedContent.highlights).to.have.lengthOf(2);
         });
+
+        it('should create a highlight with a custom title', async () => {
+            const customTitle = 'My Custom Highlight Title';
+            const res = await request(app)
+                .post('/api/highlights')
+                .set('Authorization', `Bearer ${creatorToken}`)
+                .send({ contentId: content.id, startTime: 0, endTime: 15, title: customTitle });
+
+            expect(res.status).to.equal(201);
+            expect(res.body).to.have.property('title', customTitle);
+        });
+
+        it('should create a highlight with the content title if no title is provided', async () => {
+            const res = await request(app)
+                .post('/api/highlights')
+                .set('Authorization', `Bearer ${creatorToken}`)
+                .send({ contentId: content.id, startTime: 0, endTime: 15 });
+
+            expect(res.status).to.equal(201);
+            expect(res.body).to.have.property('title', content.title);
+        });
     });
 
     describe('DELETE /api/highlights/:id', () => {
