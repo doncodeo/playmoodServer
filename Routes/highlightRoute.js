@@ -68,6 +68,9 @@ router.route('/:id').delete(protect, deleteHighlight);
  *               endTime:
  *                 type: number
  *                 description: The end time of the highlight in seconds.
+ *               title:
+ *                 type: string
+ *                 description: An optional custom title for the highlight.
  *     responses:
  *       201:
  *         description: Highlight created successfully.
