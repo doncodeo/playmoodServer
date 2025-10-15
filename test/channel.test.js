@@ -13,7 +13,7 @@ chai.use(chaiHttp);
 
 describe('Channel Controller - Integration Tests', () => {
     let mongoServer;
-    let creator;
+    let creator, user;
     let token;
 
     before(async () => {
@@ -26,10 +26,20 @@ describe('Channel Controller - Integration Tests', () => {
             email: 'creator.channel.test@example.com',
             password: 'password123',
             role: 'creator',
+            userName: 'testcreator',
             bannerImage: 'old_url',
             bannerImageId: 'old_id'
         });
         await creator.save();
+
+        user = new User({
+            name: 'Test User',
+            email: 'user.channel.test@example.com',
+            password: 'password123',
+            role: 'user',
+            userName: 'testuser'
+        });
+        await user.save();
 
         token = jwt.sign({ id: creator._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
     });
@@ -101,6 +111,31 @@ describe('Channel Controller - Integration Tests', () => {
 
             expect(res).to.have.status(403);
             expect(res.body).to.have.property('error', 'You are not authorized to update this channel');
+        });
+    });
+
+    describe('GET /api/channel/username/:userName', () => {
+        it('should get channel details for a valid creator userName', async () => {
+            const res = await chai.request(app)
+                .get(`/api/channel/username/${creator.userName}`);
+
+            expect(res).to.have.status(200);
+            expect(res.body.name).to.equal(creator.name);
+        });
+
+        it('should return 404 for a non-existent userName', async () => {
+            const res = await chai.request(app)
+                .get('/api/channel/username/nonexistentuser');
+
+            expect(res).to.have.status(404);
+            expect(res.body.error).to.equal('Creator not found');
+        });
+
+        it('should return 404 for a userName of a non-creator user', async () => {
+            const res = await chai.request(app)
+                .get(`/api/channel/username/${user.userName}`);
+            expect(res).to.have.status(404);
+            expect(res.body.error).to.equal('Creator not found');
         });
     });
 });

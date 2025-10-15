@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const upload = require('../middleware/multer');
-const { getChannelDetails, updateChannelInfo, updateChannelBannerImage, getAllChannels, getMyChannelDetails } = require('../controllers/channelController');
+const { getChannelDetails, updateChannelInfo, updateChannelBannerImage, getAllChannels, getMyChannelDetails, getChannelDetailsByUserName } = require('../controllers/channelController');
 const { protect } = require('../middleware/authmiddleware');
 
 /**
@@ -139,6 +139,32 @@ const { protect } = require('../middleware/authmiddleware');
  *       500:
  *         description: Server error
  */
+
+/**
+ * @swagger
+ * /username/{userName}:
+ *   get:
+ *     summary: Get a creator's channel details by username
+ *     description: Retrieves details of a creator's channel using their unique username.
+ *     tags: [Channels]
+ *     parameters:
+ *       - in: path
+ *         name: userName
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The unique username of the creator
+ *     responses:
+ *       200:
+ *         description: Creator channel details retrieved successfully
+ *       400:
+ *         description: Invalid or missing username
+ *       404:
+ *         description: Creator not found
+ *       500:
+ *         description: Server error
+ */
+router.route('/username/:userName').get(getChannelDetailsByUserName);
 router.route('/:userId').get(getChannelDetails);
 
 /**

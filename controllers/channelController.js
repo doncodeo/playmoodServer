@@ -254,10 +254,49 @@ const getMyChannelDetails = asyncHandler(async (req, res) => {
     }
 });
 
+// @desc Get creator channel details by username
+// @route GET /api/channel/username/:userName
+// @access Public
+const getChannelDetailsByUserName = asyncHandler(async (req, res) => {
+    const { userName } = req.params;
+
+    if (!userName) {
+        return res.status(400).json({ error: 'Username is required' });
+    }
+
+    const creator = await User.findOne({ userName: userName.toLowerCase(), role: 'creator' })
+        .populate('subscribers', 'name profileImage')
+        .populate('communityPosts', 'title content');
+
+    if (!creator) {
+        return res.status(404).json({ error: 'Creator not found' });
+    }
+
+    const content = await Content.find({ user: creator._id, isApproved: true }).select(
+        'title category description thumbnail video views likes createdAt'
+    );
+
+    res.status(200).json({
+        name: creator.name,
+        profileImage: creator.profileImage,
+        about: creator.about,
+        bannerImage: creator.bannerImage,
+        subscribers: creator.subscribers.length,
+        subscriberDetails: creator.subscribers,
+        content,
+        communityPosts: creator.communityPosts || [],
+        instagram: creator.instagram || "",
+        tiktok: creator.tiktok || "",
+        linkedin: creator.linkedin || "",
+        twitter: creator.twitter || ""
+    });
+});
+
 module.exports = {
   getChannelDetails,
   updateChannelInfo,
   updateChannelBannerImage,
   getAllChannels,
-  getMyChannelDetails
+  getMyChannelDetails,
+  getChannelDetailsByUserName
 };
