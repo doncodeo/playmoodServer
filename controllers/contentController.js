@@ -407,12 +407,13 @@ const generateUploadSignature = asyncHandler(async (req, res) => {
 // Add a comment to content
 const addComment = asyncHandler(async (req, res) => {
     try {
-        const { contentId, text } = req.body;
+        const { contentId } = req.params;
+        const { text } = req.body;
         const userId = req.user.id; // From protect middleware
 
         // Validate input
-        if (!contentId || !text) {
-            return res.status(400).json({ error: 'Content ID and comment text are required!' });
+        if (!text) {
+            return res.status(400).json({ error: 'Comment text is required!' });
         }
         if (typeof text !== 'string' || text.trim().length === 0) {
             return res.status(400).json({ error: 'Comment text cannot be empty!' });
@@ -458,6 +459,19 @@ const addComment = asyncHandler(async (req, res) => {
 
         // Get the newly added comment
         const addedComment = updatedContent.comments[updatedContent.comments.length - 1];
+
+        const wss = getWss();
+        wss.clients.forEach((client) => {
+            if (client.readyState === WebSocket.OPEN) {
+                client.send(JSON.stringify({
+                    event: 'comment_added',
+                    payload: {
+                        contentId: contentId,
+                        comment: addedComment,
+                    },
+                }));
+            }
+        });
 
         res.status(201).json({
             message: 'Comment added successfully!',
@@ -731,6 +745,19 @@ const likeContent = asyncHandler(async (req, res) => {
             await content.save();
         }
 
+        const wss = getWss();
+        wss.clients.forEach((client) => {
+            if (client.readyState === WebSocket.OPEN) {
+                client.send(JSON.stringify({
+                    event: 'content_liked',
+                    payload: {
+                        contentId: id,
+                        likes: content.likes.length,
+                    },
+                }));
+            }
+        });
+
         res.status(200).json({ message: 'Content liked successfully', likes: content.likes });
     } catch (error) {
         console.error(error);
@@ -754,6 +781,19 @@ const unlikeContent = asyncHandler(async (req, res) => {
             content.likes = content.likes.filter(like => like.toString() !== userId);
             await content.save();
         }
+
+        const wss = getWss();
+        wss.clients.forEach((client) => {
+            if (client.readyState === WebSocket.OPEN) {
+                client.send(JSON.stringify({
+                    event: 'content_unliked',
+                    payload: {
+                        contentId: id,
+                        likes: content.likes.length,
+                    },
+                }));
+            }
+        });
 
         res.status(200).json({ message: 'Content unliked successfully', likes: content.likes });
     } catch (error) {
