@@ -407,13 +407,12 @@ const generateUploadSignature = asyncHandler(async (req, res) => {
 // Add a comment to content
 const addComment = asyncHandler(async (req, res) => {
     try {
-        const { contentId } = req.params;
-        const { text } = req.body;
+        const { contentId, text } = req.body;
         const userId = req.user.id; // From protect middleware
 
         // Validate input
-        if (!text) {
-            return res.status(400).json({ error: 'Comment text is required!' });
+        if (!contentId || !text) {
+            return res.status(400).json({ error: 'Content ID and comment text are required!' });
         }
         if (typeof text !== 'string' || text.trim().length === 0) {
             return res.status(400).json({ error: 'Comment text cannot be empty!' });
@@ -459,19 +458,6 @@ const addComment = asyncHandler(async (req, res) => {
 
         // Get the newly added comment
         const addedComment = updatedContent.comments[updatedContent.comments.length - 1];
-
-        const wss = getWss();
-        wss.clients.forEach((client) => {
-            if (client.readyState === WebSocket.OPEN) {
-                client.send(JSON.stringify({
-                    event: 'comment_added',
-                    payload: {
-                        contentId: contentId,
-                        comment: addedComment,
-                    },
-                }));
-            }
-        });
 
         res.status(201).json({
             message: 'Comment added successfully!',
@@ -700,7 +686,7 @@ const rejectContent = asyncHandler(async (req, res) => {
 const updateContent = asyncHandler(async (req, res) => {
     try {
         const { id } = req.params;
-        const { title, category, description, credit, thumbnail, video } = req.body;
+        const { title, category, description, credit, thumbnail, video, likes } = req.body;
         
         let content = await contentSchema.findById(id);
         if (!content) {
@@ -718,84 +704,10 @@ const updateContent = asyncHandler(async (req, res) => {
         content.credit = credit || content.credit;
         content.thumbnail = thumbnail || content.thumbnail;
         content.video = video || content.video;
+        content.likes = likes || content.likes;
 
         const updatedContent = await content.save();
         res.status(200).json(updatedContent);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Server error' });
-    }
-});
-
-
-const likeContent = asyncHandler(async (req, res) => {
-    try {
-        const { id } = req.params;
-        const userId = req.user.id;
-
-        const content = await contentSchema.findById(id);
-
-        if (!content) {
-            return res.status(404).json({ error: 'Content not found' });
-        }
-
-        // Add user to likes if not already present
-        if (!content.likes.includes(userId)) {
-            content.likes.push(userId);
-            await content.save();
-        }
-
-        const wss = getWss();
-        wss.clients.forEach((client) => {
-            if (client.readyState === WebSocket.OPEN) {
-                client.send(JSON.stringify({
-                    event: 'content_liked',
-                    payload: {
-                        contentId: id,
-                        likes: content.likes.length,
-                    },
-                }));
-            }
-        });
-
-        res.status(200).json({ message: 'Content liked successfully', likes: content.likes });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Server error' });
-    }
-});
-
-const unlikeContent = asyncHandler(async (req, res) => {
-    try {
-        const { id } = req.params;
-        const userId = req.user.id;
-
-        const content = await contentSchema.findById(id);
-
-        if (!content) {
-            return res.status(404).json({ error: 'Content not found' });
-        }
-
-        // Remove user from likes if present
-        if (content.likes.includes(userId)) {
-            content.likes = content.likes.filter(like => like.toString() !== userId);
-            await content.save();
-        }
-
-        const wss = getWss();
-        wss.clients.forEach((client) => {
-            if (client.readyState === WebSocket.OPEN) {
-                client.send(JSON.stringify({
-                    event: 'content_unliked',
-                    payload: {
-                        contentId: id,
-                        likes: content.likes.length,
-                    },
-                }));
-            }
-        });
-
-        res.status(200).json({ message: 'Content unliked successfully', likes: content.likes });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Server error' });
@@ -1141,6 +1053,4 @@ module.exports = {
     getWatchlist,
     removeWatchlist,
     combineVideosByIds,
-    likeContent,
-    unlikeContent,
 }

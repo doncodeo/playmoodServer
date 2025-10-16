@@ -124,9 +124,10 @@ const shutdown = async () => {
   if (server) {
     server.close(async () => {
       console.log('HTTP server closed.');
-      if (workerInstance) {
-        await workerInstance.close();
-        console.log('Worker closed.');
+      if (workerInstance && workerInstance.uploadWorker && workerInstance.analyticsWorker) {
+        await workerInstance.uploadWorker.close();
+        await workerInstance.analyticsWorker.close();
+        console.log('Workers closed.');
       }
       // Close MongoDB connection if using Mongoose
       if (typeof require('mongoose').connection.close === 'function') {
