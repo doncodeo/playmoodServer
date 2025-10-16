@@ -252,4 +252,84 @@ describe('Content API', function() {
         });
     });
   });
+
+    describe('PUT /api/content/:id/like', () => {
+        let content;
+
+        beforeEach(async () => {
+            content = await Content.create({
+                user: userId,
+                title: 'Test Video',
+                category: 'Test',
+                description: 'A test video',
+                credit: 'Test User',
+                video: 'http://res.cloudinary.com/demo/video/upload/test.mp4',
+                cloudinary_video_id: 'test_video_id',
+                isApproved: true,
+            });
+        });
+
+        afterEach(async () => {
+            await Content.deleteMany({});
+        });
+
+        it('should like a content item', (done) => {
+            request(app)
+                .put(`/api/content/${content._id}/like`)
+                .set('Authorization', `Bearer ${token}`)
+                .expect(200)
+                .end((err, res) => {
+                    if (err) return done(err);
+                    if (res.body.message !== 'Content liked successfully') {
+                        return done(new Error('Incorrect like message'));
+                    }
+                    if (res.body.likes.length !== 1) {
+                        return done(new Error('Like count should be 1'));
+                    }
+                    if (res.body.likes[0] !== userId.toString()) {
+                        return done(new Error('User ID not added to likes'));
+                    }
+                    done();
+                });
+        });
+    });
+
+    describe('PUT /api/content/:id/unlike', () => {
+        let content;
+
+        beforeEach(async () => {
+            content = await Content.create({
+                user: userId,
+                title: 'Test Video',
+                category: 'Test',
+                description: 'A test video',
+                credit: 'Test User',
+                video: 'http://res.cloudinary.com/demo/video/upload/test.mp4',
+                cloudinary_video_id: 'test_video_id',
+                isApproved: true,
+                likes: [userId],
+            });
+        });
+
+        afterEach(async () => {
+            await Content.deleteMany({});
+        });
+
+        it('should unlike a content item', (done) => {
+            request(app)
+                .put(`/api/content/${content._id}/unlike`)
+                .set('Authorization', `Bearer ${token}`)
+                .expect(200)
+                .end((err, res) => {
+                    if (err) return done(err);
+                    if (res.body.message !== 'Content unliked successfully') {
+                        return done(new Error('Incorrect unlike message'));
+                    }
+                    if (res.body.likes.length !== 0) {
+                        return done(new Error('Like count should be 0'));
+                    }
+                    done();
+                });
+        });
+    });
 });

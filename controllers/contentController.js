@@ -686,7 +686,7 @@ const rejectContent = asyncHandler(async (req, res) => {
 const updateContent = asyncHandler(async (req, res) => {
     try {
         const { id } = req.params;
-        const { title, category, description, credit, thumbnail, video, likes } = req.body;
+        const { title, category, description, credit, thumbnail, video } = req.body;
         
         let content = await contentSchema.findById(id);
         if (!content) {
@@ -704,10 +704,58 @@ const updateContent = asyncHandler(async (req, res) => {
         content.credit = credit || content.credit;
         content.thumbnail = thumbnail || content.thumbnail;
         content.video = video || content.video;
-        content.likes = likes || content.likes;
 
         const updatedContent = await content.save();
         res.status(200).json(updatedContent);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+
+const likeContent = asyncHandler(async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user.id;
+
+        const content = await contentSchema.findById(id);
+
+        if (!content) {
+            return res.status(404).json({ error: 'Content not found' });
+        }
+
+        // Add user to likes if not already present
+        if (!content.likes.includes(userId)) {
+            content.likes.push(userId);
+            await content.save();
+        }
+
+        res.status(200).json({ message: 'Content liked successfully', likes: content.likes });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+const unlikeContent = asyncHandler(async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user.id;
+
+        const content = await contentSchema.findById(id);
+
+        if (!content) {
+            return res.status(404).json({ error: 'Content not found' });
+        }
+
+        // Remove user from likes if present
+        if (content.likes.includes(userId)) {
+            content.likes = content.likes.filter(like => like.toString() !== userId);
+            await content.save();
+        }
+
+        res.status(200).json({ message: 'Content unliked successfully', likes: content.likes });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Server error' });
@@ -1053,4 +1101,6 @@ module.exports = {
     getWatchlist,
     removeWatchlist,
     combineVideosByIds,
+    likeContent,
+    unlikeContent,
 }
