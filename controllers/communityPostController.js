@@ -2,6 +2,8 @@ const asyncHandler = require('express-async-handler');
 const CommunityPost = require('../models/communityPostModel');
 const User = require('../models/userModel');
 const mongoose = require('mongoose');
+const { getWss } = require('../websocket');
+const WebSocket = require('ws');
 
 
 // @desc    Create a new community post
@@ -178,7 +180,20 @@ const likeCommunityPost = asyncHandler(async (req, res) => {
         post.likes.push(userId); 
         await post.save();
 
-        res.status(200).json({ message: 'Post liked successfully' });
+        const wss = getWss();
+        wss.clients.forEach((client) => {
+            if (client.readyState === WebSocket.OPEN) {
+                client.send(JSON.stringify({
+                    event: 'community_post_liked',
+                    payload: {
+                        postId: postId,
+                        likes: post.likes.length,
+                    },
+                }));
+            }
+        });
+
+        res.status(200).json(post);
     } catch (error) {
         res.status(500).json({ error: 'Server error: Unable to like post' });
     }
@@ -205,7 +220,20 @@ const unlikeCommunityPost = asyncHandler(async (req, res) => {
         post.likes = post.likes.filter((like) => like.toString() !== userId);
         await post.save();
 
-        res.status(200).json({ message: 'Post unliked successfully' });
+        const wss = getWss();
+        wss.clients.forEach((client) => {
+            if (client.readyState === WebSocket.OPEN) {
+                client.send(JSON.stringify({
+                    event: 'community_post_unliked',
+                    payload: {
+                        postId: postId,
+                        likes: post.likes.length,
+                    },
+                }));
+            }
+        });
+
+        res.status(200).json(post);
     } catch (error) {
         res.status(500).json({ error: 'Server error: Unable to unlike post' });
     }
@@ -239,7 +267,20 @@ const commentOnCommunityPost = asyncHandler(async (req, res) => {
         post.comments.push(newComment);
         await post.save();
 
-        res.status(201).json(newComment);
+        const wss = getWss();
+        wss.clients.forEach((client) => {
+            if (client.readyState === WebSocket.OPEN) {
+                client.send(JSON.stringify({
+                    event: 'community_post_comment_added',
+                    payload: {
+                        postId: postId,
+                        comment: newComment,
+                    },
+                }));
+            }
+        });
+
+        res.status(201).json(post);
     } catch (error) {
         res.status(500).json({ error: 'Server error: Unable to add comment' });
     }
