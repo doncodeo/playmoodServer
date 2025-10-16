@@ -256,11 +256,7 @@ router.route('/:postId').delete(protect, deleteCommunityPost);
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: Post liked successfully
+ *               $ref: '#/components/schemas/CommunityPost'
  *       400:
  *         description: You have already liked this post
  *       404:
@@ -292,11 +288,7 @@ router.put('/:postId/like', protect, likeCommunityPost);
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: Post unliked successfully
+ *               $ref: '#/components/schemas/CommunityPost'
  *       400:
  *         description: You have not liked this post
  *       404:
@@ -339,21 +331,7 @@ router.put('/:postId/unlike', protect, unlikeCommunityPost);
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 _id:
- *                   type: string
- *                   example: 65a9fc7b72128447ad320250
- *                 user:
- *                   type: string
- *                   example: 65a8025e3af4e7929b379e7b
- *                 content:
- *                   type: string
- *                   example: Great post!
- *                 timestamp:
- *                   type: string
- *                   format: date-time
- *                   example: 2023-01-15T12:00:00Z
+ *               $ref: '#/components/schemas/CommunityPost'
  *       400:
  *         description: Comment content is required
  *       404:
