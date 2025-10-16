@@ -23,64 +23,8 @@ const {
     getWatchlist,
     removeWatchlist,
     combineVideosByIds,
-    likeContent,
-    unlikeContent,
 } = require('../controllers/contentController');
 const { protect, admin } = require('../middleware/authmiddleware');
-
-/**
- * @swagger
- * /api/content/{id}/like:
- *   put:
- *     summary: Like a content item
- *     description: Allows an authenticated user to like a specific content item.
- *     tags: [Content]
- *     security:
- *       - BearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: ID of the content to like
- *     responses:
- *       200:
- *         description: Content liked successfully
- *       401:
- *         description: Unauthorized
- *       404:
- *         description: Content not found
- *       500:
- *         description: Server error
- */
-
-/**
- * @swagger
- * /api/content/{id}/unlike:
- *   put:
- *     summary: Unlike a content item
- *     description: Allows an authenticated user to unlike a specific content item.
- *     tags: [Content]
- *     security:
- *       - BearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: ID of the content to unlike
- *     responses:
- *       200:
- *         description: Content unliked successfully
- *       401:
- *         description: Unauthorized
- *       404:
- *         description: Content not found
- *       500:
- *         description: Server error
- */
 
 /**
  * @swagger
@@ -969,9 +913,6 @@ router.route('/watchlist/remove').post(protect, removeWatchlist);
  *         description: Server error
  */
 router.route('/:id').get(getContentById);
-
-router.route('/:id/like').put(protect, likeContent);
-router.route('/:id/unlike').put(protect, unlikeContent);
 
 /**
  * @swagger
