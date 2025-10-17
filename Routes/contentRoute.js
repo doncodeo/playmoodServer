@@ -23,8 +23,96 @@ const {
     getWatchlist,
     removeWatchlist,
     combineVideosByIds,
+    likeContent,
+    unlikeContent,
 } = require('../controllers/contentController');
 const { protect, admin } = require('../middleware/authmiddleware');
+
+/**
+ * @swagger
+ * /api/content/{id}/like:
+ *   put:
+ *     summary: Like a piece of content
+ *     tags: [Content]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The ID of the content to like
+ *     responses:
+ *       200:
+ *         description: Content liked successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Content liked successfully
+ *                 likes:
+ *                   type: array
+ *                   items:
+ *                     type: string
+ *                 likesCount:
+ *                   type: integer
+ *       400:
+ *         description: Invalid content ID
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Content not found
+ *       500:
+ *         description: Server error
+ */
+router.route('/:id/like').put(protect, likeContent);
+
+/**
+ * @swagger
+ * /api/content/{id}/unlike:
+ *   put:
+ *     summary: Unlike a piece of content
+ *     tags: [Content]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The ID of the content to unlike
+ *     responses:
+ *       200:
+ *         description: Content unliked successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Content unliked successfully
+ *                 likes:
+ *                   type: array
+ *                   items:
+ *                     type: string
+ *                 likesCount:
+ *                   type: integer
+ *       400:
+ *         description: Invalid content ID
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Content not found
+ *       500:
+ *         description: Server error
+ */
+router.route('/:id/unlike').put(protect, unlikeContent);
 
 /**
  * @swagger

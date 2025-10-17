@@ -815,168 +815,30 @@ const getUserprofile = asyncHandler(async (req, res) => {
 // @route PUT /api/user/like/:id (user id) push the content id  {"contentId": "65a6fc7b72128447ad32024e", "userId": "65a8025e3af4e7929b379e7b"}
 
 
-const likeContent = asyncHandler(async (req, res) => {
-    try {
-        const contentId = req.body.contentId;
-        const userId = req.user.id; // Use req.user.id from protect middleware
-
-        // Log for debugging
-        console.log({ userId, contentId });
-
-        // Validate ObjectIds
-        if (!mongoose.Types.ObjectId.isValid(userId)) {
-            return res.status(400).json({ error: 'Invalid user ID' });
-        }
-        if (!mongoose.Types.ObjectId.isValid(contentId)) {
-            return res.status(400).json({ error: 'Invalid content ID' });
-        }
-
-        // Check if the user exists
-        const user = await userData.findById(userId);
-        if (!user) {
-            return res.status(404).json({ error: 'User not found' });
-        }
-
-        // Check if the content exists
-        const content = await contentSchema.findById(contentId);
-        if (!content) {
-            return res.status(404).json({ error: 'Content not found' });
-        }
-
-        // Check if the user has already liked the content
-        if (user.likes.includes(contentId)) {
-            return res.status(400).json({ error: 'This user already liked this content' });
-        }
-
-        // Check if the content has the user in its likes array
-        if (content.likes.includes(userId)) {
-            return res.status(400).json({ error: 'This content is already liked by the user' });
-        }
-
-        // Add the content to the user's likes array
-        const updatedUser = await userData.findByIdAndUpdate(
-            userId,
-            { $push: { likes: contentId } },
-            { new: true }
-        );
-
-        // Add the user to the content's likes array
-        const updatedContent = await contentSchema.findByIdAndUpdate(
-            contentId,
-            { $push: { likes: userId } },
-            { new: true }
-        );
-
-        // Check if updates were successful
-        if (!updatedUser || !updatedContent) {
-            return res.status(500).json({ error: 'Failed to update likes' });
-        }
-
-        res.status(200).json({ 
-            message: "User successfully liked content", 
-            userLikes: updatedUser.likes, 
-            contentLikes: updatedContent.likes 
-        });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Server error', details: error.message });
-    }
-});
-
-
-const unlikeContent = asyncHandler(async (req, res) => {
-    try {
-        const contentId = req.body.contentId;
-        const userId = req.user.id; // Use authenticated user's ID from protect middleware
-
-        console.log({ userId, contentId }); // Debug
-
-        // Validate ObjectIds
-        if (!mongoose.Types.ObjectId.isValid(userId)) {
-            return res.status(400).json({ error: 'Invalid user ID' });
-        }
-        if (!mongoose.Types.ObjectId.isValid(contentId)) {
-            return res.status(400).json({ error: 'Invalid content ID' });
-        }
-
-        // Check if the user exists
-        const user = await userData.findById(userId);
-        if (!user) {
-            return res.status(404).json({ error: 'User not found' });
-        }
-
-        // Check if the content exists
-        const content = await contentSchema.findById(contentId);
-        if (!content) {
-            return res.status(404).json({ error: 'Content not found' });
-        }
-
-        // Check if the user has liked the content
-        if (!user.likes.includes(contentId)) {
-            return res.status(400).json({ error: 'User has not liked this content' });
-        }
-
-        // Remove the content from the user's likes array
-        const updatedUser = await userData.findByIdAndUpdate(
-            userId,
-            { $pull: { likes: contentId } },
-            { new: true }
-        );
-
-        // Remove the user from the content's likes array
-        const updatedContent = await contentSchema.findByIdAndUpdate(
-            contentId,
-            { $pull: { likes: userId } },
-            { new: true }
-        );
-
-        // Check if updates were successful
-        if (!updatedUser || !updatedContent) {
-            return res.status(500).json({ error: 'Failed to update likes' });
-        }
-
-        res.status(200).json({
-            message: 'Content unliked successfully',
-            user: updatedUser, // Align with Swagger documentation
-            contentId: contentId
-        });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Server error', details: error.message });
-    }
-});
 
 // @desc    Get liked content for the authenticated user
 // @route   GET /api/users/likes
 // @access  Private
 const getLikedContents = asyncHandler(async (req, res) => {
-    const userId = req.user.id; // Get userId from authenticated user
+    const userId = req.user.id;
 
-    // Validate userId format (should always be valid from protect middleware)
     if (!mongoose.Types.ObjectId.isValid(userId)) {
         return res.status(400).json({ error: 'Invalid user ID format' });
     }
 
     try {
-        // Find user and populate likes
-        const user = await userData.findById(userId).populate({
-            path: 'likes',
-            select: 'title category description thumbnail video shortPreview previewUrl isApproved comments', // Include relevant fields
-            match: { isApproved: true }, // Optional: Only return approved content
-            populate: {
+        const likedContents = await contentSchema.find({ likes: userId, isApproved: true })
+            .select('title category description thumbnail video shortPreview isApproved comments')
+            .populate({
+                path: 'user',
+                select: 'name profileImage',
+            })
+            .populate({
                 path: 'comments.user',
-                select: 'name profileImage', // Populate comment user details
-            },
-        });
+                select: 'name profileImage',
+            });
 
-        // Check if user exists
-        if (!user) {
-            return res.status(404).json({ error: 'User not found' });
-        }
-
-        res.status(200).json({
-            likedContents: user.likes || [], // Return empty array if no likes
-        });
+        res.status(200).json({ likedContents: likedContents || [] });
     } catch (error) {
         console.error('Get liked contents error:', JSON.stringify(error, null, 2));
         res.status(500).json({ error: 'Server error', details: error.message });
@@ -1241,8 +1103,6 @@ const getCreatorApplicationStatus = asyncHandler(async (req, res) => {
     getUserprofile,
     updateUser,
     deleteUser,
-    likeContent,
-    unlikeContent,
     getLikedContents,
     saveContentToHistory,
     getUserHistory,
