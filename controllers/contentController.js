@@ -708,7 +708,6 @@ const updateContent = asyncHandler(async (req, res) => {
         content.credit = credit || content.credit;
         content.thumbnail = thumbnail || content.thumbnail;
         content.video = video || content.video;
-        content.likes = likes || content.likes;
 
         const updatedContent = await content.save();
         res.status(200).json(updatedContent);
@@ -1034,6 +1033,106 @@ const combineVideosByIds = asyncHandler(async (req, res) => {
 
 
 
+// @desc    Like a piece of content
+// @route   PUT /api/content/:id/like
+// @access  Private
+const likeContent = asyncHandler(async (req, res) => {
+    const { id: contentId } = req.params;
+    const userId = req.user.id;
+
+    if (!mongoose.Types.ObjectId.isValid(contentId)) {
+        return res.status(400).json({ error: 'Invalid content ID' });
+    }
+
+    const content = await contentSchema.findById(contentId);
+
+    if (!content) {
+        return res.status(404).json({ error: 'Content not found' });
+    }
+
+    // Use $addToSet to prevent duplicate likes
+    const updatedContent = await contentSchema.findByIdAndUpdate(
+        contentId,
+        { $addToSet: { likes: userId } },
+        { new: true }
+    ).populate('user', 'name profileImage');
+
+    if (!updatedContent) {
+        return res.status(404).json({ error: 'Content not found after update attempt' });
+    }
+
+    // Broadcast WebSocket event
+    const wss = getWss();
+    wss.clients.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(JSON.stringify({
+                event: 'content_liked',
+                payload: {
+                    contentId,
+                    userId,
+                    likesCount: updatedContent.likes.length,
+                },
+            }));
+        }
+    });
+
+    res.status(200).json({
+        message: 'Content liked successfully',
+        likes: updatedContent.likes,
+        likesCount: updatedContent.likes.length,
+    });
+});
+
+// @desc    Unlike a piece of content
+// @route   PUT /api/content/:id/unlike
+// @access  Private
+const unlikeContent = asyncHandler(async (req, res) => {
+    const { id: contentId } = req.params;
+    const userId = req.user.id;
+
+    if (!mongoose.Types.ObjectId.isValid(contentId)) {
+        return res.status(400).json({ error: 'Invalid content ID' });
+    }
+
+    const content = await contentSchema.findById(contentId);
+
+    if (!content) {
+        return res.status(404).json({ error: 'Content not found' });
+    }
+
+    // Use $pull to remove the user's like
+    const updatedContent = await contentSchema.findByIdAndUpdate(
+        contentId,
+        { $pull: { likes: userId } },
+        { new: true }
+    ).populate('user', 'name profileImage');
+
+    if (!updatedContent) {
+        return res.status(404).json({ error: 'Content not found after update attempt' });
+    }
+
+    // Broadcast WebSocket event
+    const wss = getWss();
+    wss.clients.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(JSON.stringify({
+                event: 'content_unliked',
+                payload: {
+                    contentId,
+                    userId,
+                    likesCount: updatedContent.likes.length,
+                },
+            }));
+        }
+    });
+
+    res.status(200).json({
+        message: 'Content unliked successfully',
+        likes: updatedContent.likes,
+        likesCount: updatedContent.likes.length,
+    });
+});
+
 module.exports = {
     getContent,
     getRecentContent,
@@ -1057,4 +1156,6 @@ module.exports = {
     getWatchlist,
     removeWatchlist,
     combineVideosByIds,
+    likeContent,
+    unlikeContent,
 }
