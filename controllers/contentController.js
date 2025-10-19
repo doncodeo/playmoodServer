@@ -245,7 +245,7 @@ const getContentById = asyncHandler(async (req, res) => {
     const userId = req.user ? req.user._id : null;
     const viewerIP = req.ip;
 
-    const content = await contentSchema.findById(id).populate('user', 'name');
+    const content = await contentSchema.findById(id).select('title thumbnail user views createdAt category video description credit likes comments updatedAt shortPreview highlights viewers viewerIPs cloudinary_video_id').populate('user', 'name');
     if (!content) {
         return res.status(404).json({ error: 'Content not found' });
     }
