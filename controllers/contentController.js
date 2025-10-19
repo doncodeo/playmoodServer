@@ -245,7 +245,7 @@ const getContentById = asyncHandler(async (req, res) => {
     const userId = req.user ? req.user._id : null;
     const viewerIP = req.ip;
 
-    const content = await contentSchema.findById(id).select('title thumbnail user views createdAt category video description credit likes comments updatedAt shortPreview highlights viewers viewerIPs cloudinary_video_id').populate('user', 'name');
+    const content = await contentSchema.findById(id).select('title thumbnail user views createdAt category video description credit likes comments updatedAt shortPreview highlights viewers viewerIPs').populate('user', 'name');
     if (!content) {
         return res.status(404).json({ error: 'Content not found' });
     }
@@ -284,6 +284,11 @@ const getContentById = asyncHandler(async (req, res) => {
             contentData.highlightUrl = `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/video/upload/e_accelerate:50,so_${highlight.startTime},eo_${highlight.endTime}/${content.cloudinary_video_id}.mp4`;
         }
     }
+
+    // Remove unnecessary fields before sending the response
+    delete contentData.viewers;
+    delete contentData.viewerIPs;
+    delete contentData.cloudinary_video_id;
 
     res.status(200).json(contentData);
 });
