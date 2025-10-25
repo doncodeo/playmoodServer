@@ -302,6 +302,14 @@ const createContent = asyncHandler(async (req, res) => {
         const { title, category, description, credit, previewStart, previewEnd, languageCode, video, thumbnail } = req.body;
         const userId = req.user.id; // Use the authenticated user's ID
 
+        // Enforce HTTPS
+        if (video && video.url) {
+            video.url = video.url.replace(/^http:\/\//i, 'https://');
+        }
+        if (thumbnail && thumbnail.url) {
+            thumbnail.url = thumbnail.url.replace(/^http:\/\//i, 'https://');
+        }
+
         // 1. Initial Validation
         if (!title || !category || !description || !credit || !video) {
             return res.status(400).json({ error: 'Important fields, including video data, are missing!' });
@@ -697,6 +705,14 @@ const updateContent = asyncHandler(async (req, res) => {
         const { id } = req.params;
         const { title, category, description, credit, thumbnail, video, likes } = req.body;
         
+        // Enforce HTTPS on URLs
+        if (video && typeof video === 'string') {
+            video = video.replace(/^http:\/\//i, 'https://');
+        }
+        if (thumbnail && typeof thumbnail === 'string') {
+            thumbnail = thumbnail.replace(/^http:\/\//i, 'https://');
+        }
+
         let content = await contentSchema.findById(id);
         if (!content) {
             return res.status(404).json({ error: 'Content not found' });

@@ -61,24 +61,19 @@ describe('Channel Controller - Integration Tests', () => {
 
     describe('PUT /api/channel/:userId/banner', () => {
         it('should update the channel banner image and return success', async () => {
-            const newImageData = {
-                url: 'http://new.banner.url/image.jpg',
-                public_id: 'new_banner_id'
-            };
-
             const res = await chai.request(app)
                 .put(`/api/channel/${creator._id}/banner`)
                 .set('Authorization', `Bearer ${token}`)
-                .send(newImageData);
+                .send({ url: 'http://new.banner.url/image.jpg', public_id: 'new_banner_id' });
 
             expect(res).to.have.status(200);
             expect(res.body).to.have.property('message', 'Channel banner image updated successfully');
-            expect(res.body).to.have.property('bannerImage', newImageData.url);
+            expect(res.body).to.have.property('bannerImage', 'https://new.banner.url/image.jpg');
 
             // Verify the database was updated
             const updatedUser = await User.findById(creator._id);
-            expect(updatedUser.bannerImage).to.equal(newImageData.url);
-            expect(updatedUser.bannerImageId).to.equal(newImageData.public_id);
+            expect(updatedUser.bannerImage).to.equal('https://new.banner.url/image.jpg');
+            expect(updatedUser.bannerImageId).to.equal('new_banner_id');
 
             // Verify the old image was deleted
             expect(cloudinary.uploader.destroy.calledOnceWith('old_id')).to.be.true;

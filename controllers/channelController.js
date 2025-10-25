@@ -135,7 +135,7 @@ const updateChannelBannerImage = asyncHandler(async (req, res) => {
     await cloudinary.uploader.destroy(user.bannerImageId);
   }
 
-  user.bannerImage = url;
+  user.bannerImage = url.replace(/^http:\/\//i, 'https://');
   user.bannerImageId = public_id;
   await user.save();
 
