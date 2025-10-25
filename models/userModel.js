@@ -1,5 +1,13 @@
 const mongoose = require('mongoose');
 
+// Helper function to enforce HTTPS on URLs
+const enforceHttps = (url) => {
+    if (typeof url === 'string') {
+        return url.replace(/^http:\/\//i, 'https://');
+    }
+    return url;
+};
+
 const userRoles = ['user', 'creator', 'admin'];
 
 const userSchema = new mongoose.Schema(
@@ -33,6 +41,7 @@ const userSchema = new mongoose.Schema(
         },
         profileImage: {
             type: String,
+            get: enforceHttps,
         },
         cloudinary_id: {
             type: String,
@@ -93,6 +102,7 @@ const userSchema = new mongoose.Schema(
         bannerImage: {
             type: String,
             default: 'https://img.freepik.com/free-vector/gradient-colored-youtube-banner_23-2149209334.jpg',
+            get: enforceHttps,
         },
         bannerImageId: {
             type: String,
