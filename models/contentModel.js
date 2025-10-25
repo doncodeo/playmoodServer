@@ -164,7 +164,7 @@ contentSchema.virtual('commentsCount').get(function () {
 });
 
 // Ensure virtual fields are included in toJSON output
-contentSchema.set('toJSON', { virtuals: true });
-contentSchema.set('toObject', { virtuals: true });
+contentSchema.set('toJSON', { virtuals: true, getters: true });
+contentSchema.set('toObject', { virtuals: true, getters: true });
 
 module.exports = mongoose.model('Contents', contentSchema);

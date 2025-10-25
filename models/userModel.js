@@ -164,6 +164,8 @@ const userSchema = new mongoose.Schema(
     },
     {
         timestamps: true,
+        toJSON: { getters: true },
+        toObject: { getters: true },
     }
 );
 
