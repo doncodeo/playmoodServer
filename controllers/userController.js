@@ -547,7 +547,7 @@ const updateUser = asyncHandler(async (req, res) => {
             }
 
             // Update profile image and Cloudinary ID
-            user.profileImage = result.secure_url;
+            user.profileImage = result.secure_url.replace(/^http:\/\//i, 'https://');
             user.cloudinary_id = result.public_id;
             updatedFields.push('profileImage');
         } catch (error) {
