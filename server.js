@@ -18,6 +18,12 @@ const server = http.createServer(app);
 let workerInstance;
 
 app.set('trust proxy', 1); // Trust the first proxy
+app.use((req, res, next) => {
+  if (req.headers['x-forwarded-proto'] !== 'https') {
+    return res.redirect('https://' + req.headers.host + req.url);
+  }
+  next();
+});
 const passport = require('passport');
 const port = process.env.PORT || 5000;
 
