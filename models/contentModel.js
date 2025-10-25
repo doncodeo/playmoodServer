@@ -1,5 +1,13 @@
 const mongoose = require('mongoose');
 
+// Helper function to enforce HTTPS on URLs
+const enforceHttps = (url) => {
+    if (typeof url === 'string') {
+        return url.replace(/^http:\/\//i, 'https://');
+    }
+    return url;
+};
+
 const contentSchema = new mongoose.Schema(
     {
         user: {
@@ -21,6 +29,7 @@ const contentSchema = new mongoose.Schema(
         },
         thumbnail: {
             type: String,
+            get: enforceHttps,
         },
         shortPreview: {
             type: {
@@ -41,6 +50,7 @@ const contentSchema = new mongoose.Schema(
         video: {
             type: String,
             required: true,
+            get: enforceHttps,
         },
         cloudinary_video_id: {
             type: String,
