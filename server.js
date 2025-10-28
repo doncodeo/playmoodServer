@@ -95,6 +95,7 @@ app.use('/api/playlists', require('./Routes/playlistRoutes'));
 app.use('/api/highlights', require('./Routes/highlightRoute'));
 app.use('/api/ai', require('./Routes/aiRoute'));
 app.use('/api/analytics', require('./Routes/analyticsRoute'));
+app.use('/api/feed', require('./Routes/feedPostRoute'));
 
 // Serve login.html for /login route
 app.get('/login', (req, res) => {
