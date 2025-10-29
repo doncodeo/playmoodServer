@@ -38,6 +38,8 @@ const mainProcessor = async (job) => {
     switch (job.name) {
         case 'process-upload':
             return await processUpload(job);
+        case 'generate-captions':
+            return await processCaptionGeneration(job);
         case 'combine-videos':
             return await processVideoCombination(job);
         case 'aggregate-platform-stats':
@@ -150,6 +152,48 @@ const processUpload = async (job) => {
             await content.save();
         }
         throw error; // Re-throw to let BullMQ handle the job failure
+    }
+};
+
+const processCaptionGeneration = async (job) => {
+    const { contentId, languageCode } = job.data;
+    console.log(`[Worker] Starting 'generate-captions' for content ID: ${contentId}`);
+
+    try {
+        const content = await contentSchema.findById(contentId);
+        if (!content) {
+            throw new Error(`Content with ID ${contentId} not found.`);
+        }
+
+        const captionText = await aiService.generateCaptions(content.video, contentId, languageCode);
+        if (captionText) {
+            const newCaption = {
+                languageCode: languageCode,
+                text: captionText,
+            };
+
+            const captionsIsArray = Array.isArray(content.captions);
+            const updateOperation = captionsIsArray
+                ? { $push: { captions: newCaption } }
+                : { $set: { captions: [newCaption] } };
+
+            await contentSchema.updateOne({ _id: contentId }, updateOperation);
+
+            console.log(`[${contentId}] Captions for language '${languageCode}' generated and saved successfully.`);
+        } else {
+            throw new Error('Caption generation returned no text.');
+        }
+
+        return { success: true };
+    } catch (error) {
+        console.error(`[Worker] Error in 'generate-captions' for job ${job.id}:`, error);
+        const content = await contentSchema.findById(contentId);
+        if (content) {
+            content.status = 'failed';
+            content.processingError = error.message;
+            await content.save();
+        }
+        throw error;
     }
 };
 

@@ -47,7 +47,7 @@ const { protect } = require('../middleware/authmiddleware');
  *       200:
  *         description: Captions already exist for the given language
  *       202:
- *         description: Caption generation started
+ *         description: Caption generation has been queued
  *         content:
  *           application/json:
  *             schema:
@@ -55,12 +55,9 @@ const { protect } = require('../middleware/authmiddleware');
  *               properties:
  *                 message:
  *                   type: string
- *                   example: Captions generated successfully
- *                 captions:
- *                   type: string
- *                   example: "This is a transcript of the video."
+ *                   example: "Caption generation for language 'es' has been queued."
  *       400:
- *         description: Content ID is required
+ *         description: Content ID or language code is required
  *       404:
  *         description: Content not found
  *       500:
