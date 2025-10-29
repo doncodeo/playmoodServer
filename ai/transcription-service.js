@@ -2,8 +2,10 @@ const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
 const ffmpeg = require('fluent-ffmpeg');
+const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
 const { pipeline, env } = require('@xenova/transformers');
 
+ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 env.cacheDir = '/tmp/transformers_cache';
 console.log('Using transformers cache directory:', env.cacheDir);
 
