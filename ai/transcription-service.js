@@ -26,21 +26,27 @@ class TranscriptionService {
         }
     }
 
-    async transcribe(url, language = 'eng_Latn') {
+    async transcribe(url, language = 'eng_Latn', contentId = 'N/A') {
         await this.initializing;
         if (!this.model) {
             throw new Error('Transcription model failed to load.');
         }
 
-        const videoPath = await this.download(url);
+        console.log(`[${contentId}] Transcription Service: Starting process.`);
+        const videoPath = await this.download(url, contentId);
         const tempAudioDir = path.join('/tmp', `chunks_${Date.now()}`);
         fs.mkdirSync(tempAudioDir, { recursive: true });
 
         try {
-            const chunkFiles = await this.extractAudioChunks(videoPath, tempAudioDir);
+            console.log(`[${contentId}] Transcription Service: Extracting audio chunks.`);
+            const chunkFiles = await this.extractAudioChunks(videoPath, tempAudioDir, contentId);
+            console.log(`[${contentId}] Transcription Service: Found ${chunkFiles.length} audio chunks.`);
             let fullTranscript = '';
+            let chunkCounter = 0;
 
             for (const audioPath of chunkFiles.sort()) {
+                chunkCounter++;
+                console.log(`[${contentId}] Transcription Service: Processing chunk ${chunkCounter} of ${chunkFiles.length}.`);
                 const buffer = fs.readFileSync(audioPath);
                 const wav = new wavefile.WaveFile(buffer);
                 wav.toBitDepth('32f');
@@ -61,13 +67,17 @@ class TranscriptionService {
                     fullTranscript += transcript.text.trim() + ' ';
                 }
             }
+            console.log(`[${contentId}] Transcription Service: Finished processing all chunks.`);
             return fullTranscript.trim();
         } finally {
+            console.log(`[${contentId}] Transcription Service: Cleaning up temporary files.`);
             await this.cleanup([videoPath], [tempAudioDir]);
+            console.log(`[${contentId}] Transcription Service: Cleanup complete.`);
         }
     }
 
-    async download(url) {
+    async download(url, contentId = 'N/A') {
+        console.log(`[${contentId}] Transcription Service: Downloading video from ${url}.`);
         const response = await axios({
             url,
             method: 'GET',
@@ -80,12 +90,18 @@ class TranscriptionService {
         response.data.pipe(writer);
 
         return new Promise((resolve, reject) => {
-            writer.on('finish', () => resolve(videoPath));
-            writer.on('error', reject);
+            writer.on('finish', () => {
+                console.log(`[${contentId}] Transcription Service: Video downloaded successfully to ${videoPath}.`);
+                resolve(videoPath);
+            });
+            writer.on('error', (error) => {
+                console.error(`[${contentId}] Transcription Service: Error downloading video.`, error);
+                reject(error);
+            });
         });
     }
 
-    async extractAudioChunks(videoPath, outputDir) {
+    async extractAudioChunks(videoPath, outputDir, contentId = 'N/A') {
         const outputPath = path.join(outputDir, 'chunk_%03d.wav');
 
         return new Promise((resolve, reject) => {
@@ -98,8 +114,12 @@ class TranscriptionService {
                     '-segment_time 30',
                     '-c:a pcm_s16le',
                 ])
-                .on('error', reject)
+                .on('error', (err) => {
+                    console.error(`[${contentId}] Transcription Service: FFMpeg error during audio extraction.`, err);
+                    reject(err);
+                })
                 .on('end', () => {
+                    console.log(`[${contentId}] Transcription Service: Audio extraction complete.`);
                     const chunks = fs.readdirSync(outputDir).map(file => path.join(outputDir, file));
                     resolve(chunks);
                 })
