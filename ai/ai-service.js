@@ -27,7 +27,7 @@ class AIService {
     async generateCaptions(url, contentId, languageCode = 'en') {
         console.log(`[${contentId}] AI Service: Starting caption generation for ${url} with language ${languageCode}`);
         try {
-            const transcript = await transcriptionService.transcribe(url, languageCode);
+            const transcript = await transcriptionService.transcribe(url, languageCode, contentId);
             console.log(`[${contentId}] Transcription complete.`);
             return transcript;
         } catch (error) {

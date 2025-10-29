@@ -50,6 +50,16 @@ const generateCaptions = asyncHandler(async (req, res) => {
         }
     }
 
+    // Check the number of active and waiting jobs
+    const jobCounts = await uploadQueue.getJobCounts('wait', 'active');
+    const totalJobs = jobCounts.wait + jobCounts.active;
+
+    if (totalJobs > 10) {
+        return res.status(503).json({
+            error: 'The captioning service is currently busy. Please try again in a few minutes.'
+        });
+    }
+
     // Add a job to the queue
     await uploadQueue.add('generate-captions', { contentId, languageCode });
 
