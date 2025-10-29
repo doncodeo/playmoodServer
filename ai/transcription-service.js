@@ -33,30 +33,37 @@ class TranscriptionService {
         }
 
         const videoPath = await this.download(url);
-        const audioPath = await this.extractAudio(videoPath);
+        const tempAudioDir = path.join('/tmp', `chunks_${Date.now()}`);
+        fs.mkdirSync(tempAudioDir, { recursive: true });
 
         try {
-            // Read the audio file and convert it to the format required by the model
-            const buffer = fs.readFileSync(audioPath);
-            const wav = new wavefile.WaveFile(buffer);
-            wav.toBitDepth('32f');
-            wav.toSampleRate(16000);
-            let audioData = wav.getSamples();
-            if (Array.isArray(audioData)) {
-                // For multi-channel audio, take the first channel
-                audioData = audioData[0];
+            const chunkFiles = await this.extractAudioChunks(videoPath, tempAudioDir);
+            let fullTranscript = '';
+
+            for (const audioPath of chunkFiles.sort()) {
+                const buffer = fs.readFileSync(audioPath);
+                const wav = new wavefile.WaveFile(buffer);
+                wav.toBitDepth('32f');
+                wav.toSampleRate(16000);
+                let audioData = wav.getSamples();
+                if (Array.isArray(audioData)) {
+                    audioData = audioData[0];
+                }
+
+                const transcript = await this.model(audioData, {
+                    chunk_length_s: 30,
+                    stride_length_s: 5,
+                    language: language,
+                    task: 'transcribe',
+                });
+
+                if (transcript && transcript.text) {
+                    fullTranscript += transcript.text.trim() + ' ';
+                }
             }
-
-            const transcript = await this.model(audioData, {
-                chunk_length_s: 30,
-                stride_length_s: 5,
-                language: language,
-                task: 'transcribe',
-            });
-
-            return transcript.text;
+            return fullTranscript.trim();
         } finally {
-            await this.cleanup([videoPath, audioPath]);
+            await this.cleanup([videoPath], [tempAudioDir]);
         }
     }
 
@@ -78,24 +85,37 @@ class TranscriptionService {
         });
     }
 
-    async extractAudio(videoPath) {
-        const audioPath = videoPath.replace('.mp4', '.wav');
+    async extractAudioChunks(videoPath, outputDir) {
+        const outputPath = path.join(outputDir, 'chunk_%03d.wav');
 
         return new Promise((resolve, reject) => {
             ffmpeg(videoPath)
                 .toFormat('wav')
-                .audioChannels(1) // Mono channel
-                .audioFrequency(16000) // 16000Hz sample rate
+                .audioChannels(1)
+                .audioFrequency(16000)
+                .outputOptions([
+                    '-f segment',
+                    '-segment_time 30',
+                    '-c:a pcm_s16le',
+                ])
                 .on('error', reject)
-                .on('end', () => resolve(audioPath))
-                .save(audioPath);
+                .on('end', () => {
+                    const chunks = fs.readdirSync(outputDir).map(file => path.join(outputDir, file));
+                    resolve(chunks);
+                })
+                .save(outputPath);
         });
     }
 
-    async cleanup(files) {
+    async cleanup(files, dirs = []) {
         for (const file of files) {
             if (fs.existsSync(file)) {
                 fs.unlinkSync(file);
+            }
+        }
+        for (const dir of dirs) {
+            if (fs.existsSync(dir)) {
+                fs.rmSync(dir, { recursive: true, force: true });
             }
         }
     }
