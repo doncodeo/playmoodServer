@@ -1,6 +1,5 @@
 const axios = require('axios');
 const cloudinary = require('../config/cloudinary');
-const transcriptionService = require('./transcription-service');
 
 // This service will act as an abstraction layer for our AI models and services.
 // It will expose a set of functions that our application can use without needing
@@ -27,6 +26,7 @@ class AIService {
     async generateCaptions(url, contentId, languageCode = 'en') {
         console.log(`[${contentId}] AI Service: Starting caption generation for ${url} with language ${languageCode}`);
         try {
+            const transcriptionService = require('./transcription-service');
             const transcript = await transcriptionService.transcribe(url, languageCode, contentId);
             console.log(`[${contentId}] Transcription complete.`);
             return transcript;
