@@ -2,7 +2,10 @@ const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
 const ffmpeg = require('fluent-ffmpeg');
-const { pipeline } = require('@xenova/transformers');
+const { pipeline, env } = require('@xenova/transformers');
+
+env.cacheDir = '/tmp/transformers_cache';
+console.log('Using transformers cache directory:', env.cacheDir);
 
 class TranscriptionService {
     constructor() {
