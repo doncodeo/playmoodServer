@@ -11,7 +11,6 @@ const { generalLimiter } = require('./middleware/rateLimiter');
 const compression = require('compression'); // Add compression
 const mongoSanitize = require('express-mongo-sanitize'); // Add input sanitizer
 const { initWebSocket } = require('./websocket');
-const { startWorker } = require('./worker-manager');
 
 const app = express();
 const server = http.createServer(app);
@@ -118,7 +117,6 @@ if (require.main === module) {
     .then(() => {
       console.log('MongoDB connected successfully.');
       initWebSocket(server); // Initialize WebSocket
-      workerInstance = startWorker(); // Start the worker
       server.listen(port, () => console.log(`Server started on port ${port}`));
     })
     .catch((error) => {
@@ -131,16 +129,11 @@ if (require.main === module) {
 const shutdown = async () => {
   console.log('\nGracefully shutting down...');
   if (server) {
-    server.close(async () => {
+    server.close(() => {
       console.log('HTTP server closed.');
-      if (workerInstance && workerInstance.uploadWorker && workerInstance.analyticsWorker) {
-        await workerInstance.uploadWorker.close();
-        await workerInstance.analyticsWorker.close();
-        console.log('Workers closed.');
-      }
-      // Close MongoDB connection if using Mongoose
-      if (typeof require('mongoose').connection.close === 'function') {
-        require('mongoose').connection.close(false, () => {
+      // Close MongoDB connection
+      if (mongoose.connection.readyState === 1) {
+        mongoose.connection.close(false, () => {
           console.log('MongoDB connection closed.');
           process.exit(0);
         });
