@@ -48,6 +48,7 @@
     "sinon": "^21.0.0",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
+    "wavefile": "^11.0.0",
     "ws": "^8.18.3",
     "xoauth2": "^1.2.0"
   },

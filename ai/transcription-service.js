@@ -3,6 +3,7 @@ const path = require('path');
 const axios = require('axios');
 const ffmpeg = require('fluent-ffmpeg');
 const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
+const wavefile = require('wavefile');
 const { pipeline, env } = require('@xenova/transformers');
 
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
@@ -35,7 +36,18 @@ class TranscriptionService {
         const audioPath = await this.extractAudio(videoPath);
 
         try {
-            const transcript = await this.model(audioPath, {
+            // Read the audio file and convert it to the format required by the model
+            const buffer = fs.readFileSync(audioPath);
+            const wav = new wavefile.WaveFile(buffer);
+            wav.toBitDepth('32f');
+            wav.toSampleRate(16000);
+            let audioData = wav.getSamples();
+            if (Array.isArray(audioData)) {
+                // For multi-channel audio, take the first channel
+                audioData = audioData[0];
+            }
+
+            const transcript = await this.model(audioData, {
                 chunk_length_s: 30,
                 stride_length_s: 5,
                 language: language,
@@ -67,11 +79,13 @@ class TranscriptionService {
     }
 
     async extractAudio(videoPath) {
-        const audioPath = videoPath.replace('.mp4', '.mp3');
+        const audioPath = videoPath.replace('.mp4', '.wav');
 
         return new Promise((resolve, reject) => {
             ffmpeg(videoPath)
-                .toFormat('mp3')
+                .toFormat('wav')
+                .audioChannels(1) // Mono channel
+                .audioFrequency(16000) // 16000Hz sample rate
                 .on('error', reject)
                 .on('end', () => resolve(audioPath))
                 .save(audioPath);
