@@ -113,8 +113,15 @@ const processUpload = async (job) => {
         // The rest of the original processing logic (e.g., captions, moderation) would go here.
         // For example, generating captions:
         if (languageCode) {
-            const captions = await aiService.generateCaptions(content.video, contentId, languageCode);
-            content.captions = captions;
+            const captionText = await aiService.generateCaptions(content.video, contentId, languageCode);
+            if (captionText) {
+                const captionIndex = content.captions.findIndex(c => c.languageCode === languageCode);
+                if (captionIndex > -1) {
+                    content.captions[captionIndex].text = captionText;
+                } else {
+                    content.captions.push({ languageCode, text: captionText });
+                }
+            }
         }
 
         // Mark as completed
