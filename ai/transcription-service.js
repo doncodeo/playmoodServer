@@ -18,8 +18,8 @@ class TranscriptionService {
 
     async init() {
         try {
-            this.model = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny');
-            console.log('Transcription model loaded successfully.');
+            this.model = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny', { quantized: true });
+            console.log('Quantized multilingual transcription model loaded successfully.');
         } catch (error) {
             console.error('Error loading transcription model:', error);
             throw error;
