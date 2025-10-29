@@ -1,4 +1,5 @@
 const asyncHandler = require('express-async-handler');
+const { Queue } = require('bullmq');
 const aiService = require('../ai/ai-service');
 const contentSchema = require('../models/contentModel');
 const { downloadFile } = require('../utils/fileHelpers');
@@ -8,6 +9,15 @@ const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
 const fsp = require('fs').promises;
+
+const redisConnectionOpts = {
+  connection: {
+    url: process.env.REDIS_URL,
+    tls: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
+  },
+};
+
+const uploadQueue = new Queue('upload', redisConnectionOpts);
 
 let isProcessing = false;
 
@@ -40,40 +50,11 @@ const generateCaptions = asyncHandler(async (req, res) => {
         }
     }
 
+    // Add a job to the queue
+    await uploadQueue.add('generate-captions', { contentId, languageCode });
+
     // Immediately respond that the process has started
-    res.status(202).json({ message: `Caption generation for language '${languageCode}' started. This is a long-running process.` });
-
-    // Run the captioning process in the background
-    (async () => {
-        const videoUrl = content.video;
-
-        try {
-            const captionText = await aiService.generateCaptions(videoUrl, contentId, languageCode);
-
-            if (captionText) {
-                const newCaption = {
-                    languageCode: languageCode,
-                    text: captionText,
-                };
-
-                // If the original captions field was an array, push the new caption.
-                // Otherwise, overwrite the old string field with a new array containing the new caption.
-                const updateOperation = captionsIsArray
-                    ? { $push: { captions: newCaption } }
-                    : { $set: { captions: [newCaption] } };
-
-                await contentSchema.updateOne({ _id: contentId }, updateOperation);
-
-                console.log(`[${contentId}] Captions for language '${languageCode}' generated and saved successfully.`);
-            } else {
-                throw new Error('Caption generation returned no text.');
-            }
-
-        } catch (error) {
-            console.error(`[${contentId}] Failed to generate captions for language '${languageCode}':`, error.message);
-            // Optionally, you could add a failed status to the DB here if needed
-        }
-    })();
+    res.status(202).json({ message: `Caption generation for language '${languageCode}' has been queued.` });
 });
 
 // @desc    Generate embeddings for a piece of content
