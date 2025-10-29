@@ -1,7 +1,6 @@
-const { AssemblyAI } = require('assemblyai');
 const axios = require('axios');
-const contentSchema = require('../models/contentModel');
 const cloudinary = require('../config/cloudinary');
+const transcriptionService = require('./transcription-service');
 
 // This service will act as an abstraction layer for our AI models and services.
 // It will expose a set of functions that our application can use without needing
@@ -9,13 +8,6 @@ const cloudinary = require('../config/cloudinary');
 
 class AIService {
     constructor() {
-        if (process.env.ASSEMBLYAI_API_KEY) {
-            this.assemblyai = new AssemblyAI({
-                apiKey: process.env.ASSEMBLYAI_API_KEY,
-            });
-        } else {
-            this.assemblyai = null;
-        }
         this.heygen = axios.create({
             baseURL: 'https://api.heygen.com/v2',
             headers: {
@@ -32,28 +24,15 @@ class AIService {
      * @param {string} languageCode - The language code for transcription.
      * @returns {Promise<string>} The generated transcript.
      */
-    async generateCaptions(url, contentId, languageCode = 'en_us') {
-        if (!this.assemblyai) {
-            console.warn(`[${contentId}] AssemblyAI service is not initialized due to missing API key. Skipping caption generation.`);
-            return null;
-        }
+    async generateCaptions(url, contentId, languageCode = 'en') {
         console.log(`[${contentId}] AI Service: Starting caption generation for ${url} with language ${languageCode}`);
-
         try {
-            const transcript = await this.assemblyai.transcripts.transcribe({
-                audio: url,
-                language_code: languageCode,
-            });
-
-            if (transcript.status === 'error') {
-                throw new Error(`Transcription failed: ${transcript.error}`);
-            }
-
+            const transcript = await transcriptionService.transcribe(url, languageCode);
             console.log(`[${contentId}] Transcription complete.`);
-            return transcript.text;
+            return transcript;
         } catch (error) {
             console.error(`[${contentId}] An error occurred during transcription:`, error);
-            throw new Error(`AssemblyAI error: ${error.message}`);
+            throw new Error(`Transcription error: ${error.message}`);
         }
     }
 
