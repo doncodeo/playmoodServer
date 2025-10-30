@@ -215,6 +215,7 @@ const redisConnectionOpts = {
   lockRenewTime: 450000, // 7.5 minutes
 };
 
+// Force update
 let uploadWorker;
 let analyticsWorker;
 let analyticsQueue;
