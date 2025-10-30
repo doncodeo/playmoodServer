@@ -61,7 +61,10 @@ const generateCaptions = asyncHandler(async (req, res) => {
     }
 
     // Add a job to the queue
-    await uploadQueue.add('generate-captions', { contentId, languageCode });
+    await uploadQueue.add('generate-captions', { contentId, languageCode }, {
+        attempts: 1,
+        removeOnFail: true,
+    });
 
     // Immediately respond that the process has started
     res.status(202).json({ message: `Caption generation for language '${languageCode}' has been queued.` });
