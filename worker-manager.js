@@ -160,9 +160,15 @@ const processCaptionGeneration = async (job) => {
     console.log(`[Worker] Starting 'generate-captions' for content ID: ${contentId}`);
 
     try {
-        const content = await contentSchema.findById(contentId);
+        let content = await contentSchema.findById(contentId);
         if (!content) {
             throw new Error(`Content with ID ${contentId} not found.`);
+        }
+
+        // Check for existing captions one more time to prevent race conditions
+        if (Array.isArray(content.captions) && content.captions.some(c => c.languageCode === languageCode)) {
+            console.log(`[Worker] Captions for language '${languageCode}' already exist for content ${contentId}. Skipping generation.`);
+            return { success: true, message: 'Captions already exist.' };
         }
 
         const captionText = await aiService.generateCaptions(content.video, contentId, languageCode);
@@ -172,6 +178,8 @@ const processCaptionGeneration = async (job) => {
                 text: captionText,
             };
 
+            // Re-fetch the content to ensure the captions array is the latest version
+            content = await contentSchema.findById(contentId);
             const captionsIsArray = Array.isArray(content.captions);
             const updateOperation = captionsIsArray
                 ? { $push: { captions: newCaption } }

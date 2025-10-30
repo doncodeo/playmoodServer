@@ -8,6 +8,7 @@ const {
     translateVideo,
     processPendingTranslations,
     getSupportedLanguages,
+    getSupportedTranscriptionLanguages,
 } = require('../controllers/aiController');
 const { protect } = require('../middleware/authmiddleware');
 
@@ -315,5 +316,28 @@ router.get('/process-translations-manual', processPendingTranslations);
  *         description: Failed to fetch supported languages
  */
 router.get('/supported-languages', protect, getSupportedLanguages);
+
+/**
+ * @swagger
+ * /api/ai/supported-transcription-languages:
+ *   get:
+ *     summary: Get a list of supported languages for transcription
+ *     description: Returns an object where keys are language codes (e.g., "en") and values are full language names (e.g., "English") supported by the Whisper transcription model.
+ *     tags: [AI]
+ *     responses:
+ *       200:
+ *         description: An object of supported languages
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               additionalProperties:
+ *                 type: string
+ *               example:
+ *                 en: "English"
+ *                 es: "Spanish"
+ *                 fr: "French"
+ */
+router.get('/supported-transcription-languages', getSupportedTranscriptionLanguages);
 
 module.exports = router;

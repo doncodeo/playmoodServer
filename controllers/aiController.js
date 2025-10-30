@@ -357,6 +357,26 @@ const getSupportedLanguages = asyncHandler(async (req, res) => {
     }
 });
 
+// @desc    Get a list of supported languages for transcription
+// @route   GET /api/ai/supported-transcription-languages
+// @access  Public
+const getSupportedTranscriptionLanguages = asyncHandler(async (req, res) => {
+    const languages = {
+        "en": "English",
+        "es": "Spanish",
+        "fr": "French",
+        "de": "German",
+        "it": "Italian",
+        "pt": "Portuguese",
+        "ru": "Russian",
+        "zh": "Chinese",
+        "ja": "Japanese",
+        "ko": "Korean",
+        "ar": "Arabic",
+    };
+    res.status(200).json(languages);
+});
+
 module.exports = {
     generateCaptions,
     generateEmbeddings,
@@ -365,4 +385,5 @@ module.exports = {
     translateVideo,
     processPendingTranslations,
     getSupportedLanguages,
+    getSupportedTranscriptionLanguages,
 };
