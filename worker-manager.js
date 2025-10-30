@@ -210,7 +210,7 @@ const redisConnectionOpts = {
     url: process.env.REDIS_URL,
     tls: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
   },
-  concurrency: 2,
+  concurrency: 1,
   lockDuration: 900000, // 15 minutes
   lockRenewTime: 450000, // 7.5 minutes
 };
