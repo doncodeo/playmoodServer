@@ -211,8 +211,8 @@ const redisConnectionOpts = {
     tls: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
   },
   concurrency: 5,
-  lockDuration: 300000, // 5 minutes
-  lockRenewTime: 150000, // 2.5 minutes
+  lockDuration: 900000, // 15 minutes
+  lockRenewTime: 450000, // 7.5 minutes
 };
 
 let uploadWorker;
