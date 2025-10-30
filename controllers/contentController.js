@@ -19,7 +19,7 @@ const { createHighlightForContent } = require('../worker-manager');
 // @access Private
 const getContent = asyncHandler(async (req, res) => {
     const content = await contentSchema.find({ isApproved: true })
-    .select('title thumbnail user views createdAt category video description credit likes updatedAt')
+    .select('title thumbnail user views createdAt category video description credit likes updatedAt captions')
     .populate('user', 'name').lean();
     const lastUpdated = content.length > 0 ? Math.max(...content.map(c => c.updatedAt.getTime())) : 0;
     const etag = `"all-${content.length}-${lastUpdated}"`;
@@ -38,7 +38,7 @@ const getRecentContent = asyncHandler(async (req, res) => {
         const recentContents = await contentSchema.find({ isApproved: true })
             .sort({ createdAt: -1 })
             .limit(10)
-            .select('title thumbnail user views createdAt category video description credit likes updatedAt')
+            .select('title thumbnail user views createdAt category video description credit likes updatedAt captions')
             .populate('user', 'name');
 
         // Generate an ETag based on recent content
@@ -68,7 +68,7 @@ const getTopTenContent = asyncHandler(async (req, res) => {
         const topContents = await contentSchema.find({ isApproved: true })
             .sort({ views: -1 })
             .limit(10)
-            .select('title thumbnail user views createdAt category video description credit likes updatedAt')
+            .select('title thumbnail user views createdAt category video description credit likes updatedAt captions')
             .populate('user', 'name')
             .lean();
 
@@ -245,7 +245,7 @@ const getContentById = asyncHandler(async (req, res) => {
     const userId = req.user ? req.user._id : null;
     const viewerIP = req.ip;
 
-    const content = await contentSchema.findById(id).select('title thumbnail user views createdAt category video description credit likes comments updatedAt shortPreview highlights viewers viewerIPs').populate('user', 'name');
+    const content = await contentSchema.findById(id).select('title thumbnail user views createdAt category video description credit likes comments updatedAt shortPreview highlights viewers viewerIPs captions').populate('user', 'name');
     if (!content) {
         return res.status(404).json({ error: 'Content not found' });
     }
