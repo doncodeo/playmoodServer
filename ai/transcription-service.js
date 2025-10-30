@@ -18,7 +18,7 @@ class TranscriptionService {
 
     async init() {
         try {
-            this.model = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny', { quantized: true });
+            this.model = await pipeline('automatic-speech-recognition', 'Xenova/whisper-small', { quantized: true });
             console.log('Quantized multilingual transcription model loaded successfully.');
         } catch (error) {
             console.error('Error loading transcription model:', error);
@@ -56,11 +56,14 @@ class TranscriptionService {
                     audioData = audioData[0];
                 }
 
+                const task = language === 'en' ? 'translate' : 'transcribe';
+                console.log(`[${contentId}] Transcription Service: Using task '${task}' for language '${language}'.`);
+
                 const transcript = await this.model(audioData, {
                     chunk_length_s: 30,
                     stride_length_s: 5,
                     language: language,
-                    task: 'transcribe',
+                    task: task,
                 });
 
                 if (transcript && transcript.text) {
