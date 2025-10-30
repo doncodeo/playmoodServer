@@ -16,7 +16,7 @@ const app = express();
 const server = http.createServer(app);
 let workerInstance;
 
-if (process.env.NODE_ENV !== 'test') {
+if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1); // Trust the first proxy
   app.use((req, res, next) => {
     if (req.headers['x-forwarded-proto'] !== 'https') {
