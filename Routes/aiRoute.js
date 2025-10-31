@@ -10,7 +10,7 @@ const {
     getSupportedLanguages,
     getSupportedTranscriptionLanguages,
 } = require('../controllers/aiController');
-const { protect } = require('../middleware/authmiddleware');
+const { protect, admin } = require('../middleware/authmiddleware');
 
 /**
  * @swagger
@@ -64,7 +64,7 @@ const { protect } = require('../middleware/authmiddleware');
  *       500:
  *         description: Failed to generate captions
  */
-router.post('/generate-captions', protect, generateCaptions);
+router.post('/generate-captions', protect, admin, generateCaptions);
 
 /**
  * @swagger
@@ -255,7 +255,7 @@ router.post('/moderate-comment', protect, moderateComment);
  *       500:
  *         description: Failed to start video translation
  */
-router.post('/translate-video', protect, translateVideo);
+router.post('/translate-video', protect, admin, translateVideo);
 
 /**
  * @swagger
