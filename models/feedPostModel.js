@@ -27,6 +27,10 @@ const feedPostSchema = new mongoose.Schema(
                     type: String,
                     required: true,
                 },
+                thumbnail: {
+                    url: String,
+                    public_id: String,
+                },
             },
         ],
         likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'profiles' }],
