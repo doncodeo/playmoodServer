@@ -17,11 +17,12 @@ const generateThumbnail = (videoUrl) => {
     return new Promise((resolve, reject) => {
         const timestamp = '00:00:01';
         const size = '300x200';
-        const tempFileName = `thumbnail-${Date.now()}.png`;
-        const tempFilePath = path.join(os.tmpdir(), tempFileName);
+        const tempFolder = os.tmpdir();
 
         ffmpeg(videoUrl)
-            .on('end', () => {
+            .on('filenames', (filenames) => {
+                const tempFilePath = path.join(tempFolder, filenames[0]);
+
                 // Upload to Cloudinary from the local file
                 cloudinary.uploader.upload(tempFilePath, {
                     folder: "feed_thumbnails",
@@ -45,16 +46,12 @@ const generateThumbnail = (videoUrl) => {
             })
             .on('error', (err) => {
                 console.error("FFMPEG Error:", err);
-                // Ensure the temp file is deleted on error as well
-                fs.unlink(tempFilePath, (unlinkErr) => {
-                    if (unlinkErr) console.error("Error deleting temp file on FFMPEG error:", unlinkErr);
-                });
                 reject(new Error('Failed to generate thumbnail.'));
             })
             .screenshots({
                 timestamps: [timestamp],
-                filename: tempFileName,
-                folder: os.tmpdir(),
+                filename: `thumbnail-${Date.now()}.png`,
+                folder: tempFolder,
                 size: size,
             });
     });
