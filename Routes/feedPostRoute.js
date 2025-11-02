@@ -57,6 +57,15 @@ const { protect, creator } = require('../middleware/authmiddleware');
  *               public_id:
  *                 type: string
  *                 example: feed/image123
+ *               thumbnail:
+ *                 type: object
+ *                 properties:
+ *                   url:
+ *                     type: string
+ *                     example: https://res.cloudinary.com/.../thumbnail.jpg
+ *                   public_id:
+ *                     type: string
+ *                     example: feed_thumbnails/thumbnail123
  *         likes:
  *           type: array
  *           items:
@@ -121,6 +130,13 @@ const { protect, creator } = require('../middleware/authmiddleware');
  *                       type: string
  *                     public_id:
  *                       type: string
+ *                     thumbnail:
+ *                       type: object
+ *                       properties:
+ *                         url:
+ *                           type: string
+ *                         public_id:
+ *                           type: string
  *     responses:
  *       201:
  *         description: Feed post created successfully

@@ -2,6 +2,7 @@ const FeedPost = require('../models/feedPostModel');
 const User = require('../models/userModel');
 const asyncHandler = require('express-async-handler');
 const { getWss, sendToUser } = require('../websocket');
+const { generateThumbnail } = require('../utils/video');
 
 // @desc    Create a new feed post
 // @route   POST /api/feed
@@ -14,11 +15,26 @@ const createFeedPost = asyncHandler(async (req, res) => {
         throw new Error('Please provide a type and at least one media item');
     }
 
+    const processedMedia = await Promise.all(
+        media.map(async (item) => {
+            if (type === 'video' && !item.thumbnail) {
+                try {
+                    const thumbnail = await generateThumbnail(item.url);
+                    return { ...item, thumbnail };
+                } catch (error) {
+                    console.error('Error generating thumbnail:', error);
+                    return item; // Proceed without a thumbnail if generation fails
+                }
+            }
+            return item;
+        })
+    );
+
     const post = await FeedPost.create({
         user: req.user._id,
         caption,
         type,
-        media,
+        media: processedMedia,
     });
 
     res.status(201).json(post);
