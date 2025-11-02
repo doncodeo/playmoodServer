@@ -23,7 +23,7 @@ const createFeedPost = asyncHandler(async (req, res) => {
                     return { ...item, thumbnail };
                 } catch (error) {
                     console.error('Error generating thumbnail:', error);
-                    return item; // Proceed without a thumbnail if generation fails
+                    throw error;
                 }
             }
             return item;
