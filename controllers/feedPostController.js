@@ -126,8 +126,11 @@ const addCommentToFeedPost = asyncHandler(async (req, res) => {
     post.comments.push(comment);
     await post.save();
 
+    await post.populate({
+        path: 'comments.user',
+        select: 'name profileImage',
+    });
     const populatedComment = post.comments[post.comments.length - 1];
-    await populatedComment.populate('user', 'name profileImage');
 
 
     // Broadcast WebSocket event
