@@ -19,11 +19,14 @@ const createFeedPost = asyncHandler(async (req, res) => {
         media.map(async (item) => {
             if (type === 'video' && !item.thumbnail) {
                 try {
-                    const thumbnail = await generateThumbnail(item.url);
+                    const secureUrl = item.url.startsWith('http://')
+                        ? item.url.replace('http://', 'https://')
+                        : item.url;
+                    const thumbnail = await generateThumbnail(secureUrl);
                     return { ...item, thumbnail };
                 } catch (error) {
                     console.error('Error generating thumbnail:', error);
-                    throw error;
+                    return item; // Proceed without a thumbnail if generation fails
                 }
             }
             return item;
