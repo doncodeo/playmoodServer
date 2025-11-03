@@ -35,6 +35,8 @@ function toVtt(chunks) {
     return vtt;
 }
 
+const downloadProgress = {};
+
 class TranscriptionService {
     constructor() {
         this.model = null;
@@ -46,7 +48,38 @@ class TranscriptionService {
             this.model = await pipeline('automatic-speech-recognition', 'onnx-community/whisper-base_timestamped', {
                 quantized: true,
                 progress_callback: (progress) => {
-                    console.log(`[Model Loading] Status: ${progress.status}, File: ${progress.file}, Loaded: ${Math.round(progress.loaded / 1024 / 1024)}MB of ${Math.round(progress.total / 1024 / 1024)}MB`);
+                    if (progress.status === 'done') {
+                        console.log(`[Model Loading] Download complete: ${progress.file}`);
+                        delete downloadProgress[progress.file];
+                        return;
+                    }
+
+                    if (progress.status === 'progress' && progress.total > 0) {
+                        if (!downloadProgress[progress.file]) {
+                            downloadProgress[progress.file] = {
+                                lastLoggedPercentage: -1,
+                                startTime: Date.now(),
+                            };
+                        }
+
+                        const state = downloadProgress[progress.file];
+                        const percentage = Math.floor((progress.loaded / progress.total) * 100);
+
+                        if (percentage > state.lastLoggedPercentage) {
+                            const elapsedTimeMs = Date.now() - state.startTime;
+                            const downloadSpeedBps = progress.loaded / (elapsedTimeMs / 1000);
+                            const remainingBytes = progress.total - progress.loaded;
+                            const etaSeconds = Math.round(remainingBytes / downloadSpeedBps);
+
+                            const loadedMB = Math.round(progress.loaded / 1024 / 1024);
+                            const totalMB = Math.round(progress.total / 1024 / 1024);
+
+                            console.log(`[Model Loading] Downloading ${progress.file}: ${percentage}% (${loadedMB}MB / ${totalMB}MB) - ETA: ${etaSeconds}s`);
+                            state.lastLoggedPercentage = percentage;
+                        }
+                    } else if (progress.status === 'initiate') {
+                         console.log(`[Model Loading] Initializing download for ${progress.file}`);
+                    }
                 },
             });
             console.log('Timestamped multilingual transcription model loaded successfully.');
@@ -126,7 +159,7 @@ class TranscriptionService {
         });
     }
 
-    async extractAudio(videoPath, outputPath, contentId = 'N/A') {
+    async extractAudio(videoPath, outputPath, contentId = 'N-A') {
         return new Promise((resolve, reject) => {
             ffmpeg(videoPath)
                 .toFormat('wav')
