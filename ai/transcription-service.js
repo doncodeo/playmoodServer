@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const axios = require('axios');
 const ffmpeg = require('fluent-ffmpeg');
 const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
@@ -7,7 +8,7 @@ const wavefile = require('wavefile');
 const { pipeline, env } = require('@xenova/transformers');
 
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
-env.cacheDir = '/tmp/transformers_cache';
+env.cacheDir = path.join(os.tmpdir(), 'transformers_cache');
 console.log('Using transformers cache directory:', env.cacheDir);
 
 function formatTimestamp(seconds) {
@@ -42,7 +43,12 @@ class TranscriptionService {
 
     async init() {
         try {
-            this.model = await pipeline('automatic-speech-recognition', 'onnx-community/whisper-base_timestamped', { quantized: true });
+            this.model = await pipeline('automatic-speech-recognition', 'onnx-community/whisper-base_timestamped', {
+                quantized: true,
+                progress_callback: (progress) => {
+                    console.log(`[Model Loading] Status: ${progress.status}, File: ${progress.file}, Loaded: ${Math.round(progress.loaded / 1024 / 1024)}MB of ${Math.round(progress.total / 1024 / 1024)}MB`);
+                },
+            });
             console.log('Timestamped multilingual transcription model loaded successfully.');
         } catch (error) {
             console.error('Error loading transcription model:', error);
@@ -58,7 +64,7 @@ class TranscriptionService {
 
         console.log(`[${contentId}] Transcription Service: Starting process.`);
         const videoPath = await this.download(url, contentId);
-        const audioPath = path.join('/tmp', `${Date.now()}.wav`);
+        const audioPath = path.join(os.tmpdir(), `${Date.now()}.wav`);
 
         try {
             console.log(`[${contentId}] Transcription Service: Extracting audio.`);
@@ -103,7 +109,7 @@ class TranscriptionService {
             responseType: 'stream',
         });
 
-        const videoPath = path.join('/tmp', `${Date.now()}.mp4`);
+        const videoPath = path.join(os.tmpdir(), `${Date.now()}.mp4`);
         const writer = fs.createWriteStream(videoPath);
 
         response.data.pipe(writer);
