@@ -10,6 +10,30 @@ ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 env.cacheDir = '/tmp/transformers_cache';
 console.log('Using transformers cache directory:', env.cacheDir);
 
+function formatTimestamp(seconds) {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+    const ms = Math.floor((seconds - Math.floor(seconds)) * 1000);
+
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}.${String(ms).padStart(3, '0')}`;
+}
+
+function toVtt(chunks) {
+    let vtt = 'WEBVTT\n\n';
+    if (!chunks) return vtt;
+
+    chunks.forEach((chunk) => {
+        if (chunk.timestamp && chunk.timestamp[0] != null && chunk.timestamp[1] != null) {
+            const start = formatTimestamp(chunk.timestamp[0]);
+            const end = formatTimestamp(chunk.timestamp[1]);
+            vtt += `${start} --> ${end}\n`;
+            vtt += `${chunk.text.trim()}\n\n`;
+        }
+    });
+    return vtt;
+}
+
 class TranscriptionService {
     constructor() {
         this.model = null;
@@ -18,8 +42,8 @@ class TranscriptionService {
 
     async init() {
         try {
-            this.model = await pipeline('automatic-speech-recognition', 'Xenova/whisper-small', { quantized: true });
-            console.log('Quantized multilingual transcription model loaded successfully.');
+            this.model = await pipeline('automatic-speech-recognition', 'onnx-community/whisper-base_timestamped', { quantized: true });
+            console.log('Timestamped multilingual transcription model loaded successfully.');
         } catch (error) {
             console.error('Error loading transcription model:', error);
             throw error;
@@ -34,47 +58,39 @@ class TranscriptionService {
 
         console.log(`[${contentId}] Transcription Service: Starting process.`);
         const videoPath = await this.download(url, contentId);
-        const tempAudioDir = path.join('/tmp', `chunks_${Date.now()}`);
-        fs.mkdirSync(tempAudioDir, { recursive: true });
+        const audioPath = path.join('/tmp', `${Date.now()}.wav`);
 
         try {
-            console.log(`[${contentId}] Transcription Service: Extracting audio chunks.`);
-            const chunkFiles = await this.extractAudioChunks(videoPath, tempAudioDir, contentId);
-            console.log(`[${contentId}] Transcription Service: Found ${chunkFiles.length} audio chunks.`);
-            let fullTranscript = '';
-            let chunkCounter = 0;
+            console.log(`[${contentId}] Transcription Service: Extracting audio.`);
+            await this.extractAudio(videoPath, audioPath, contentId);
+            console.log(`[${contentId}] Transcription Service: Audio extracted to ${audioPath}.`);
 
-            for (const audioPath of chunkFiles.sort()) {
-                chunkCounter++;
-                console.log(`[${contentId}] Transcription Service: Processing chunk ${chunkCounter} of ${chunkFiles.length}.`);
-                const buffer = fs.readFileSync(audioPath);
-                const wav = new wavefile.WaveFile(buffer);
-                wav.toBitDepth('32f');
-                wav.toSampleRate(16000);
-                let audioData = wav.getSamples();
-                if (Array.isArray(audioData)) {
-                    audioData = audioData[0];
-                }
-
-                const task = language === 'en' ? 'translate' : 'transcribe';
-                console.log(`[${contentId}] Transcription Service: Using task '${task}' for language '${language}'.`);
-
-                const transcript = await this.model(audioData, {
-                    chunk_length_s: 30,
-                    stride_length_s: 5,
-                    language: language,
-                    task: task,
-                });
-
-                if (transcript && transcript.text) {
-                    fullTranscript += transcript.text.trim() + ' ';
-                }
+            const buffer = fs.readFileSync(audioPath);
+            const wav = new wavefile.WaveFile(buffer);
+            wav.toBitDepth('32f');
+            wav.toSampleRate(16000);
+            let audioData = wav.getSamples();
+            if (Array.isArray(audioData)) {
+                audioData = audioData[0];
             }
-            console.log(`[${contentId}] Transcription Service: Finished processing all chunks.`);
-            return fullTranscript.trim();
+
+            const task = language === 'en' ? 'translate' : 'transcribe';
+            console.log(`[${contentId}] Transcription Service: Using task '${task}' for language '${language}'.`);
+
+            const transcript = await this.model(audioData, {
+                chunk_length_s: 30,
+                language: language,
+                task: task,
+                return_timestamps: 'word',
+            });
+
+            const vttResult = toVtt(transcript.chunks);
+
+            console.log(`[${contentId}] Transcription Service: Finished processing.`);
+            return vttResult;
         } finally {
             console.log(`[${contentId}] Transcription Service: Cleaning up temporary files.`);
-            await this.cleanup([videoPath], [tempAudioDir]);
+            await this.cleanup([videoPath, audioPath]);
             console.log(`[${contentId}] Transcription Service: Cleanup complete.`);
         }
     }
@@ -104,27 +120,19 @@ class TranscriptionService {
         });
     }
 
-    async extractAudioChunks(videoPath, outputDir, contentId = 'N/A') {
-        const outputPath = path.join(outputDir, 'chunk_%03d.wav');
-
+    async extractAudio(videoPath, outputPath, contentId = 'N/A') {
         return new Promise((resolve, reject) => {
             ffmpeg(videoPath)
                 .toFormat('wav')
                 .audioChannels(1)
                 .audioFrequency(16000)
-                .outputOptions([
-                    '-f segment',
-                    '-segment_time 30',
-                    '-c:a pcm_s16le',
-                ])
                 .on('error', (err) => {
                     console.error(`[${contentId}] Transcription Service: FFMpeg error during audio extraction.`, err);
                     reject(err);
                 })
                 .on('end', () => {
                     console.log(`[${contentId}] Transcription Service: Audio extraction complete.`);
-                    const chunks = fs.readdirSync(outputDir).map(file => path.join(outputDir, file));
-                    resolve(chunks);
+                    resolve();
                 })
                 .save(outputPath);
         });
