@@ -7,7 +7,8 @@
     "test": "NODE_ENV=test JWT_SECRET=test GOOGLE_CLIENT_ID=test GOOGLE_CLIENT_SECRET=test GOOGLE_CALLBACK_URL=test CLOUDINARY_API_KEY=test CLOUDINARY_API_SECRET=test mocha test/content.test.js",
     "start": "nodemon server.js",
     "server": "server.js",
-    "heroku-prebuild": "npm cache clean --force"
+    "heroku-prebuild": "npm cache clean --force",
+    "postinstall": "rm -rf node_modules/onnxruntime-node/bin/napi-v6/darwin && rm -rf node_modules/onnxruntime-node/bin/napi-v6/win32"
   },
   "author": "Dada",
   "license": "ISC",
