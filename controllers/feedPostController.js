@@ -228,10 +228,11 @@ const getAllCreatorsFeed = asyncHandler(async (req, res) => {
     };
 
     creators.forEach(creator => {
-        if (creator.feedSettings.feedPosts) settingsMap.feedPosts.push(creator._id);
-        if (creator.feedSettings.thumbnails) settingsMap.thumbnails.push(creator._id);
-        if (creator.feedSettings.shortPreviews) settingsMap.shortPreviews.push(creator._id);
-        if (creator.feedSettings.highlights) settingsMap.highlights.push(creator._id);
+        const settings = creator.feedSettings || { feedPosts: true, thumbnails: true, shortPreviews: true, highlights: true };
+        if (settings.feedPosts) settingsMap.feedPosts.push(creator._id);
+        if (settings.thumbnails) settingsMap.thumbnails.push(creator._id);
+        if (settings.shortPreviews) settingsMap.shortPreviews.push(creator._id);
+        if (settings.highlights) settingsMap.highlights.push(creator._id);
     });
 
     if (settingsMap.feedPosts.length > 0) {
@@ -263,21 +264,45 @@ const getAllCreatorsFeed = asyncHandler(async (req, res) => {
         combinedFeed.push(...userHighlights.map(h => ({ ...h, feedType: 'highlight' })));
     }
 
-    // Seeded shuffle (for consistent pagination)
-    let m = combinedFeed.length, t, i;
-    let seededRandom = function() {
-        var x = Math.sin(seed++) * 10000;
-        return x - Math.floor(x);
-    };
-    while (m) {
-        i = Math.floor(seededRandom() * m--);
-        t = combinedFeed[m];
-        combinedFeed[m] = combinedFeed[i];
-        combinedFeed[i] = t;
+    // NOTE: This implementation loads all data into memory and may not scale well with a large number of creators and posts.
+    // A more scalable solution would involve a database aggregation pipeline or a dedicated feed generation service.
+
+    // Group content by creator
+    const contentByCreator = {};
+    combinedFeed.forEach(item => {
+        const creatorId = item.user._id.toString();
+        if (!contentByCreator[creatorId]) {
+            contentByCreator[creatorId] = [];
+        }
+        contentByCreator[creatorId].push(item);
+    });
+
+    const creatorIds = Object.keys(contentByCreator);
+    const shuffledFeed = [];
+    let lastCreatorId = null;
+
+    // Intelligent shuffle to avoid consecutive posts from the same creator
+    while (shuffledFeed.length < combinedFeed.length) {
+        let availableCreators = creatorIds.filter(id => contentByCreator[id].length > 0 && id !== lastCreatorId);
+        if (availableCreators.length === 0) {
+            // This can happen if only one creator has remaining posts
+            availableCreators = creatorIds.filter(id => contentByCreator[id].length > 0);
+        }
+
+        if (availableCreators.length === 0) {
+            break; // Should not happen if logic is correct
+        }
+
+        const randomCreatorId = availableCreators[Math.floor(Math.random() * availableCreators.length)];
+        const contentIndex = Math.floor(Math.random() * contentByCreator[randomCreatorId].length);
+
+        shuffledFeed.push(contentByCreator[randomCreatorId][contentIndex]);
+        contentByCreator[randomCreatorId].splice(contentIndex, 1);
+        lastCreatorId = randomCreatorId;
     }
 
     // Paginate
-    const paginatedFeed = combinedFeed.slice((page - 1) * limit, page * limit);
+    const paginatedFeed = shuffledFeed.slice((page - 1) * limit, page * limit);
 
     res.json({ feed: paginatedFeed, seed });
 });
