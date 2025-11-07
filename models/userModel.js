@@ -161,6 +161,12 @@ const userSchema = new mongoose.Schema(
             enum: ['none', 'pending', 'approved', 'rejected'],
             default: 'none',
         },
+        feedSettings: {
+            feedPosts: { type: Boolean, default: true },
+            thumbnails: { type: Boolean, default: true },
+            shortPreviews: { type: Boolean, default: true },
+            highlights: { type: Boolean, default: true },
+        },
     },
     {
         timestamps: true,

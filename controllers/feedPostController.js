@@ -1,5 +1,7 @@
 const FeedPost = require('../models/feedPostModel');
 const User = require('../models/userModel');
+const Content = require('../models/contentModel');
+const Highlight = require('../models/highlightModel');
 const asyncHandler = require('express-async-handler');
 const { getWss, sendToUser } = require('../websocket');
 const { generateThumbnail } = require('../utils/video');
@@ -153,13 +155,59 @@ const addCommentToFeedPost = asyncHandler(async (req, res) => {
 // @desc    Get feed posts for a user
 // @route   GET /api/feed/user/:userId
 // @access  Public
-const getFeedPosts = asyncHandler(async (req, res) => {
-    const posts = await FeedPost.find({ user: req.params.userId })
-        .populate('user', 'name profileImage')
-        .populate('comments.user', 'name profileImage')
-        .sort({ createdAt: -1 });
+const getCreatorFeed = asyncHandler(async (req, res) => {
+    const { userId } = req.params;
+    const { page = 1, limit = 10 } = req.query;
 
-    res.json(posts);
+    const creator = await User.findById(userId);
+
+    if (!creator) {
+        res.status(404);
+        throw new Error('Creator not found');
+    }
+
+    const { feedPosts, thumbnails, shortPreviews, highlights } = creator.feedSettings;
+    let combinedFeed = [];
+
+    if (feedPosts) {
+        const posts = await FeedPost.find({ user: userId })
+            .populate('user', 'name profileImage')
+            .populate('comments.user', 'name profileImage')
+            .lean();
+        combinedFeed.push(...posts.map(p => ({ ...p, feedType: 'feedPost' })));
+    }
+
+    if (thumbnails) {
+        const contentsWithThumbnails = await Content.find({ user: userId, thumbnail: { $ne: null } })
+            .select('user title thumbnail createdAt')
+            .populate('user', 'name profileImage')
+            .lean();
+        combinedFeed.push(...contentsWithThumbnails.map(c => ({ ...c, feedType: 'thumbnail' })));
+    }
+
+    if (shortPreviews) {
+        const contentsWithPreviews = await Content.find({ user: userId, shortPreview: { $ne: null } })
+            .select('user title shortPreview createdAt')
+            .populate('user', 'name profileImage')
+            .lean();
+        combinedFeed.push(...contentsWithPreviews.map(c => ({ ...c, feedType: 'shortPreview' })));
+    }
+
+    if (highlights) {
+        const userHighlights = await Highlight.find({ user: userId })
+            .populate('user', 'name profileImage')
+            .populate('content', 'title thumbnail')
+            .lean();
+        combinedFeed.push(...userHighlights.map(h => ({ ...h, feedType: 'highlight' })));
+    }
+
+    // Sort by creation date
+    combinedFeed.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    // Paginate
+    const paginatedFeed = combinedFeed.slice((page - 1) * limit, page * limit);
+
+    res.json(paginatedFeed);
 });
 
 // @desc    Increment view count for a feed post
@@ -201,6 +249,6 @@ module.exports = {
     likeFeedPost,
     unlikeFeedPost,
     addCommentToFeedPost,
-    getFeedPosts,
+    getCreatorFeed,
     viewFeedPost,
 };

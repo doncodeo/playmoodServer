@@ -25,6 +25,7 @@ const {
   googleAuthCallback,
   resetPassword,
   changePassword,
+  updateFeedSettings,
 } = require('../controllers/userController');
 const { protect } = require('../middleware/authmiddleware');
 const { loginLimiter } = require('../middleware/rateLimiter');
@@ -816,5 +817,51 @@ router.get(
   passport.authenticate('google', { failureRedirect: '/', session: false }),
   googleAuthCallback
 );
+
+/**
+ * @swagger
+ * /api/users/feed-settings:
+ *   put:
+ *     summary: Update user's feed settings
+ *     tags: [Users]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               feedPosts:
+ *                 type: boolean
+ *               thumbnails:
+ *                 type: boolean
+ *               shortPreviews:
+ *                 type: boolean
+ *               highlights:
+ *                 type: boolean
+ *     responses:
+ *       200:
+ *         description: Feed settings updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 feedPosts:
+ *                   type: boolean
+ *                 thumbnails:
+ *                   type: boolean
+ *                 shortPreviews:
+ *                   type: boolean
+ *                 highlights:
+ *                   type: boolean
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: User not found
+ */
+router.put('/feed-settings', protect, updateFeedSettings);
 
 module.exports = router;
