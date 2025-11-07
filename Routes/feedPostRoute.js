@@ -6,9 +6,51 @@ const {
     unlikeFeedPost,
     addCommentToFeedPost,
     getCreatorFeed,
+    getAllCreatorsFeed,
     viewFeedPost,
 } = require('../controllers/feedPostController');
 const { protect, creator } = require('../middleware/authmiddleware');
+
+/**
+ * @swagger
+ * /api/feed/all:
+ *   get:
+ *     summary: Get a randomized feed of all creators' posts
+ *     tags: [Feed]
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number for pagination
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Number of items per page
+ *       - in: query
+ *         name: seed
+ *         schema:
+ *           type: integer
+ *         description: Seed for randomizing the feed (optional, for pagination)
+ *     responses:
+ *       200:
+ *         description: A randomized and paginated list of feed items from all creators
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 feed:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                 seed:
+ *                   type: integer
+ */
+router.route('/all').get(getAllCreatorsFeed);
 
 /**
  * @swagger

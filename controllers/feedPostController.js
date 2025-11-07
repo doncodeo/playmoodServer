@@ -210,6 +210,78 @@ const getCreatorFeed = asyncHandler(async (req, res) => {
     res.json(paginatedFeed);
 });
 
+// @desc    Get a randomized feed of all creators' posts
+// @route   GET /api/feed/all
+// @access  Public
+const getAllCreatorsFeed = asyncHandler(async (req, res) => {
+    const { page = 1, limit = 10, seed: querySeed } = req.query;
+    const seed = querySeed ? parseInt(querySeed) : Math.floor(Math.random() * 10000);
+
+    const creators = await User.find({ role: 'creator' }).lean();
+    let combinedFeed = [];
+
+    const settingsMap = {
+        feedPosts: [],
+        thumbnails: [],
+        shortPreviews: [],
+        highlights: [],
+    };
+
+    creators.forEach(creator => {
+        if (creator.feedSettings.feedPosts) settingsMap.feedPosts.push(creator._id);
+        if (creator.feedSettings.thumbnails) settingsMap.thumbnails.push(creator._id);
+        if (creator.feedSettings.shortPreviews) settingsMap.shortPreviews.push(creator._id);
+        if (creator.feedSettings.highlights) settingsMap.highlights.push(creator._id);
+    });
+
+    if (settingsMap.feedPosts.length > 0) {
+        const posts = await FeedPost.find({ user: { $in: settingsMap.feedPosts } })
+            .populate('user', 'name profileImage')
+            .populate('comments.user', 'name profileImage')
+            .lean();
+        combinedFeed.push(...posts.map(p => ({ ...p, feedType: 'feedPost' })));
+    }
+    if (settingsMap.thumbnails.length > 0) {
+        const contentsWithThumbnails = await Content.find({ user: { $in: settingsMap.thumbnails }, thumbnail: { $ne: null } })
+            .select('user title thumbnail createdAt')
+            .populate('user', 'name profileImage')
+            .lean();
+        combinedFeed.push(...contentsWithThumbnails.map(c => ({ ...c, feedType: 'thumbnail' })));
+    }
+    if (settingsMap.shortPreviews.length > 0) {
+        const contentsWithPreviews = await Content.find({ user: { $in: settingsMap.shortPreviews }, shortPreview: { $ne: null } })
+            .select('user title shortPreview createdAt')
+            .populate('user', 'name profileImage')
+            .lean();
+        combinedFeed.push(...contentsWithPreviews.map(c => ({ ...c, feedType: 'shortPreview' })));
+    }
+    if (settingsMap.highlights.length > 0) {
+        const userHighlights = await Highlight.find({ user: { $in: settingsMap.highlights } })
+            .populate('user', 'name profileImage')
+            .populate('content', 'title thumbnail')
+            .lean();
+        combinedFeed.push(...userHighlights.map(h => ({ ...h, feedType: 'highlight' })));
+    }
+
+    // Seeded shuffle (for consistent pagination)
+    let m = combinedFeed.length, t, i;
+    let seededRandom = function() {
+        var x = Math.sin(seed++) * 10000;
+        return x - Math.floor(x);
+    };
+    while (m) {
+        i = Math.floor(seededRandom() * m--);
+        t = combinedFeed[m];
+        combinedFeed[m] = combinedFeed[i];
+        combinedFeed[i] = t;
+    }
+
+    // Paginate
+    const paginatedFeed = combinedFeed.slice((page - 1) * limit, page * limit);
+
+    res.json({ feed: paginatedFeed, seed });
+});
+
 // @desc    Increment view count for a feed post
 // @route   PUT /api/feed/:id/view
 // @access  Private
@@ -250,5 +322,6 @@ module.exports = {
     unlikeFeedPost,
     addCommentToFeedPost,
     getCreatorFeed,
+    getAllCreatorsFeed,
     viewFeedPost,
 };
