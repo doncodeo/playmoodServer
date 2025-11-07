@@ -3,17 +3,10 @@ const https = require('https');
 const http = require('http');
 const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
 ffmpeg.setFfmpegPath(ffmpegPath);
-const cloudinary = require('cloudinary').v2;
+const cloudinary = require('../config/cloudinary');
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
-
-// Configure Cloudinary
-cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET,
-});
 
 const generateThumbnail = (videoUrl) => {
     return new Promise((resolve, reject) => {
