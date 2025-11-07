@@ -5,7 +5,7 @@ const {
     likeFeedPost,
     unlikeFeedPost,
     addCommentToFeedPost,
-    getFeedPosts,
+    getCreatorFeed,
     viewFeedPost,
 } = require('../controllers/feedPostController');
 const { protect, creator } = require('../middleware/authmiddleware');
@@ -221,7 +221,7 @@ router.route('/:id/comment').post(protect, addCommentToFeedPost);
  * @swagger
  * /api/feed/user/{userId}:
  *   get:
- *     summary: Get all feed posts for a user
+ *     summary: Get the aggregated feed for a creator
  *     tags: [Feed]
  *     parameters:
  *       - in: path
@@ -229,17 +229,35 @@ router.route('/:id/comment').post(protect, addCommentToFeedPost);
  *         required: true
  *         schema:
  *           type: string
+ *           description: The ID of the creator
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number for pagination
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Number of items per page
  *     responses:
  *       200:
- *         description: A list of feed posts
+ *         description: An aggregated list of feed items
  *         content:
  *           application/json:
  *             schema:
  *               type: array
  *               items:
- *                 $ref: '#/components/schemas/FeedPost'
+ *                 type: object
+ *                 properties:
+ *                   feedType:
+ *                     type: string
+ *                     enum: [feedPost, thumbnail, shortPreview, highlight]
+ *                     description: The type of the feed item.
  */
-router.route('/user/:userId').get(getFeedPosts);
+router.route('/user/:userId').get(getCreatorFeed);
 
 /**
  * @swagger

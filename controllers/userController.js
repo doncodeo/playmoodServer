@@ -1,7 +1,7 @@
 
 const asyncHandler = require ('express-async-handler'); 
 // const userSchema = require('../models/userModel');
-const userData = require('../models/userModel');
+const User = require('../models/userModel');
 const contentSchema = require('../models/contentModel');
 const jwt = require("jsonwebtoken");
 const bcryptjs = require("bcryptjs");
@@ -23,7 +23,7 @@ const generateToken = (id, role) => {
 
 const getUser = asyncHandler(async (req, res) => {
       
-    const users = await userData.find().populate('subscriptions', 'name email profileImage');
+    const users = await User.find().populate('subscriptions', 'name email profileImage');
 
     res.status(200).json(users)
 })
@@ -43,7 +43,7 @@ const registerUser = asyncHandler(async (req, res) => {
         }
 
         // Check if the user already exists
-        const userExist = await userData.findOne({ email });
+        const userExist = await User.findOne({ email });
         if (userExist) {
             return res.status(400).json({ error: "User already exists!" });
         }
@@ -61,7 +61,7 @@ const registerUser = asyncHandler(async (req, res) => {
         const defaultCloudinaryId = 'user-uploads/qdayeocck7k6zzqqery15';
 
         // Create the new user
-        const user = await userData.create({
+        const user = await User.create({
             name,
             email,
             password: hashedPassword,
@@ -124,7 +124,7 @@ const verifyEmail = asyncHandler(async (req, res) => {
     }
 
     try {
-        const user = await userData.findById(userId);
+        const user = await User.findById(userId);
 
         if (!user) {
             return res.status(404).json({ error: 'User not found' });
@@ -192,7 +192,7 @@ const resendVerificationCode = asyncHandler(async (req, res) => {
     }
 
     try {
-        const user = await userData.findOne({ email });
+        const user = await User.findOne({ email });
 
         if (!user || user.isEmailVerified) {
             return res.status(200).json({
@@ -253,7 +253,7 @@ const deleteUser = asyncHandler(async (req, res) => {
     const userId = req.params.id; // Assuming the user ID is passed as a parameter
 
     // Fetch the user from MongoDB
-    const user = await userData.findById(userId); 
+    const user = await User.findById(userId);
 
     if (!user) {
       res.status(404).json({ error: 'User not found' });
@@ -337,7 +337,7 @@ const updateUser = asyncHandler(async (req, res) => {
     // Fetch the user
     let user;
     try {
-        user = await userData.findById(userId);
+        user = await User.findById(userId);
     } catch (error) {
         console.error(
             `[${getTimestamp()}] ERROR: Failed to fetch user from database - userId: ${userId}, requesterId: ${
@@ -462,7 +462,7 @@ const updateUser = asyncHandler(async (req, res) => {
     // Check email uniqueness if email is updated
     if (req.body.email && req.body.email !== user.email) {
         try {
-            const emailExists = await userData.findOne({ email: req.body.email });
+            const emailExists = await User.findOne({ email: req.body.email });
             if (emailExists) {
                 console.log(
                     `[${getTimestamp()}] WARN: Email already in use - userId: ${userId}, email: ${
@@ -623,7 +623,7 @@ const updateUser = asyncHandler(async (req, res) => {
 //         const userId = req.params.id; // Assuming the user ID is passed as a parameter
 
 //         // Fetch the user from MongoDB
-//         const user = await userData.findById(userId);
+//         const user = await User.findById(userId);
 
 //         if (!user) {
 //             return res.status(404).json({ error: 'User not found' });
@@ -671,7 +671,7 @@ const createUser = asyncHandler(async (req, res) => {
         }
 
         // check for existing user
-        const userExist = await userData.findOne({email})
+        const userExist = await User.findOne({email})
   
         if(userExist){
             console.log("User already exist", email);
@@ -685,7 +685,7 @@ const createUser = asyncHandler(async (req, res) => {
         console.log(hashedPassword)
 
         // create user
-        const user = await userData.create({
+        const user = await User.create({
             name,
             email,
             password:hashedPassword,
@@ -724,7 +724,7 @@ const loginUser = asyncHandler(async (req, res) => {
     // console.log(email)
 
     // check for user email
-    const user = await userData.findOne({email});
+    const user = await User.findOne({email});
 
     if (user && !user.password) {
         return res.status(400).json({
@@ -761,7 +761,7 @@ const loginUser = asyncHandler(async (req, res) => {
 // @access Public
 
 const getUserprofile = asyncHandler(async (req, res) => {
-    const user = await userData.findById(req.user.id).populate('subscriptions', 'name email profileImage');
+    const user = await User.findById(req.user.id).populate('subscriptions', 'name email profileImage');
 
     if (!user) {
         res.status(404);
@@ -798,7 +798,7 @@ const getUserprofile = asyncHandler(async (req, res) => {
 
  const getCreators = asyncHandler(async (req, res) => {
     try {
-        const creators = await userData.find({ role: 'creator' });
+        const creators = await User.find({ role: 'creator' });
 
         if (creators.length === 0) {
             return res.status(404).json({ message: 'No creators found' });
@@ -857,7 +857,7 @@ const saveContentToHistory = asyncHandler(async (req, res) => {
 
     try {
         // Find the user by ID and update the history array
-        const updatedUser = await userData.findByIdAndUpdate(
+        const updatedUser = await User.findByIdAndUpdate(
             userId,
             { $push: { history: contentId } },
             { new: true }
@@ -879,7 +879,7 @@ const getUserHistory = asyncHandler(async (req, res) => {
     const userId = req.body.userId;
 
     try {
-        const user = await userData.findById(userId).populate('history');
+        const user = await User.findById(userId).populate('history');
         res.status(200).json({ history: user.history });
     } catch (error) {
         console.error(error);
@@ -896,7 +896,7 @@ const markPrivacyPolicyAsRead = asyncHandler(async (req, res) => {
     }
 
     try {
-        const user = await userData.findById(userId);
+        const user = await User.findById(userId);
         
 
         if (!user) {
@@ -915,7 +915,7 @@ const markPrivacyPolicyAsRead = asyncHandler(async (req, res) => {
 const forgetPassword = async (req, res) => {
   try {
     const { email } = req.body;
-    const user = await userData.findOne({ email });
+    const user = await User.findOne({ email });
 
     if (!user) {
 
@@ -987,7 +987,7 @@ const resetPassword = asyncHandler(async (req, res) => {
             return res.status(400).json({ message: "Token has expired. Please request a new one." });
         }
 
-        const user = await userData.findById(tokenDoc.userId);
+        const user = await User.findById(tokenDoc.userId);
         if (!user) {
             return res.status(404).json({ message: "User not found." });
         }
@@ -1015,7 +1015,7 @@ const changePassword = asyncHandler(async (req, res) => {
             return res.status(400).json({ message: "Both current and new passwords are required." });
         }
 
-        const user = await userData.findById(userId);
+        const user = await User.findById(userId);
         if (!user) {
             return res.status(404).json({ message: "User not found." });
         }
@@ -1080,7 +1080,7 @@ const googleAuthCallback = asyncHandler(async (req, res) => {
 const getCreatorApplicationStatus = asyncHandler(async (req, res) => {
     const userId = req.user.id;
 
-    const user = await userData.findById(userId);
+    const user = await User.findById(userId);
 
     if (!user) {
         return res.status(404).json({ error: 'User not found' });
@@ -1088,9 +1088,34 @@ const getCreatorApplicationStatus = asyncHandler(async (req, res) => {
 
     res.status(200).json({ creatorApplicationStatus: user.creatorApplicationStatus });
 });
+
+// @desc    Update user's feed settings
+// @route   PUT /api/users/feed-settings
+// @access  Private
+const updateFeedSettings = asyncHandler(async (req, res) => {
+    const user = await User.findById(req.user.id);
+
+    if (!user) {
+        res.status(404);
+        throw new Error('User not found');
+    }
+
+    const { feedPosts, thumbnails, shortPreviews, highlights } = req.body;
+
+    // Update settings if they are provided in the request body
+    if (typeof feedPosts === 'boolean') user.feedSettings.feedPosts = feedPosts;
+    if (typeof thumbnails === 'boolean') user.feedSettings.thumbnails = thumbnails;
+    if (typeof shortPreviews === 'boolean') user.feedSettings.shortPreviews = shortPreviews;
+    if (typeof highlights === 'boolean') user.feedSettings.highlights = highlights;
+
+    await user.save();
+
+    res.json(user.feedSettings);
+});
  
  module.exports = {
     getUser,
+    updateFeedSettings,
     getCreatorApplicationStatus,
     forgetPassword,
     resetPassword,
