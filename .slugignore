@@ -1,0 +1,4 @@
+# Ignore non-essential files and directories from the Heroku slug
+/test
+.git
+.vscode
