@@ -4,8 +4,6 @@ const Content = require('../models/contentModel');
 const Highlight = require('../models/highlightModel');
 const asyncHandler = require('express-async-handler');
 const { getWss, sendToUser } = require('../websocket');
-const { generateThumbnail } = require('../utils/video');
-
 // @desc    Create a new feed post
 // @route   POST /api/feed
 // @access  Private (Creator)
@@ -17,23 +15,19 @@ const createFeedPost = asyncHandler(async (req, res) => {
         throw new Error('Please provide a type and at least one media item');
     }
 
-    const processedMedia = await Promise.all(
-        media.map(async (item) => {
-            if (type === 'video' && !item.thumbnail) {
-                try {
-                    const secureUrl = item.url.startsWith('http://')
-                        ? item.url.replace('http://', 'https://')
-                        : item.url;
-                    const thumbnail = await generateThumbnail(secureUrl);
-                    return { ...item, thumbnail };
-                } catch (error) {
-                    console.error('Error generating thumbnail:', error);
-                    return item; // Proceed without a thumbnail if generation fails
+    const processedMedia = media.map(item => {
+        if (type === 'video' && !item.thumbnail && item.public_id) {
+            const thumbnailUrl = `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/video/upload/so_1/${item.public_id}.jpg`;
+            return {
+                ...item,
+                thumbnail: {
+                    url: thumbnailUrl,
+                    public_id: ''
                 }
-            }
-            return item;
-        })
-    );
+            };
+        }
+        return item;
+    });
 
     const post = await FeedPost.create({
         user: req.user._id,
