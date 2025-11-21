@@ -404,9 +404,7 @@ const backfillContentEmbeddings = asyncHandler(async (req, res) => {
 
         let queuedCount = 0;
         for (const content of contentsToUpdate) {
-            // We reuse the 'process-upload' job which now includes embedding generation.
-            // We don't pass a languageCode, so only the embedding part will run for missing ones.
-            await uploadQueue.add('process-upload', { contentId: content._id }, {
+            await uploadQueue.add('generate-embedding', { contentId: content._id }, {
                  jobId: `backfill-embedding-${content._id}`, // Prevents duplicate jobs
                  removeOnComplete: true,
                  removeOnFail: true,

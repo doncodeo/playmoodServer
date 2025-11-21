@@ -81,7 +81,7 @@ class AIService {
             console.log(`AI Service: Successfully generated a ${embedding.length}-dimensional embedding.`);
             return embedding;
         } catch (error) {
-            console.error(`An error occurred during embedding generation for content "${content.title}":`, error);
+            console.error(`An error occurred during embedding generation for content "${content.title}":`, error.message);
             // Return null or handle the error as appropriate for your application
             return null;
         }
