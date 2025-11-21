@@ -9,6 +9,7 @@ const {
     processPendingTranslations,
     getSupportedLanguages,
     getSupportedTranscriptionLanguages,
+    backfillContentEmbeddings,
 } = require('../controllers/aiController');
 const { protect, admin } = require('../middleware/authmiddleware');
 
@@ -339,5 +340,33 @@ router.get('/supported-languages', protect, getSupportedLanguages);
  *                 fr: "French"
  */
 router.get('/supported-transcription-languages', getSupportedTranscriptionLanguages);
+
+/**
+ * @swagger
+ * /api/ai/backfill-embeddings:
+ *   post:
+ *     summary: Backfill content embeddings for all existing content
+ *     description: Scans all content and queues a job to generate embeddings for any content that is missing them. This is a safe way to backfill data without overloading the system.
+ *     tags: [AI]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: All content already has embeddings, nothing to do.
+ *       202:
+ *         description: The backfill process has been successfully queued.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Successfully queued 150 content documents for embedding backfill."
+ *       500:
+ *         description: An error occurred while queueing the backfill job.
+ */
+router.post('/backfill-embeddings', protect, admin, backfillContentEmbeddings);
+
 
 module.exports = router;
