@@ -380,6 +380,50 @@ const getSupportedTranscriptionLanguages = asyncHandler(async (req, res) => {
     res.status(200).json(languages);
 });
 
+// @desc    Backfill content embeddings for existing content
+// @route   POST /api/ai/backfill-embeddings
+// @access  Private/Admin
+const backfillContentEmbeddings = asyncHandler(async (req, res) => {
+    console.log('[Admin] Starting backfill job for content embeddings.');
+
+    try {
+        // Find all content documents where contentEmbedding is missing or empty
+        const contentsToUpdate = await contentSchema.find({
+            $or: [
+                { contentEmbedding: { $exists: false } },
+                { contentEmbedding: { $size: 0 } }
+            ]
+        }).select('_id'); // We only need the ID
+
+        if (contentsToUpdate.length === 0) {
+            console.log('[Admin] No content found that needs embedding backfill.');
+            return res.status(200).json({ message: 'All content already has embeddings. Nothing to do.' });
+        }
+
+        console.log(`[Admin] Found ${contentsToUpdate.length} content documents to backfill.`);
+
+        let queuedCount = 0;
+        for (const content of contentsToUpdate) {
+            // We reuse the 'process-upload' job which now includes embedding generation.
+            // We don't pass a languageCode, so only the embedding part will run for missing ones.
+            await uploadQueue.add('process-upload', { contentId: content._id }, {
+                 jobId: `backfill-embedding-${content._id}`, // Prevents duplicate jobs
+                 removeOnComplete: true,
+                 removeOnFail: true,
+            });
+            queuedCount++;
+        }
+
+        const responseMessage = `Successfully queued ${queuedCount} content documents for embedding backfill.`;
+        console.log(`[Admin] ${responseMessage}`);
+        res.status(202).json({ message: responseMessage });
+
+    } catch (error) {
+        console.error('[Admin] An error occurred during the embedding backfill process:', error);
+        res.status(500).json({ error: 'Failed to queue content for embedding backfill.', details: error.message });
+    }
+});
+
 module.exports = {
     generateCaptions,
     generateEmbeddings,
@@ -389,4 +433,5 @@ module.exports = {
     processPendingTranslations,
     getSupportedLanguages,
     getSupportedTranscriptionLanguages,
+    backfillContentEmbeddings,
 };

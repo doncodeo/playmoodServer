@@ -112,6 +112,15 @@ const processUpload = async (job) => {
             await createHighlightForContent(content);
         }
 
+        // Generate and save content embeddings for recommendation engine
+        const embedding = await aiService.generateEmbeddings(content);
+        if (embedding) {
+            content.contentEmbedding = embedding;
+        } else {
+            console.warn(`[Worker] Could not generate embedding for content ID: ${contentId}. Proceeding without it.`);
+        }
+        await content.save();
+
         // The rest of the original processing logic (e.g., captions, moderation) would go here.
         // For example, generating captions:
         if (languageCode) {

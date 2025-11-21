@@ -1,5 +1,6 @@
 const axios = require('axios');
 const cloudinary = require('../config/cloudinary');
+const { pipeline } = require('@xenova/transformers');
 
 // This service will act as an abstraction layer for our AI models and services.
 // It will expose a set of functions that our application can use without needing
@@ -14,7 +15,23 @@ class AIService {
                 'Content-Type': 'application/json'
             }
         });
+
+        // Lazily initialize the feature extraction pipeline
+        this.extractor = null;
+        this.initializingExtractor = this.initExtractor();
     }
+
+    async initExtractor() {
+        try {
+            this.extractor = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
+            console.log('Feature extraction model loaded successfully.');
+        } catch (error) {
+            console.error('Error loading feature extraction model:', error);
+            // We don't throw here to avoid crashing the app on startup if the model fails to load.
+            // The generateEmbeddings function will handle the case where the extractor is null.
+        }
+    }
+
 
     /**
      * Generates captions for a video or audio file from a URL.
@@ -39,14 +56,37 @@ class AIService {
     /**
      * Generates a vector embedding for a piece of content.
      * @param {object} content - The content object (with title, description, category).
-     * @returns {Promise<Array<number>>} The generated embedding.
+     * @returns {Promise<Array<number>|null>} The generated embedding, or null if an error occurs.
      */
     async generateEmbeddings(content) {
-        // TODO: Implement content embedding generation.
         console.log(`AI Service: Generating embeddings for content: "${content.title}"`);
-        // Placeholder implementation
-        return Promise.resolve(Array(128).fill(Math.random()));
+        try {
+            await this.initializingExtractor; // Ensure the model is loaded
+            if (!this.extractor) {
+                throw new Error('Feature extraction model is not available.');
+            }
+
+            // Concatenate the most relevant text fields to create a descriptive string
+            const textToEmbed = `${content.title}. ${content.description}. Category: ${content.category}.`;
+
+            // Generate the embedding
+            const output = await this.extractor(textToEmbed, {
+                pooling: 'mean',
+                normalize: true,
+            });
+
+            // The output tensor contains the embedding. Convert it to a regular array.
+            const embedding = Array.from(output.data);
+
+            console.log(`AI Service: Successfully generated a ${embedding.length}-dimensional embedding.`);
+            return embedding;
+        } catch (error) {
+            console.error(`An error occurred during embedding generation for content "${content.title}":`, error);
+            // Return null or handle the error as appropriate for your application
+            return null;
+        }
     }
+
 
     /**
      * Analyzes a video for content moderation.
