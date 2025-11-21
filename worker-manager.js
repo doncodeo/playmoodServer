@@ -40,6 +40,8 @@ const mainProcessor = async (job) => {
             return await processUpload(job);
         case 'generate-captions':
             return await processCaptionGeneration(job);
+        case 'generate-embedding':
+            return await processEmbeddingGeneration(job);
         case 'combine-videos':
             return await processVideoCombination(job);
         case 'aggregate-platform-stats':
@@ -48,6 +50,29 @@ const mainProcessor = async (job) => {
             throw new Error(`Unknown job name: ${job.name}`);
     }
 };
+
+const processEmbeddingGeneration = async (job) => {
+    const { contentId } = job.data;
+    console.log(`[Worker] Starting 'generate-embedding' for content ID: ${contentId}`);
+
+    const content = await contentSchema.findById(contentId);
+    if (!content) {
+        throw new Error(`Content with ID ${contentId} not found.`);
+    }
+
+    const embedding = await aiService.generateEmbeddings(content);
+    if (!embedding) {
+        // This will cause the job to fail, as intended.
+        throw new Error(`Failed to generate embedding for content ID: ${contentId}.`);
+    }
+
+    content.contentEmbedding = embedding;
+    await content.save();
+
+    console.log(`[Worker] Successfully generated and saved embedding for content ID: ${contentId}`);
+    return { success: true };
+};
+
 
 const processVideoCombination = async (job) => {
     // ... (existing implementation)
