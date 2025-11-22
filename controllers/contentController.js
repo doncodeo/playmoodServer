@@ -5,6 +5,7 @@ const userSchema = require('../models/userModel');
 const cloudinary = require('../config/cloudinary');
 const mongoose = require('mongoose'); // Add mongoose import
 const fs = require('fs');
+const jwt = require('jsonwebtoken');
 const { setEtagAndCache } = require('../utils/responseHelpers');
 const { compressVideo } = require('../utils/videoCompressor');
 const aiService = require('../ai/ai-service');
@@ -118,27 +119,6 @@ const getRecommendedContent = asyncHandler(async (req, res) => {
         res.status(500).json({ error: 'Server error' });
     }
 });
-
-function cosineSimilarity(vecA, vecB) {
-    if (!vecA || !vecB || vecA.length !== vecB.length) {
-        return 0;
-    }
-
-    let dotProduct = 0;
-    let normA = 0;
-    let normB = 0;
-    for (let i = 0; i < vecA.length; i++) {
-        dotProduct += vecA[i] * vecB[i];
-        normA += vecA[i] * vecA[i];
-        normB += vecB[i] * vecB[i];
-    }
-
-    if (normA === 0 || normB === 0) {
-        return 0;
-    }
-
-    return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
-}
 
 // @desc    Get the most recent approved content for a specific creator
 // @route   GET /api/content/creator/:userId/recent
@@ -1104,6 +1084,72 @@ const likeContent = asyncHandler(async (req, res) => {
     });
 });
 
+// @desc Get Homepage Feed (Personalized or Generic)
+// @route GET /api/content/homepage-feed
+// @access Public
+const getHomepageFeed = asyncHandler(async (req, res) => {
+    let userId = null;
+
+    // Check for an Authorization header
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+        try {
+            const token = req.headers.authorization.split(' ')[1];
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            userId = decoded.id;
+        } catch (error) {
+            // Invalid token, treat as anonymous user
+            console.log('Invalid token provided for homepage feed, serving generic content.');
+        }
+    }
+
+    // Scenario 1: User is logged in
+    if (userId) {
+        const user = await userSchema.findById(userId).populate('videoProgress.contentId');
+        if (user && user.videoProgress && user.videoProgress.length > 0) {
+            // User has a viewing history, generate a personalized feed
+            const recentHistory = user.videoProgress
+                .filter(p => p.contentId && p.contentId.contentEmbedding && p.contentId.contentEmbedding.length > 0)
+                .slice(-10); // Use last 10 viewed items with embeddings
+
+            if (recentHistory.length > 0) {
+                // Calculate the user's average interest vector
+                const userVector = recentHistory
+                    .map(p => p.contentId.contentEmbedding)
+                    .reduce((acc, vec) => {
+                        for (let i = 0; i < vec.length; i++) {
+                            acc[i] = (acc[i] || 0) + vec[i];
+                        }
+                        return acc;
+                    }, [])
+                    .map(v => v / recentHistory.length);
+
+                const viewedContentIds = recentHistory.map(p => p.contentId._id);
+
+                // Find content similar to the user's interest vector
+                const allContent = await contentSchema.find({
+                    isApproved: true,
+                    _id: { $nin: viewedContentIds }, // Exclude already watched content
+                    contentEmbedding: { $exists: true, $ne: [] }
+                }).lean();
+
+                const recommendations = allContent.map(content => {
+                    const similarity = cosineSimilarity(userVector, content.contentEmbedding);
+                    return { ...content, similarity };
+                })
+                .sort((a, b) => b.similarity - a.similarity)
+                .slice(0, 10);
+
+                return res.status(200).json(recommendations);
+            }
+        }
+    }
+
+    // Scenario 2 & 3: User is new (no history) or not logged in
+    // Fallback to the generic "Top Ten" content
+    console.log('Serving generic top-ten content for homepage.');
+    getTopTenContent(req, res);
+});
+
 // @desc    Unlike a piece of content
 // @route   PUT /api/content/:id/unlike
 // @access  Private
@@ -1179,4 +1225,26 @@ module.exports = {
     combineVideosByIds,
     likeContent,
     unlikeContent,
+    getHomepageFeed,
+}
+
+function cosineSimilarity(vecA, vecB) {
+    if (!vecA || !vecB || vecA.length !== vecB.length) {
+        return 0;
+    }
+
+    let dotProduct = 0;
+    let normA = 0;
+    let normB = 0;
+    for (let i = 0; i < vecA.length; i++) {
+        dotProduct += vecA[i] * vecB[i];
+        normA += vecA[i] * vecA[i];
+        normB += vecB[i] * vecB[i];
+    }
+
+    if (normA === 0 || normB === 0) {
+        return 0;
+    }
+
+    return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
 }

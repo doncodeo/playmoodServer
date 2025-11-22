@@ -25,6 +25,7 @@ const {
     combineVideosByIds,
     likeContent,
     unlikeContent,
+    getHomepageFeed,
 } = require('../controllers/contentController');
 const { protect, admin } = require('../middleware/authmiddleware');
 
@@ -1318,5 +1319,32 @@ router.route('/progress/:contentId').post(protect, saveVideoProgress);
  *         description: Server error
  */
 router.route('/progress/:contentId').get(protect, getVideoProgress);
+
+/**
+ * @swagger
+ * /api/content/homepage-feed:
+ *   get:
+ *     summary: Get the homepage feed (personalized or generic)
+ *     description: |
+ *       Retrieves a feed of content suitable for the homepage.
+ *       - **For logged-in users with a viewing history:** Returns a personalized list of 10 recommended videos based on their recently watched content.
+ *       - **For new users or anonymous users:** Returns a generic list of the top 10 most popular videos on the platform.
+ *       Authentication is optional. If a valid `Bearer` token is provided, the endpoint will attempt to return a personalized feed.
+ *     tags: [Content]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: A list of content for the homepage.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Content'
+ *       500:
+ *         description: Server error
+ */
+router.route('/homepage-feed').get(getHomepageFeed);
 
 module.exports = router;
