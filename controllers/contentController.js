@@ -94,6 +94,16 @@ const getRecommendedContent = asyncHandler(async (req, res) => {
     try {
         const content = await contentSchema.findById(req.params.id);
 
+        // DIAGNOSTIC LOGGING START
+        console.log(`[DIAGNOSTIC] Looking for recommendations for content ID: ${req.params.id}`);
+        if (content) {
+            console.log(`[DIAGNOSTIC] Found source content: ${content.title}`);
+            console.log(`[DIAGNOSTIC] Source content has embedding: ${!!content.contentEmbedding && content.contentEmbedding.length > 0}`);
+        } else {
+            console.log(`[DIAGNOSTIC] Source content with ID ${req.params.id} NOT FOUND.`);
+        }
+        // DIAGNOSTIC LOGGING END
+
         if (!content || !content.contentEmbedding || content.contentEmbedding.length === 0) {
             return res.status(404).json({ error: 'Content not found or does not have an embedding for recommendations.' });
         }
@@ -106,12 +116,20 @@ const getRecommendedContent = asyncHandler(async (req, res) => {
             contentEmbedding: { $exists: true, $ne: [] }
         }).lean();
 
+        // DIAGNOSTIC LOGGING START
+        console.log(`[DIAGNOSTIC] Found ${allContent.length} other content documents with embeddings.`);
+        // DIAGNOSTIC LOGGING END
+
         const recommendedContents = allContent.map(otherContent => {
             const similarity = cosineSimilarity(content.contentEmbedding, otherContent.contentEmbedding);
             return { ...otherContent, similarity };
         })
         .sort((a, b) => b.similarity - a.similarity)
         .slice(0, 10); // Get top 10 recommendations
+
+        // DIAGNOSTIC LOGGING START
+        console.log(`[DIAGNOSTIC] Generated ${recommendedContents.length} recommendations.`);
+        // DIAGNOSTIC LOGGING END
 
         res.status(200).json(recommendedContents);
     } catch (error) {
