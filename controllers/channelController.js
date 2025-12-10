@@ -26,6 +26,7 @@ const getChannelDetails = asyncHandler(async (req, res) => {
 
     // Fetch creator with populated subscribers and communityPosts
     const creator = await User.findOne({ _id: userId, role: 'creator' })
+        .select('name profileImage about bannerImage subscribers communityPosts instagram tiktok linkedin twitter userName')
         .populate('subscribers', 'name profileImage') // Populate subscribers to get their details
         .populate('communityPosts', 'title content'); // Uncommented to populate community posts
 
@@ -151,6 +152,7 @@ const updateChannelBannerImage = asyncHandler(async (req, res) => {
 const getAllChannels = asyncHandler(async (req, res) => {
     // Fetch all creators with populated subscribers and communityPosts
     const creators = await User.find({ role: 'creator' })
+        .select('name profileImage about bannerImage subscribers communityPosts instagram tiktok linkedin twitter userName')
         .populate('subscribers', 'name profileImage') // Populate subscribers to get their details
         .populate('communityPosts', 'title content'); // Populate community posts
 
@@ -214,6 +216,7 @@ const getMyChannelDetails = asyncHandler(async (req, res) => {
     try {
         // Fetch creator with populated subscribers and communityPosts
         const creator = await User.findOne({ _id: userId, role: 'creator' })
+            .select('name profileImage about bannerImage subscribers communityPosts instagram tiktok linkedin twitter userName')
             .populate('subscribers', 'name profileImage')
             .populate('communityPosts', 'title content');
 
@@ -265,6 +268,7 @@ const getChannelDetailsByUserName = asyncHandler(async (req, res) => {
     }
 
     const creator = await User.findOne({ userName: userName.toLowerCase(), role: 'creator' })
+        .select('name profileImage about bannerImage subscribers communityPosts instagram tiktok linkedin twitter userName')
         .populate('subscribers', 'name profileImage')
         .populate('communityPosts', 'title content');
 

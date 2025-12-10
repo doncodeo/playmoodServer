@@ -22,8 +22,8 @@ const generateToken = (id, role) => {
 };
 
 const getUser = asyncHandler(async (req, res) => {
-      
-    const users = await User.find().populate('subscriptions', 'name email profileImage');
+
+    const users = await User.find().populate('subscriptions', 'name profileImage').select('name profileImage bannerImage subscribers');
 
     res.status(200).json(users)
 })
@@ -798,7 +798,7 @@ const getUserprofile = asyncHandler(async (req, res) => {
 
  const getCreators = asyncHandler(async (req, res) => {
     try {
-        const creators = await User.find({ role: 'creator' });
+        const creators = await User.find({ role: 'creator' }).select('name profileImage bannerImage subscribers about');
 
         if (creators.length === 0) {
             return res.status(404).json({ message: 'No creators found' });

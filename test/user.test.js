@@ -52,7 +52,6 @@ describe('User Controller Unit Tests', () => {
         assert.ok(testedUser, 'Subscriber not found in getUser response');
         assert.strictEqual(testedUser.subscriptions.length, 1);
         assert.strictEqual(testedUser.subscriptions[0].name, 'Creator');
-        assert.ok(testedUser.subscriptions[0].email, 'Subscribed creator email should be populated');
         assert.ok(testedUser.subscriptions[0].profileImage, 'Subscribed creator profileImage should be populated');
     });
 
