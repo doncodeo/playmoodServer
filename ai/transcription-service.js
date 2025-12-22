@@ -47,6 +47,7 @@ class TranscriptionService {
         try {
             this.model = await pipeline('automatic-speech-recognition', 'onnx-community/whisper-base_timestamped', {
                 quantized: true,
+                revision: '85322b4',
                 progress_callback: (progress) => {
                     if (progress.status === 'done') {
                         console.log(`[Model Loading] Download complete: ${progress.file}`);
