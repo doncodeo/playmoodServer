@@ -44,22 +44,9 @@ class TranscriptionService {
     }
 
     async init() {
-        // try {
-        //     // Force-clear the cache to ensure the correct model revision is downloaded.
-        //     if (fs.existsSync(env.cacheDir)) {
-        //         console.log(`[Cache] Clearing transformers cache directory: ${env.cacheDir}`);
-        //         fs.rmSync(env.cacheDir, { recursive: true, force: true });
-        //         console.log('[Cache] Directory cleared successfully.');
-        //     }
-        // } catch (error) {
-        //     console.error('[Cache] Error clearing transformers cache:', error);
-        //     // Non-critical error, so we don't throw.
-        // }
-
         try {
             this.model = await pipeline('automatic-speech-recognition', 'onnx-community/whisper-base_timestamped', {
                 quantized: true,
-                revision: '85322b4',
                 progress_callback: (progress) => {
                     if (progress.status === 'done') {
                         console.log(`[Model Loading] Download complete: ${progress.file}`);
