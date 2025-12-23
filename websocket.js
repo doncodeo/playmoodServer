@@ -50,8 +50,26 @@ const sendToUser = (userId, message) => {
     }
 };
 
+const closeWebSocket = (callback) => {
+    if (wss) {
+        // First, terminate all connected clients
+        wss.clients.forEach(client => {
+            client.terminate();
+        });
+        // Then, close the server
+        wss.close(() => {
+            console.log('WebSocket server closed.');
+            wss = null; // Clear the instance for a clean state
+            if (callback) callback();
+        });
+    } else if (callback) {
+        callback();
+    }
+};
+
 module.exports = {
   initWebSocket,
   getWss,
   sendToUser,
+  closeWebSocket,
 };
