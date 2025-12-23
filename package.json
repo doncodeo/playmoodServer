@@ -4,7 +4,7 @@
   "description": "Server application for Playmood",
   "main": "server.js",
   "scripts": {
-    "test": "NODE_ENV=test JWT_SECRET=test GOOGLE_CLIENT_ID=test GOOGLE_CLIENT_SECRET=test GOOGLE_CALLBACK_URL=test CLOUDINARY_API_KEY=test CLOUDINARY_API_SECRET=test mocha test/content.test.js",
+    "test": "NODE_ENV=test JWT_SECRET=test GOOGLE_CLIENT_ID=test GOOGLE_CLIENT_SECRET=test GOOGLE_CALLBACK_URL=test CLOUDINARY_CLOUD_NAME=test CLOUDINARY_API_KEY=test CLOUDINARY_API_SECRET=test ASSEMBLYAI_API_KEY=test mocha test/content.test.js",
     "start": "nodemon server.js",
     "server": "server.js",
     "heroku-prebuild": "npm cache clean --force",
@@ -14,7 +14,6 @@
   "license": "ISC",
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
-    "@ffprobe-installer/ffprobe": "^2.1.2",
     "@remotion/renderer": "^4.0.131",
     "@xenova/transformers": "2.15.0",
     "axios": "^1.11.0",
@@ -51,7 +50,6 @@
     "streamifier": "^0.1.1",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
-    "wavefile": "^11.0.0",
     "ws": "^8.18.3",
     "xoauth2": "^1.2.0"
   },

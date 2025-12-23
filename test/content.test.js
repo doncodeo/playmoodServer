@@ -11,7 +11,7 @@ const jwt =require('jsonwebtoken');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const uploadQueue = require('../config/queue');
 const sinon = require('sinon');
-const { initWebSocket } = require('../websocket');
+const { initWebSocket, closeWebSocket } = require('../websocket');
 
 describe('Content API', function() {
   this.timeout(60000);
@@ -35,7 +35,12 @@ describe('Content API', function() {
     const serverModule = require('../server');
     app = serverModule.app;
     server = serverModule.server;
-    initWebSocket(server);
+
+    await new Promise(resolve => {
+        runningServer = server.listen(0, resolve);
+    });
+    initWebSocket(runningServer);
+
 
     const user = await User.create({
       name: 'Test User',
@@ -69,16 +74,26 @@ describe('Content API', function() {
     runningServer = server;
   });
 
-  after(async () => {
-    await User.deleteMany({});
-    await mongoose.disconnect();
-    await mongoServer.stop();
-    addStub.restore(); // Restore the original method
-    getVideoDurationStub.restore();
-    generateHighlightStub.restore();
-    if (runningServer) {
-      await new Promise(resolve => runningServer.close(resolve));
-    }
+  after(function(done) {
+    this.timeout(20000); // Increased timeout for graceful shutdown
+
+    // Restore stubs safely
+    if (addStub) addStub.restore();
+    if (getVideoDurationStub) getVideoDurationStub.restore();
+    if (generateHighlightStub) generateHighlightStub.restore();
+
+    // Sequentially close servers and DB connection
+    closeWebSocket(() => {
+        if (runningServer) {
+            runningServer.close(async () => {
+                await mongoose.disconnect();
+                await mongoServer.stop();
+                done();
+            });
+        } else {
+            mongoose.disconnect().then(() => mongoServer.stop()).then(() => done());
+        }
+    });
   });
 
   it('should create a content record and queue it for processing', (done) => {

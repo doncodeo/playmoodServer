@@ -3,6 +3,7 @@ const http = require('http');
 const cors = require('cors');
 const dotenv = require('dotenv').config();
 const connectDB = require('./config/db');
+require('./config/assemblyai'); // Ensure AssemblyAI API key is set
 const path = require('path');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./swagger');
