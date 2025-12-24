@@ -90,7 +90,7 @@ class TranscriptionService {
      */
     async translateSegment(text, languageName) {
         try {
-            const lemurResponse = await this.lemur.post('', {
+            const lemurResponse = await this.lemur.post('/v1/task', {
                 context: "This is a caption from a video, so keep the translation concise.",
                 prompt: `Translate the following text into ${languageName}: "${text}"`,
             });
