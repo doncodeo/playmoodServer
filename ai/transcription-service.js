@@ -91,7 +91,7 @@ class TranscriptionService {
         console.log(`[Translation] Calling LLM Gateway to translate to ${languageName}.`);
         try {
             const response = await this.llmGateway.post('/chat/completions', {
-                model: 'claude-haiku-20240228', // Using a fast and capable model
+                model: 'claude-3-haiku-20240307', // Using a fast and capable model
                 messages: [
                     {
                         role: 'system',
