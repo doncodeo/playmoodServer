@@ -4,8 +4,7 @@ const axios = require('axios');
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
- * Converts a language code (e.g., 'es') to its full name (e.g., 'Spanish')
- * for use in the LeMUR translation prompt.
+ * Converts a language code (e.g., 'es') to its full name (e.g., 'Spanish').
  * @param {string} code - The language code.
  * @returns {string} The full language name.
  */
@@ -23,7 +22,6 @@ const getLanguageName = (code) => {
 
 /**
  * Parses a VTT file string into an array of caption segments.
- * Each segment is an object with 'timestamp' and 'text' properties.
  * @param {string} vttString - The VTT file content as a string.
  * @returns {Array<{timestamp: string, text: string}>} The parsed caption segments.
  */
@@ -63,7 +61,7 @@ const reconstructVtt = (segments) => {
 
 class TranscriptionService {
     constructor() {
-        // Axios instance for the main v2 API
+        // Axios instance for the main v2 API (transcription)
         this.assembly = axios.create({
             baseURL: 'https://api.assemblyai.com/v2',
             headers: {
@@ -72,9 +70,9 @@ class TranscriptionService {
             },
         });
 
-        // Separate Axios instance for the LeMUR API
-        this.lemur = axios.create({
-            baseURL: 'https://api.assemblyai.com/lemur',
+        // NEW Axios instance for the LLM Gateway API (translation)
+        this.llmGateway = axios.create({
+            baseURL: 'https://llm-gateway.assemblyai.com/v1',
             headers: {
                 authorization: process.env.ASSEMBLYAI_API_KEY,
                 'content-type': 'application/json',
@@ -83,21 +81,39 @@ class TranscriptionService {
     }
 
     /**
-     * Translates a single caption segment using the LeMUR API.
+     * Translates a single caption segment using the AssemblyAI LLM Gateway.
      * @param {string} text - The text to translate.
      * @param {string} languageName - The target language name.
      * @returns {Promise<string>} The translated text.
      */
     async translateSegment(text, languageName) {
+        // ADDING THIS LOG TO PROVE THE NEW CODE IS RUNNING
+        console.log(`[Translation] Calling LLM Gateway to translate to ${languageName}.`);
         try {
-            const lemurResponse = await this.lemur.post('/v1/task', {
-                context: "This is a caption from a video, so keep the translation concise.",
-                prompt: `Translate the following text into ${languageName}: "${text}"`,
+            const response = await this.llmGateway.post('/chat/completions', {
+                model: 'claude-haiku-20240228', // Using a fast and capable model
+                messages: [
+                    {
+                        role: 'system',
+                        content: 'You are an expert translator. Translate the user\'s text accurately and concisely for video captions.'
+                    },
+                    {
+                        role: 'user',
+                        content: `Translate the following English text to ${languageName}: "${text}"`
+                    }
+                ]
             });
-            // LeMUR's basic endpoint is synchronous and returns the response directly
-            return lemurResponse.data.response.trim();
+
+            if (response.data && response.data.choices && response.data.choices.length > 0) {
+                return response.data.choices[0].message.content.trim();
+            }
+            // Fallback if the response format is unexpected
+            console.warn('[Translation] LLM Gateway response was empty or malformed.');
+            return text;
+
         } catch (error) {
-            console.error('Error translating segment:', error.response ? error.response.data : error.message);
+            const errorMessage = error.response ? JSON.stringify(error.response.data) : error.message;
+            console.error(`[Translation] Error translating segment: ${errorMessage}`);
             return text; // Fallback to original text on error
         }
     }
@@ -113,15 +129,15 @@ class TranscriptionService {
         console.log(`[${contentId}] Transcription Service: Starting process for ${url} with target language ${languageCode}`);
 
         try {
-            // Step 1: Submit the transcription job, enabling language detection to find the source language.
+            // Step 1: Submit the transcription job, enabling language detection.
             const submitResponse = await this.assembly.post('/transcript', {
                 audio_url: url,
-                language_detection: true, // Let AssemblyAI detect the source language
+                language_detection: true,
             });
             const transcriptId = submitResponse.data.id;
             console.log(`[${contentId}] AssemblyAI transcription job submitted with ID: ${transcriptId}`);
 
-            // Step 2: Poll for the transcription to complete.
+            // Step 2: Poll for completion.
             let transcriptData;
             while (true) {
                 const pollResponse = await this.assembly.get(`/transcript/${transcriptId}`);
@@ -132,29 +148,26 @@ class TranscriptionService {
                     console.log(`[${contentId}] Transcription complete. Detected language: ${transcriptData.language_code}`);
                     break;
                 } else if (status === 'error') {
-                    const errorMessage = pollResponse.data.error || 'Unknown AssemblyAI error';
-                    throw new Error(`AssemblyAI transcription failed: ${errorMessage}`);
+                    throw new Error(`AssemblyAI transcription failed: ${pollResponse.data.error}`);
                 }
-
                 console.log(`[${contentId}] Transcription status for ${transcriptId}: ${status}. Polling...`);
                 await delay(10000);
             }
 
             const sourceLanguage = transcriptData.language_code;
 
-            // Step 3: Fetch the timestamped VTT in the source language.
+            // Step 3: Get the timestamped VTT.
             const vttResponse = await this.assembly.get(`/transcript/${transcriptId}/vtt`);
             const sourceVtt = vttResponse.data;
 
-            // Step 4: If the target language is the same as the source, return the standard timestamped VTT.
-            if (languageCode.startsWith(sourceLanguage)) {
-                console.log(`[${contentId}] Target language matches source. Returning original VTT.`);
+            // Step 4: If no translation is needed, return the original VTT.
+            if (languageCode.startsWith(sourceLanguage) || languageCode === 'en') {
+                console.log(`[${contentId}] Target language (${languageCode}) matches source (${sourceLanguage}). No translation needed.`);
                 return sourceVtt;
             }
 
-            // Step 5: If languages differ, perform the two-pass translation.
+            // Step 5: If translation is needed, use the two-pass pipeline.
             console.log(`[${contentId}] Target language differs. Initiating two-pass translation to ${languageCode}.`);
-
             const vttSegments = parseVtt(sourceVtt);
             const languageName = getLanguageName(languageCode);
             const translatedSegments = [];
@@ -162,11 +175,10 @@ class TranscriptionService {
             for (const segment of vttSegments) {
                 const translatedText = await this.translateSegment(segment.text, languageName);
                 translatedSegments.push({ timestamp: segment.timestamp, text: translatedText });
-                // Small delay to avoid hitting API rate limits
-                await delay(500);
+                await delay(250); // Small delay to respect rate limits
             }
 
-            // Step 6: Reconstruct the VTT with translated text.
+            // Step 6: Reconstruct and return the translated VTT.
             return reconstructVtt(translatedSegments);
 
         } catch (error) {
