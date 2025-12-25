@@ -4,64 +4,43 @@ const axios = require('axios');
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
- * Converts a language code (e.g., 'es') to its full name (e.g., 'Spanish').
- * @param {string} code - The language code.
- * @returns {string} The full language name.
+ * Converts milliseconds to VTT timestamp format (HH:MM:SS.mmm).
+ * @param {number} ms - The timestamp in milliseconds.
+ * @returns {string} The formatted timestamp string.
  */
-const getLanguageName = (code) => {
-    const languageNames = {
-        es: 'Spanish',
-        fr: 'French',
-        de: 'German',
-        it: 'Italian',
-        pt: 'Portuguese',
-        // Add more languages as needed
-    };
-    return languageNames[code.toLowerCase()] || code;
+const formatTimestamp = (ms) => {
+    const date = new Date(ms);
+    const hours = String(date.getUTCHours()).padStart(2, '0');
+    const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+    const seconds = String(date.getUTCSeconds()).padStart(2, '0');
+    const milliseconds = String(date.getUTCMilliseconds()).padStart(3, '0');
+    return `${hours}:${minutes}:${seconds}.${milliseconds}`;
 };
 
 /**
- * Parses a VTT file string into an array of caption segments.
- * @param {string} vttString - The VTT file content as a string.
- * @returns {Array<{timestamp: string, text: string}>} The parsed caption segments.
- */
-const parseVtt = (vttString) => {
-    const lines = vttString.trim().split('\n');
-    const segments = [];
-    let currentSegment = null;
-
-    for (const line of lines) {
-        if (line.includes('-->')) {
-            if (currentSegment) {
-                segments.push(currentSegment);
-            }
-            currentSegment = { timestamp: line, text: '' };
-        } else if (currentSegment && line.trim() !== '' && !line.startsWith('WEBVTT')) {
-            currentSegment.text += (currentSegment.text ? ' ' : '') + line.trim();
-        }
-    }
-    if (currentSegment) {
-        segments.push(currentSegment);
-    }
-    return segments;
-};
-
-/**
- * Reconstructs a VTT file string from an array of caption segments.
- * @param {Array<{timestamp: string, text: string}>} segments - The caption segments.
+ * Reconstructs a VTT file string from translated utterances.
+ * @param {Array<Object>} utterances - The array of utterance objects from AssemblyAI.
+ * @param {string} languageCode - The target language code for the translation.
  * @returns {string} The VTT file content as a string.
  */
-const reconstructVtt = (segments) => {
+const reconstructVttFromUtterances = (utterances, languageCode) => {
     let vtt = 'WEBVTT\n\n';
-    for (const segment of segments) {
-        vtt += `${segment.timestamp}\n${segment.text}\n\n`;
+    if (utterances) {
+        for (const utterance of utterances) {
+            // Check if a translation for the target language exists for this utterance.
+            if (utterance.translated_texts && utterance.translated_texts[languageCode]) {
+                const start = formatTimestamp(utterance.start);
+                const end = formatTimestamp(utterance.end);
+                const translatedText = utterance.translated_texts[languageCode];
+                vtt += `${start} --> ${end}\n${translatedText}\n\n`;
+            }
+        }
     }
     return vtt;
 };
 
 class TranscriptionService {
     constructor() {
-        // Axios instance for the main v2 API (transcription)
         this.assembly = axios.create({
             baseURL: 'https://api.assemblyai.com/v2',
             headers: {
@@ -69,57 +48,10 @@ class TranscriptionService {
                 'content-type': 'application/json',
             },
         });
-
-        // NEW Axios instance for the LLM Gateway API (translation)
-        this.llmGateway = axios.create({
-            baseURL: 'https://llm-gateway.assemblyai.com/v1',
-            headers: {
-                authorization: process.env.ASSEMBLYAI_API_KEY,
-                'content-type': 'application/json',
-            },
-        });
     }
 
     /**
-     * Translates a single caption segment using the AssemblyAI LLM Gateway.
-     * @param {string} text - The text to translate.
-     * @param {string} languageName - The target language name.
-     * @returns {Promise<string>} The translated text.
-     */
-    async translateSegment(text, languageName) {
-        // ADDING THIS LOG TO PROVE THE NEW CODE IS RUNNING
-        console.log(`[Translation] Calling LLM Gateway to translate to ${languageName}.`);
-        try {
-            const response = await this.llmGateway.post('/chat/completions', {
-                model: 'claude-3-haiku-20240307', // Using a fast and capable model
-                messages: [
-                    {
-                        role: 'system',
-                        content: 'You are an expert translator. Translate the user\'s text accurately and concisely for video captions.'
-                    },
-                    {
-                        role: 'user',
-                        content: `Translate the following English text to ${languageName}: "${text}"`
-                    }
-                ]
-            });
-
-            if (response.data && response.data.choices && response.data.choices.length > 0) {
-                return response.data.choices[0].message.content.trim();
-            }
-            // Fallback if the response format is unexpected
-            console.warn('[Translation] LLM Gateway response was empty or malformed.');
-            return text;
-
-        } catch (error) {
-            const errorMessage = error.response ? JSON.stringify(error.response.data) : error.message;
-            console.error(`[Translation] Error translating segment: ${errorMessage}`);
-            return text; // Fallback to original text on error
-        }
-    }
-
-    /**
-     * Transcribes or translates a video/audio file using the AssemblyAI API.
+     * Transcribes or translates a video/audio file using a single, efficient API call.
      * @param {string} url - The public URL of the video or audio file.
      * @param {string} languageCode - The target language code for transcription or translation.
      * @param {string} contentId - The ID of the content being processed for logging.
@@ -129,15 +61,33 @@ class TranscriptionService {
         console.log(`[${contentId}] Transcription Service: Starting process for ${url} with target language ${languageCode}`);
 
         try {
-            // Step 1: Submit the transcription job, enabling language detection.
-            const submitResponse = await this.assembly.post('/transcript', {
+            // Step 1: Define the base transcription payload.
+            const data = {
                 audio_url: url,
-                language_detection: true,
-            });
+                language_detection: true, // Auto-detect source language.
+            };
+
+            // Speculatively add translation parameters if the target is not English.
+            // The API will ignore this if the source and target languages match.
+            if (languageCode && languageCode !== 'en') {
+                console.log(`[${contentId}] Translation to '${languageCode}' requested. Adding translation parameters to single API call.`);
+                data.speaker_labels = true; // Required for timestamped translation.
+                data.speech_understanding = {
+                    request: {
+                        translation: {
+                            target_languages: [languageCode],
+                            match_original_utterance: true, // Get translated text per utterance.
+                        },
+                    },
+                };
+            }
+
+            // Step 2: Submit the single transcription job.
+            const submitResponse = await this.assembly.post('/transcript', data);
             const transcriptId = submitResponse.data.id;
             console.log(`[${contentId}] AssemblyAI transcription job submitted with ID: ${transcriptId}`);
 
-            // Step 2: Poll for completion.
+            // Step 3: Poll for completion.
             let transcriptData;
             while (true) {
                 const pollResponse = await this.assembly.get(`/transcript/${transcriptId}`);
@@ -154,32 +104,17 @@ class TranscriptionService {
                 await delay(10000);
             }
 
-            const sourceLanguage = transcriptData.language_code;
-
-            // Step 3: Get the timestamped VTT.
-            const vttResponse = await this.assembly.get(`/transcript/${transcriptId}/vtt`);
-            const sourceVtt = vttResponse.data;
-
-            // Step 4: If no translation is needed, return the original VTT.
-            if (languageCode.startsWith(sourceLanguage) || languageCode === 'en') {
-                console.log(`[${contentId}] Target language (${languageCode}) matches source (${sourceLanguage}). No translation needed.`);
-                return sourceVtt;
+            // Step 4: Process the result.
+            // Check if translation was performed and the result is available.
+            if (transcriptData.utterances && transcriptData.utterances[0]?.translated_texts?.[languageCode]) {
+                console.log(`[${contentId}] Reconstructing translated VTT for language '${languageCode}'.`);
+                return reconstructVttFromUtterances(transcriptData.utterances, languageCode);
+            } else {
+                // If no translation was performed, fetch the original VTT.
+                console.log(`[${contentId}] No translation performed or available. Fetching original source VTT.`);
+                const vttResponse = await this.assembly.get(`/transcript/${transcriptId}/vtt`);
+                return vttResponse.data;
             }
-
-            // Step 5: If translation is needed, use the two-pass pipeline.
-            console.log(`[${contentId}] Target language differs. Initiating two-pass translation to ${languageCode}.`);
-            const vttSegments = parseVtt(sourceVtt);
-            const languageName = getLanguageName(languageCode);
-            const translatedSegments = [];
-
-            for (const segment of vttSegments) {
-                const translatedText = await this.translateSegment(segment.text, languageName);
-                translatedSegments.push({ timestamp: segment.timestamp, text: translatedText });
-                await delay(250); // Small delay to respect rate limits
-            }
-
-            // Step 6: Reconstruct and return the translated VTT.
-            return reconstructVtt(translatedSegments);
 
         } catch (error) {
             const errorMessage = error.response ? JSON.stringify(error.response.data) : error.message;
