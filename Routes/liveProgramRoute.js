@@ -26,7 +26,7 @@ const { protect, admin } = require('../middleware/authmiddleware');
  *           type: string
  *           description: The unique identifier for the live program.
  *           example: "665f7a4b1f8d3c1e8f0a3b8c"
- *         videoId:
+ *         contentId:
  *           type: string
  *           description: The ID of the content being streamed.
  *           example: "65a6fc7b72128447ad32024e"
@@ -131,11 +131,11 @@ router.route('/today').get(getTodaysProgramming);
  *           schema:
  *             type: object
  *             required:
- *               - videoId
+ *               - contentId
  *               - date
  *               - startTime
  *             properties:
- *               videoId:
+ *               contentId:
  *                 type: string
  *                 description: The ID of the content to be scheduled.
  *                 example: "65a6fc7b72128447ad32024e"
@@ -191,7 +191,7 @@ router.route('/').post(protect, admin, createLiveProgram);
  *           schema:
  *             type: object
  *             properties:
- *               videoId:
+ *               contentId:
  *                 type: string
  *                 description: (Optional) The new content ID for the program.
  *                 example: "65a8025e3af4e7929b379e7b"

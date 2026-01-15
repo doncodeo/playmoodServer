@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const liveProgramSchema = new mongoose.Schema(
     {
-        videoId: {
+        contentId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'Contents',
             required: true,
