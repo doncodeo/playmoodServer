@@ -110,6 +110,48 @@ const { protect, admin } = require('../middleware/authmiddleware');
  *                   type: array
  *                   items:
  *                     $ref: '#/components/schemas/LiveProgram'
+ *             examples:
+ *               liveAndUpcoming:
+ *                 summary: A program is currently live
+ *                 value:
+ *                   liveProgram:
+ *                     _id: "665f7a4b1f8d3c1e8f0a3b8c"
+ *                     contentId: "65a6fc7b72128447ad32024e"
+ *                     title: "Morning Coffee Tech Talks"
+ *                     description: "Join us for a daily dose of the latest in tech."
+ *                     thumbnail: "https://res.cloudinary.com/.../thumbnail.jpg"
+ *                     date: "2024-06-05"
+ *                     startTime: "09:00"
+ *                     endTime: "10:00"
+ *                     duration: 3600
+ *                     status: "live"
+ *                     currentPlaybackTime: 900.5
+ *                   upcomingPrograms:
+ *                     - _id: "665f7a4b1f8d3c1e8f0a3b8d"
+ *                       contentId: "65a8025e3af4e7929b379e7b"
+ *                       title: "Deep Dive into AI"
+ *                       description: "Exploring the future of artificial intelligence."
+ *                       thumbnail: "https://res.cloudinary.com/.../thumbnail2.jpg"
+ *                       date: "2024-06-05"
+ *                       startTime: "11:00"
+ *                       endTime: "11:30"
+ *                       duration: 1800
+ *                       status: "scheduled"
+ *               nothingLive:
+ *                 summary: No program is currently live
+ *                 value:
+ *                   liveProgram: null
+ *                   upcomingPrograms:
+ *                     - _id: "665f7a4b1f8d3c1e8f0a3b8d"
+ *                       contentId: "65a8025e3af4e7929b379e7b"
+ *                       title: "Deep Dive into AI"
+ *                       description: "Exploring the future of artificial intelligence."
+ *                       thumbnail: "https://res.cloudinary.com/.../thumbnail2.jpg"
+ *                       date: "2024-06-05"
+ *                       startTime: "11:00"
+ *                       endTime: "11:30"
+ *                       duration: 1800
+ *                       status: "scheduled"
  *       500:
  *         description: Server error
  */
@@ -155,14 +197,51 @@ router.route('/today').get(getTodaysProgramming);
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/LiveProgram'
+ *             example:
+ *               _id: "665f8a4b1f8d3c1e8f0a3b8f"
+ *               contentId: "65a6fc7b72128447ad32024e"
+ *               title: "Live Test Video"
+ *               description: "A video for live testing."
+ *               thumbnail: "https://res.cloudinary.com/test/video.jpg"
+ *               date: "2024-06-05"
+ *               startTime: "14:30"
+ *               endTime: "15:30"
+ *               duration: 3600
+ *               status: "scheduled"
+ *               createdAt: "2024-06-05T14:30:00.000Z"
+ *               updatedAt: "2024-06-05T14:30:00.000Z"
  *       400:
- *         description: Bad request (e.g., missing fields, invalid ID).
+ *         description: Bad request (e.g., missing fields, invalid ID, or content missing Cloudinary ID).
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *             examples:
+ *               missingFields:
+ *                 summary: Missing required fields
+ *                 value:
+ *                   error: "Missing required fields: contentId, date, startTime"
+ *               invalidContent:
+ *                 summary: Content is missing a Cloudinary ID
+ *                 value:
+ *                   error: "The selected video content is missing a Cloudinary ID and cannot be scheduled."
  *       401:
  *         description: Unauthorized (not logged in).
  *       403:
  *         description: Forbidden (user is not an admin).
  *       404:
  *         description: Video content not found.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Video content not found"
  *       500:
  *         description: Server error.
  */
@@ -211,6 +290,17 @@ router.route('/').post(protect, admin, createLiveProgram);
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/LiveProgram'
+ *             example:
+ *               _id: "665f8a4b1f8d3c1e8f0a3b8f"
+ *               contentId: "65a8025e3af4e7929b379e7b"
+ *               title: "Updated Live Video Title"
+ *               description: "Updated description."
+ *               thumbnail: "https://res.cloudinary.com/test/video_new.jpg"
+ *               date: "2024-06-05"
+ *               startTime: "15:00"
+ *               endTime: "16:00"
+ *               duration: 3600
+ *               status: "scheduled"
  *       400:
  *         description: Bad request (e.g., invalid ID).
  *       401:
@@ -219,6 +309,14 @@ router.route('/').post(protect, admin, createLiveProgram);
  *         description: Forbidden.
  *       404:
  *         description: Live program or video not found.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Live program not found"
  *       500:
  *         description: Server error.
  *   delete:
