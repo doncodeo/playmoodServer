@@ -60,6 +60,11 @@ const createLiveProgram = asyncHandler(async (req, res) => {
         return res.status(404).json({ error: 'Video content not found' });
     }
 
+    // Ensure the content has a Cloudinary ID before proceeding
+    if (!video.cloudinary_video_id) {
+        return res.status(400).json({ error: 'The selected video content is missing a Cloudinary ID and cannot be scheduled.' });
+    }
+
     // Fetch video details from Cloudinary to get the actual duration
     let durationInSeconds;
     try {
