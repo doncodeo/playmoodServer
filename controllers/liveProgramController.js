@@ -10,7 +10,7 @@ const cloudinary = require('../config/cloudinary');
 const getTodaysProgramming = asyncHandler(async (req, res) => {
     const today = new Date().toISOString().slice(0, 10); // Get YYYY-MM-DD
 
-    const programs = await LiveProgram.find({ date: today }).sort({ startTime: 'asc' }).populate('videoId', 'title description thumbnail video');
+    const programs = await LiveProgram.find({ date: today }).sort({ startTime: 'asc' }).populate('contentId', 'title description thumbnail video');
 
     const now = new Date();
     let liveProgram = null;
@@ -45,17 +45,17 @@ const getTodaysProgramming = asyncHandler(async (req, res) => {
 // @route   POST /api/live-programs
 // @access  Private/Admin
 const createLiveProgram = asyncHandler(async (req, res) => {
-    const { videoId, date, startTime } = req.body;
+    const { contentId, date, startTime } = req.body;
 
-    if (!videoId || !date || !startTime) {
-        return res.status(400).json({ error: 'Missing required fields: videoId, date, startTime' });
+    if (!contentId || !date || !startTime) {
+        return res.status(400).json({ error: 'Missing required fields: contentId, date, startTime' });
     }
 
-    if (!mongoose.Types.ObjectId.isValid(videoId)) {
-        return res.status(400).json({ error: 'Invalid videoId format' });
+    if (!mongoose.Types.ObjectId.isValid(contentId)) {
+        return res.status(400).json({ error: 'Invalid contentId format' });
     }
 
-    const video = await Content.findById(videoId);
+    const video = await Content.findById(contentId);
     if (!video) {
         return res.status(404).json({ error: 'Video content not found' });
     }
@@ -80,7 +80,7 @@ const createLiveProgram = asyncHandler(async (req, res) => {
     const programEndTime = new Date(programStartTime.getTime() + durationInSeconds * 1000);
 
     const newProgram = await LiveProgram.create({
-        videoId,
+        contentId,
         title: video.title,
         description: video.description,
         thumbnail: video.thumbnail,
@@ -99,7 +99,7 @@ const createLiveProgram = asyncHandler(async (req, res) => {
 // @access  Private/Admin
 const updateLiveProgram = asyncHandler(async (req, res) => {
     const { id } = req.params;
-    const { date, startTime, videoId } = req.body;
+    const { date, startTime, contentId } = req.body;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
         return res.status(400).json({ error: 'Invalid program ID format' });
@@ -110,17 +110,17 @@ const updateLiveProgram = asyncHandler(async (req, res) => {
         return res.status(404).json({ error: 'Live program not found' });
     }
 
-    let video = await Content.findById(program.videoId);
-    if (videoId && videoId !== program.videoId.toString()) {
-        if (!mongoose.Types.ObjectId.isValid(videoId)) {
-            return res.status(400).json({ error: 'Invalid videoId format' });
+    let video = await Content.findById(program.contentId);
+    if (contentId && contentId !== program.contentId.toString()) {
+        if (!mongoose.Types.ObjectId.isValid(contentId)) {
+            return res.status(400).json({ error: 'Invalid contentId format' });
         }
-        const newVideo = await Content.findById(videoId);
+        const newVideo = await Content.findById(contentId);
         if (!newVideo) {
             return res.status(404).json({ error: 'New video content not found' });
         }
         video = newVideo;
-        program.videoId = videoId;
+        program.contentId = contentId;
         program.title = video.title;
         program.description = video.description;
         program.thumbnail = video.thumbnail;

@@ -75,14 +75,14 @@ describe('PlaymoodTV LIVE API', () => {
                 .post('/api/live-programs')
                 .set('Authorization', `Bearer ${adminToken}`)
                 .send({
-                    videoId: testContent._id.toString(),
+                    contentId: testContent._id.toString(),
                     date: startTime.toISOString().slice(0, 10),
                     startTime: startTime.toTimeString().slice(0, 5),
                 })
                 .end((err, res) => {
                     expect(res).to.have.status(201);
                     expect(res.body).to.be.an('object');
-                    expect(res.body).to.have.property('videoId', testContent._id.toString());
+                    expect(res.body).to.have.property('contentId', testContent._id.toString());
                     expect(res.body).to.have.property('status', 'scheduled');
                     testProgram = res.body; // Save for later tests
                     done();
@@ -123,7 +123,7 @@ describe('PlaymoodTV LIVE API', () => {
             const now = new Date();
             const liveStartTime = new Date(now.getTime() - 15 * 60 * 1000); // 15 minutes ago
             await LiveProgram.create({
-                videoId: testContent._id,
+                contentId: testContent._id,
                 title: 'Currently Live Show',
                 description: 'This show is on the air.',
                 thumbnail: 'live_thumb.jpg',
