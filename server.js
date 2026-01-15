@@ -12,6 +12,7 @@ const { generalLimiter } = require('./middleware/rateLimiter');
 const compression = require('compression'); // Add compression
 const mongoSanitize = require('express-mongo-sanitize'); // Add input sanitizer
 const { initWebSocket } = require('./websocket');
+const { startScheduler } = require('./utils/liveScheduler');
 
 const app = express();
 const server = http.createServer(app);
@@ -96,6 +97,7 @@ app.use('/api/highlights', require('./Routes/highlightRoute'));
 app.use('/api/ai', require('./Routes/aiRoute'));
 app.use('/api/analytics', require('./Routes/analyticsRoute'));
 app.use('/api/feed', require('./Routes/feedPostRoute'));
+app.use('/api/live-programs', require('./Routes/liveProgramRoute'));
 
 // Serve login.html for /login route
 app.get('/login', (req, res) => {
@@ -118,6 +120,7 @@ if (require.main === module) {
     .then(() => {
       console.log('MongoDB connected successfully.');
       initWebSocket(server); // Initialize WebSocket
+      startScheduler(); // Start the live program scheduler
       server.listen(port, () => console.log(`Server started on port ${port}`));
     })
     .catch((error) => {
