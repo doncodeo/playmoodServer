@@ -1,8 +1,16 @@
 const cloudinary = require('cloudinary').v2;
 
 const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
-const apiKey = process.env.CLOUDINARY_API_KEY;
-const apiSecret = process.env.CLOUDINARY_API_SECRET;
+let apiKey = process.env.CLOUDINARY_API_KEY;
+let apiSecret = process.env.CLOUDINARY_API_SECRET;
+
+// Sanitize credentials: remove surrounding quotes if they exist
+if (apiKey) {
+    apiKey = apiKey.replace(/^['"]|['"]$/g, '');
+}
+if (apiSecret) {
+    apiSecret = apiSecret.replace(/^['"]|['"]$/g, '');
+}
 
 if (!cloudName || !apiKey || !apiSecret) {
   throw new Error(
