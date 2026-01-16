@@ -77,7 +77,13 @@ const createLiveProgram = asyncHandler(async (req, res) => {
             durationInSeconds = Math.round(videoDetails.duration);
         }
     } catch (error) {
-        console.error('Failed to fetch video details from Cloudinary:', error);
+        // Securely log only the relevant, non-sensitive error information
+        const safeError = {
+            message: error.message,
+            http_code: error.http_code,
+            name: error.name,
+        };
+        console.error('Failed to fetch video details from Cloudinary:', JSON.stringify(safeError));
         return res.status(500).json({ error: 'Failed to retrieve video metadata for scheduling.' });
     }
 
