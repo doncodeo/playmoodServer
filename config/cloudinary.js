@@ -4,12 +4,12 @@ const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
 let apiKey = process.env.CLOUDINARY_API_KEY;
 let apiSecret = process.env.CLOUDINARY_API_SECRET;
 
-// Sanitize credentials: remove surrounding quotes if they exist
+// Sanitize credentials: remove all single and double quotes from anywhere in the strings
 if (apiKey) {
-    apiKey = apiKey.replace(/^['"]|['"]$/g, '');
+    apiKey = apiKey.replace(/['"]/g, '');
 }
 if (apiSecret) {
-    apiSecret = apiSecret.replace(/^['"]|['"]$/g, '');
+    apiSecret = apiSecret.replace(/['"]/g, '');
 }
 
 if (!cloudName || !apiKey || !apiSecret) {
