@@ -180,8 +180,9 @@ const handleR2UploadProcessing = async (content, video, thumbnail) => {
         const metadata = await mediaProcessor.getMetadata(tempVideoPath);
         content.duration = metadata.format.duration;
 
-        // 3. Generate Thumbnail (if not provided)
+        // 3. Handle Thumbnail
         if (!thumbnail || !thumbnail.key) {
+            // Generate thumbnail from video
             const thumbPath = await mediaProcessor.extractThumbnail(tempVideoPath);
             const thumbStream = fs.createReadStream(thumbPath);
             const thumbName = storageService.generateFileName('thumb.jpg', `${userId}/`);
@@ -190,6 +191,22 @@ const handleR2UploadProcessing = async (content, video, thumbnail) => {
             content.thumbnail = uploadResult.url;
             content.thumbnailKey = uploadResult.key;
             fs.unlinkSync(thumbPath);
+        } else {
+            // Move user-provided thumbnail from raw to processed
+            const tempThumbPath = path.join(os.tmpdir(), `t-${Date.now()}.jpg`);
+            try {
+                await storageService.downloadFromR2(thumbnail.key, tempThumbPath);
+                const thumbStream = fs.createReadStream(tempThumbPath);
+                const thumbName = storageService.generateFileName('thumb.jpg', `${userId}/`);
+                const uploadResult = await storageService.uploadToR2(thumbStream, thumbName, 'image/jpeg', storageService.namespaces.THUMBNAILS);
+
+                content.thumbnail = uploadResult.url;
+                content.thumbnailKey = uploadResult.key;
+
+                await storageService.delete(thumbnail.key);
+            } finally {
+                if (fs.existsSync(tempThumbPath)) fs.unlinkSync(tempThumbPath);
+            }
         }
 
         // 4. Generate Audio proxy for AI
