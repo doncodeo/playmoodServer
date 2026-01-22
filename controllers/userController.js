@@ -549,16 +549,9 @@ const updateUser = asyncHandler(async (req, res) => {
             user.profileImageProvider = 'r2';
             updatedFields.push('profileImage');
         } catch (error) {
-            // Handle specific Cloudinary errors
             let errorMessage = 'Failed to upload profile image.';
-            if (error.http_code === 429) {
-                errorMessage = 'Cloudinary rate limit exceeded. Please try again later.';
-            } else if (error.http_code === 400) {
-                errorMessage = 'Invalid image file provided to Cloudinary.';
-            }
-
             console.error(
-                `[${getTimestamp()}] ERROR: Cloudinary upload failed - userId: ${userId}, error: ${
+                `[${getTimestamp()}] ERROR: Profile image upload failed - userId: ${userId}, error: ${
                     error.message || 'Unknown error'
                 }, stack: ${error.stack}`
             );

@@ -5,6 +5,7 @@ const { Worker, Queue } = require('bullmq');
 const mongoose = require('mongoose');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const axios = require('axios');
 const ffmpeg = require('fluent-ffmpeg');
 const cloudinary = require('./config/cloudinary');
@@ -166,6 +167,7 @@ const createHighlightForContent = async (content) => {
 
 const handleR2UploadProcessing = async (content, video, thumbnail) => {
     const tempVideoPath = path.join(os.tmpdir(), `v-${Date.now()}.mp4`);
+    const userId = content.user._id ? content.user._id.toString() : content.user.toString();
     try {
         console.log(`[Worker] Processing R2 upload for content ${content._id}`);
         content.processingStatus = 'processing';
@@ -182,7 +184,6 @@ const handleR2UploadProcessing = async (content, video, thumbnail) => {
         if (!thumbnail || !thumbnail.key) {
             const thumbPath = await mediaProcessor.extractThumbnail(tempVideoPath);
             const thumbStream = fs.createReadStream(thumbPath);
-            const userId = content.user._id ? content.user._id.toString() : content.user.toString();
             const thumbName = storageService.generateFileName('thumb.jpg', `${userId}/`);
             const uploadResult = await storageService.uploadToR2(thumbStream, thumbName, 'image/jpeg', storageService.namespaces.THUMBNAILS);
 
@@ -194,7 +195,6 @@ const handleR2UploadProcessing = async (content, video, thumbnail) => {
         // 4. Generate Audio proxy for AI
         const audioPath = await mediaProcessor.extractAudio(tempVideoPath);
         const audioStream = fs.createReadStream(audioPath);
-        const userId = content.user._id ? content.user._id.toString() : content.user.toString();
         const audioName = storageService.generateFileName('audio.mp3', `${userId}/`);
         const audioResult = await storageService.uploadToR2(audioStream, audioName, 'audio/mpeg', storageService.namespaces.AUDIO);
         content.audioKey = audioResult.key;
@@ -202,7 +202,6 @@ const handleR2UploadProcessing = async (content, video, thumbnail) => {
 
         // 5. Move video to processed namespace
         const videoStream = fs.createReadStream(tempVideoPath);
-        const userId = content.user._id ? content.user._id.toString() : content.user.toString();
         const videoName = storageService.generateFileName('video.mp4', `${userId}/`);
         const videoResult = await storageService.uploadToR2(videoStream, videoName, 'video/mp4', storageService.namespaces.VIDEOS);
 
