@@ -8,7 +8,7 @@
     "start": "nodemon server.js",
     "server": "server.js",
     "heroku-prebuild": "npm cache clean --force",
-    "postinstall": "rm -rf node_modules/onnxruntime-node/bin/napi-v6/darwin && rm -rf node_modules/onnxruntime-node/bin/napi-v6/win32"
+    "postinstall": "node -e \"const fs = require('fs'); ['node_modules/onnxruntime-node/bin/napi-v6/darwin', 'node_modules/onnxruntime-node/bin/napi-v6/win32'].forEach(p => fs.rmSync(p, { recursive: true, force: true }))\""
   },
   "author": "Dada",
   "license": "ISC",
