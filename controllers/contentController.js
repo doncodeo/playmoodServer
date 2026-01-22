@@ -323,8 +323,8 @@ const createContent = asyncHandler(async (req, res) => {
         if (!title || !category || !description || !credit || !video) {
             return res.status(400).json({ error: 'Important fields, including video data, are missing!' });
         }
-        if (!video.public_id || !video.url) {
-            return res.status(400).json({ error: 'Video data must include a public_id and a url.' });
+        if (!video.url || (!video.public_id && !video.key)) {
+            return res.status(400).json({ error: 'Video data must include a url and either a public_id (Cloudinary) or key (R2).' });
         }
         const start = parseFloat(previewStart);
         const end = parseFloat(previewEnd);
