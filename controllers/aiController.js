@@ -5,6 +5,7 @@ const contentSchema = require('../models/contentModel');
 const { downloadFile } = require('../utils/fileHelpers');
 const { compressVideo } = require('../utils/videoCompressor');
 const cloudinary = require('../config/cloudinary');
+const storageService = require('../services/storageService');
 const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
@@ -260,27 +261,17 @@ const processPendingTranslations = asyncHandler(async (req, res) => {
                                     console.log(`[${content._id}] Video compressed successfully: ${compressedTempFilePath}`);
                                     fileToUploadPath = compressedTempFilePath;
 
-                                    console.log(`[${content._id}] Uploading ${fileToUploadPath} to Cloudinary...`);
-                                    await new Promise((resolve, reject) => {
-                                        cloudinary.uploader.upload_large(fileToUploadPath, {
-                                            resource_type: 'video',
-                                            folder: `translated_videos/${content._id}`,
-                                            chunk_size: 20000000 // 20MB
-                                        }, (error, result) => {
-                                            if (error || !result || !result.public_id) {
-                                                // Reject the promise if there's an error from Cloudinary or if the result is invalid.
-                                                return reject(error || new Error('Cloudinary upload failed: Invalid result'));
-                                            }
+                                    console.log(`[${content._id}] Uploading ${fileToUploadPath} to R2...`);
+                                    const videoStream = fs.createReadStream(fileToUploadPath);
+                                    const videoName = storageService.generateFileName(`translated_${translation.language}.mp4`, `${content.user}/`);
+                                    const uploadResult = await storageService.uploadToR2(videoStream, videoName, 'video/mp4', storageService.namespaces.VIDEOS);
 
-                                            // On success, update the translation object and increment counters
-                                            console.log(`[${content._id}] Successfully uploaded to Cloudinary. Public ID: ${result.public_id}`);
-                                            translation.url = result.secure_url;
-                                            translation.cloudinary_video_id = result.public_id;
-                                            translation.eta = undefined; // Clear ETA on completion
-                                            successCount++;
-                                            resolve(result); // Resolve the promise to signal completion
-                                        });
-                                    });
+                                    console.log(`[${content._id}] Successfully uploaded to R2. Key: ${uploadResult.key}`);
+                                    translation.url = uploadResult.url;
+                                    translation.storageKey = uploadResult.key;
+                                    translation.storageProvider = 'r2';
+                                    translation.eta = undefined; // Clear ETA on completion
+                                    successCount++;
                                 } catch (processingError) {
                                     console.error(`[${content._id}] FAILED to process successful translation for language ${translation.language}. Error:`, processingError);
                                     // If download/upload fails, we need to mark this specific translation as failed.
@@ -325,6 +316,8 @@ const processPendingTranslations = asyncHandler(async (req, res) => {
                                     "translatedVideos.$.status": translation.status,
                                     "translatedVideos.$.url": translation.url,
                                     "translatedVideos.$.cloudinary_video_id": translation.cloudinary_video_id,
+                                    "translatedVideos.$.storageKey": translation.storageKey,
+                                    "translatedVideos.$.storageProvider": translation.storageProvider || 'cloudinary',
                                 },
                                 "$unset": {
                                     "translatedVideos.$.eta": ""

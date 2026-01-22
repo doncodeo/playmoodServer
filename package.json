@@ -13,7 +13,10 @@
   "author": "Dada",
   "license": "ISC",
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.972.0",
+    "@aws-sdk/s3-request-presigner": "^3.972.0",
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "@ffprobe-installer/ffprobe": "^2.1.2",
     "@remotion/renderer": "^4.0.131",
     "@xenova/transformers": "2.15.0",
     "axios": "^1.11.0",

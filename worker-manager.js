@@ -13,6 +13,8 @@ const userSchema = require('./models/userModel');
 const Highlight = require('./models/highlightModel');
 const aiService = require('./ai/ai-service');
 const { aggregatePlatformStats } = require('./workers/analyticsWorker');
+const storageService = require('./services/storageService');
+const mediaProcessor = require('./utils/mediaProcessor');
 
 const transporter = require('./utils/mailer');
 
@@ -81,19 +83,57 @@ const processVideoCombination = async (job) => {
 const createHighlightForContent = async (content) => {
     try {
         console.log(`[Worker] Creating highlight for content ID: ${content._id}`);
-        if (!content.cloudinary_video_id) {
-            throw new Error('Content does not have a Cloudinary video ID.');
+
+        let duration = content.duration;
+        let highlightKey = null;
+
+        if (content.storageProvider === 'cloudinary') {
+            if (!content.cloudinary_video_id) {
+                throw new Error('Content does not have a Cloudinary video ID.');
+            }
+            // 1. Get video duration from Cloudinary
+            duration = await aiService.getVideoDuration(content.cloudinary_video_id);
+        } else if (content.storageProvider === 'r2') {
+            if (!content.videoKey) {
+                throw new Error('Content does not have an R2 video key.');
+            }
+            // Duration should already be set during R2 processing, but let's double check
+            if (!duration) {
+                const tempPath = path.join(os.tmpdir(), `v-meta-${Date.now()}.mp4`);
+                await storageService.downloadFromR2(content.videoKey, tempPath);
+                const metadata = await mediaProcessor.getMetadata(tempPath);
+                duration = metadata.format.duration;
+                fs.unlinkSync(tempPath);
+            }
         }
 
-        // 1. Get video duration from Cloudinary
-        const duration = await aiService.getVideoDuration(content.cloudinary_video_id);
         if (typeof duration !== 'number' || duration <= 0) {
-            throw new Error(`Invalid duration received from AI service: ${duration}`);
+            throw new Error(`Invalid duration received: ${duration}`);
         }
-        content.duration = duration; // Save duration to content
+        content.duration = duration;
 
         // 2. Generate highlight start and end times
         const { startTime, endTime } = aiService.generateHighlight(duration);
+
+        // If R2, we also need to generate the actual highlight video file
+        if (content.storageProvider === 'r2') {
+            const tempVideoPath = path.join(os.tmpdir(), `v-h-${Date.now()}.mp4`);
+            try {
+                await storageService.downloadFromR2(content.videoKey, tempVideoPath);
+                const highlightPath = await mediaProcessor.extractHighlight(tempVideoPath, startTime, endTime - startTime);
+                const highlightStream = fs.createReadStream(highlightPath);
+                const userId = content.user._id ? content.user._id.toString() : content.user.toString();
+                const highlightName = storageService.generateFileName('highlight.mp4', `${userId}/`);
+                const uploadResult = await storageService.uploadToR2(highlightStream, highlightName, 'video/mp4', storageService.namespaces.HIGHLIGHTS);
+
+                highlightKey = uploadResult.key;
+                content.highlightKey = highlightKey;
+
+                if (fs.existsSync(highlightPath)) fs.unlinkSync(highlightPath);
+            } finally {
+                if (fs.existsSync(tempVideoPath)) fs.unlinkSync(tempVideoPath);
+            }
+        }
 
         // 3. Create and save the new highlight
         const newHighlight = new Highlight({
@@ -102,6 +142,8 @@ const createHighlightForContent = async (content) => {
             startTime,
             endTime,
             title: content.title,
+            storageProvider: content.storageProvider,
+            storageKey: highlightKey,
         });
         await newHighlight.save();
 
@@ -122,14 +164,75 @@ const createHighlightForContent = async (content) => {
 };
 
 
+const handleR2UploadProcessing = async (content, video, thumbnail) => {
+    const tempVideoPath = path.join(os.tmpdir(), `v-${Date.now()}.mp4`);
+    try {
+        console.log(`[Worker] Processing R2 upload for content ${content._id}`);
+        content.processingStatus = 'processing';
+        await content.save();
+
+        // 1. Download raw video from R2
+        await storageService.downloadFromR2(video.key, tempVideoPath);
+
+        // 2. Extract Metadata
+        const metadata = await mediaProcessor.getMetadata(tempVideoPath);
+        content.duration = metadata.format.duration;
+
+        // 3. Generate Thumbnail (if not provided)
+        if (!thumbnail || !thumbnail.key) {
+            const thumbPath = await mediaProcessor.extractThumbnail(tempVideoPath);
+            const thumbStream = fs.createReadStream(thumbPath);
+            const userId = content.user._id ? content.user._id.toString() : content.user.toString();
+            const thumbName = storageService.generateFileName('thumb.jpg', `${userId}/`);
+            const uploadResult = await storageService.uploadToR2(thumbStream, thumbName, 'image/jpeg', storageService.namespaces.THUMBNAILS);
+
+            content.thumbnail = uploadResult.url;
+            content.thumbnailKey = uploadResult.key;
+            fs.unlinkSync(thumbPath);
+        }
+
+        // 4. Generate Audio proxy for AI
+        const audioPath = await mediaProcessor.extractAudio(tempVideoPath);
+        const audioStream = fs.createReadStream(audioPath);
+        const userId = content.user._id ? content.user._id.toString() : content.user.toString();
+        const audioName = storageService.generateFileName('audio.mp3', `${userId}/`);
+        const audioResult = await storageService.uploadToR2(audioStream, audioName, 'audio/mpeg', storageService.namespaces.AUDIO);
+        content.audioKey = audioResult.key;
+        fs.unlinkSync(audioPath);
+
+        // 5. Move video to processed namespace
+        const videoStream = fs.createReadStream(tempVideoPath);
+        const userId = content.user._id ? content.user._id.toString() : content.user.toString();
+        const videoName = storageService.generateFileName('video.mp4', `${userId}/`);
+        const videoResult = await storageService.uploadToR2(videoStream, videoName, 'video/mp4', storageService.namespaces.VIDEOS);
+
+        content.video = videoResult.url;
+        content.videoKey = videoResult.key;
+
+        // 6. Cleanup Raw File in R2
+        await storageService.delete(video.key);
+
+        console.log(`[Worker] R2 processing complete for content ${content._id}`);
+    } catch (error) {
+        console.error(`[Worker] R2 processing error for content ${content._id}:`, error);
+        throw error;
+    } finally {
+        if (fs.existsSync(tempVideoPath)) fs.unlinkSync(tempVideoPath);
+    }
+};
+
 const processUpload = async (job) => {
-    const { contentId, languageCode } = job.data;
+    const { contentId, languageCode, video, thumbnail } = job.data;
     console.log(`[Worker] Starting 'process-upload' for content ID: ${contentId}`);
 
     try {
         const content = await contentSchema.findById(contentId).populate('user');
         if (!content) {
             throw new Error(`Content with ID ${contentId} not found.`);
+        }
+
+        if (content.storageProvider === 'r2') {
+            await handleR2UploadProcessing(content, video, thumbnail);
         }
 
         // Generate highlight if the content is approved
@@ -149,7 +252,10 @@ const processUpload = async (job) => {
         // The rest of the original processing logic (e.g., captions, moderation) would go here.
         // For example, generating captions:
         if (languageCode) {
-            const captionText = await aiService.generateCaptions(content.video, contentId, languageCode);
+            const aiUrl = (content.storageProvider === 'r2' && content.audioKey)
+                ? storageService.getUrl(content.audioKey, 'r2')
+                : content.video;
+            const captionText = await aiService.generateCaptions(aiUrl, contentId, languageCode);
             if (captionText) {
                 const captionIndex = content.captions.findIndex(c => c.languageCode === languageCode);
                 if (captionIndex > -1) {
@@ -162,6 +268,7 @@ const processUpload = async (job) => {
 
         // Mark as completed
         content.status = 'completed';
+        content.processingStatus = 'ready';
         await content.save();
 
         console.log(`[Worker] Finished 'process-upload' for content ID: ${contentId}`);
