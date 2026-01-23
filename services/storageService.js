@@ -35,24 +35,22 @@ class StorageService {
      * Get a presigned URL for direct upload to R2
      */
     async getPresignedUploadUrl(fileName, contentType, namespace = this.namespaces.RAW) {
-        const key = `${namespace}/${fileName}`;
+        // Avoid double namespace if fileName already starts with it
+        const key = fileName.startsWith(`${namespace}/`) ? fileName : `${namespace}/${fileName}`;
 
-        // We use a simplified command for the presigned URL to make the signature
-        // less sensitive to client-side header variations (like charset=UTF-8).
         const command = new PutObjectCommand({
             Bucket: bucketName,
             Key: key,
             ContentType: contentType,
         });
 
-        // URL expires in 1 hour
-        // We sign it with signableHeaders to ensure Content-Type is included
-        // but other auto-generated headers by clients don't break the signature.
-        // We explicitly exclude checksum headers which are known to cause mismatches in R2.
+        // R2 is very sensitive to signed headers.
+        // By default, AWS SDK signs 'host' and 'content-type' if provided in the command.
+        // We must ensure the client sends EXACTLY the same content-type.
         const url = await getSignedUrl(r2Client, command, {
             expiresIn: 3600,
-            signableHeaders: new Set(['content-type']),
-            unhoistableHeaders: new Set(['x-amz-sdk-checksum-algorithm', 'x-amz-checksum-crc32'])
+            // We explicitly specify which headers to sign to avoid surprises from SDK middleware
+            signableHeaders: new Set(['host', 'content-type']),
         });
 
         return { url, key };

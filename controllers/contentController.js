@@ -439,7 +439,7 @@ const generateUploadSignature = asyncHandler(async (req, res) => {
             return res.status(400).json({ error: 'fileName and contentType are required for R2 uploads.' });
         }
 
-        const uniqueFileName = storageService.generateFileName(fileName, `raw/${userId}/`);
+        const uniqueFileName = storageService.generateFileName(fileName, `${userId}/`);
         const { url, key } = await storageService.getPresignedUploadUrl(uniqueFileName, contentType);
 
         res.status(200).json({

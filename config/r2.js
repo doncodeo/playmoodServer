@@ -15,6 +15,9 @@ const r2Client = new S3Client({
         accessKeyId: process.env.R2_ACCESS_KEY_ID,
         secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
     },
+    // R2 doesn't support all S3 features like checksums in the same way,
+    // so we use a more compatible configuration for presigning.
+    forcePathStyle: false,
 });
 
 module.exports = {
