@@ -28,6 +28,7 @@ const {
     getHomepageFeed,
 } = require('../controllers/contentController');
 const { protect, admin } = require('../middleware/authmiddleware');
+const upload = require('../middleware/multer');
 
 /**
  * @swagger
@@ -370,7 +371,7 @@ router.route('/').get(getContent);
  *       500:
  *         description: "Server error while generating credentials."
  */
-router.route('/signature').post(protect, generateUploadSignature);
+router.route('/signature').post(protect, upload.upload.none(), generateUploadSignature);
 
 /**
  * @swagger
