@@ -215,6 +215,22 @@ router.route('/combine').post(protect, admin, combineVideosByIds);
  *         video:
  *           type: string
  *           example: https://res.cloudinary.com/.../video.mp4
+ *         videoKey:
+ *           type: string
+ *           description: "The R2 storage key for the video (if using R2)."
+ *           example: processed/videos/65a8025e3af4e7929b379e7b/video.mp4
+ *         thumbnailKey:
+ *           type: string
+ *           description: "The R2 storage key for the thumbnail (if using R2)."
+ *           example: processed/thumbnails/65a8025e3af4e7929b379e7b/thumb.jpg
+ *         storageProvider:
+ *           type: string
+ *           enum: [cloudinary, r2]
+ *           default: cloudinary
+ *         processingStatus:
+ *           type: string
+ *           enum: [pending, processing, ready, failed]
+ *           default: ready
  *         cloudinary_video_id:
  *           type: string
  *           example: videos/video123
@@ -292,8 +308,12 @@ router.route('/').get(getContent);
  * @swagger
  * /api/content/signature:
  *   post:
- *     summary: "Step 1: Generate Cloudinary Upload Signature"
- *     description: "Generates a secure, one-time signature for direct client-side uploads to Cloudinary. This is the **first step** in the content creation process. The client must send an empty POST request to this endpoint to receive the signature, timestamp, and API key needed for the direct upload."
+ *     summary: "Step 1: Generate Upload Signature (Cloudinary) or Presigned URL (R2)"
+ *     description: |
+ *       Generates the necessary credentials for a secure, direct client-side upload.
+ *       - **For R2 (Recommended):** Generates an S3-compatible Presigned URL for the `/raw` namespace.
+ *       - **For Cloudinary:** Generates a legacy signature.
+ *       This is the **first step** in the content creation process.
  *     tags: [Content]
  *     security:
  *       - BearerAuth: []
@@ -303,29 +323,52 @@ router.route('/').get(getContent);
  *         application/json:
  *           schema:
  *             type: object
- *             description: "The request body should be an empty object."
- *             example: {}
+ *             properties:
+ *               provider:
+ *                 type: string
+ *                 enum: [r2, cloudinary]
+ *                 default: r2
+ *               fileName:
+ *                 type: string
+ *                 description: "Required for R2. The original name of the file."
+ *                 example: my_video.mp4
+ *               contentType:
+ *                 type: string
+ *                 description: "Required for R2. The MIME type of the file."
+ *                 example: video/mp4
+ *               type:
+ *                 type: string
+ *                 description: "Used for legacy Cloudinary folder organization."
+ *                 example: videos
  *     responses:
  *       200:
- *         description: "Signature generated successfully. The client should use these details to upload the file directly to Cloudinary."
+ *         description: "Upload credentials generated successfully."
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
+ *                 provider:
+ *                   type: string
+ *                   example: r2
+ *                 uploadUrl:
+ *                   type: string
+ *                   description: "The URL to perform the HTTP PUT (R2) or POST (Cloudinary) request to."
+ *                 key:
+ *                   type: string
+ *                   description: "The storage key/path to be sent back in Step 2."
  *                 signature:
  *                   type: string
- *                   example: "a1b2c3d4e5f6..."
+ *                   description: "(Cloudinary only) The generated signature."
  *                 timestamp:
  *                   type: number
- *                   example: 1678886400
- *                 api_key:
- *                   type: string
- *                   example: "123456789012345"
+ *                   description: "(Cloudinary only) The request timestamp."
+ *       400:
+ *         description: "Bad Request - Missing fileName or contentType for R2."
  *       401:
  *         description: "Unauthorized - JWT token is missing or invalid."
  *       500:
- *         description: "Server error while generating the signature."
+ *         description: "Server error while generating credentials."
  */
 router.route('/signature').post(protect, generateUploadSignature);
 
@@ -384,28 +427,33 @@ router.route('/signature').post(protect, generateUploadSignature);
  *                 example: "en-US"
  *               video:
  *                 type: object
- *                 description: "The Cloudinary response object for the uploaded video. This is required."
- *                 required: [public_id, url]
+ *                 description: "Upload data for the video. Requires either 'key' (R2) or 'public_id' (Cloudinary)."
+ *                 required: [url]
  *                 properties:
+ *                   key:
+ *                     type: string
+ *                     description: "The R2 key returned in Step 1."
+ *                     example: "raw/65a8025e3af4e7929b379e7a/1715727120-abcd.mp4"
  *                   public_id:
  *                     type: string
- *                     description: "The public_id returned by Cloudinary after the video upload."
+ *                     description: "The legacy Cloudinary public_id."
  *                     example: "videos/sample_video_123"
  *                   url:
  *                     type: string
- *                     description: "The secure URL returned by Cloudinary after the video upload."
- *                     example: "https://res.cloudinary.com/.../video.mp4"
+ *                     description: "The public URL (placeholder for R2 uploads)."
+ *                     example: "https://r2.playmoodtv.com/..."
  *               thumbnail:
  *                 type: object
- *                 description: "The Cloudinary response object for the uploaded thumbnail. This is optional. If not provided, a thumbnail will be generated automatically from the video."
+ *                 description: "Optional upload data for the thumbnail. If omitted, one will be generated."
  *                 properties:
+ *                   key:
+ *                     type: string
+ *                     example: "raw/65a8025e3af4e7929b379e7a/thumb.jpg"
  *                   public_id:
  *                     type: string
- *                     description: "The public_id returned by Cloudinary after the thumbnail upload."
  *                     example: "thumbnails/sample_thumb_456"
  *                   url:
  *                     type: string
- *                     description: "The secure URL returned by Cloudinary after the thumbnail upload."
  *                     example: "https://res.cloudinary.com/.../thumb.jpg"
  *     responses:
  *       202:
