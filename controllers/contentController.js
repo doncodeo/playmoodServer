@@ -14,6 +14,7 @@ const uploadQueue = require('../config/queue');
 const { getWss } = require('../websocket');
 const WebSocket = require('ws');
 const { createHighlightForContent } = require('../worker-manager');
+const storageService = require('../services/storageService');
 
 // @desc Get All Content
 // @route GET /api/content 
@@ -275,11 +276,17 @@ const getContentById = asyncHandler(async (req, res) => {
     });
 
     const contentData = content.toObject();
-    if (content.highlight) {
-        const highlight = await Highlight.findById(content.highlight);
+    if (content.highlights && content.highlights.length > 0) {
+        // Find the most recent highlight
+        const highlightId = content.highlights[content.highlights.length - 1];
+        const highlight = await Highlight.findById(highlightId);
         if (highlight) {
             contentData.highlight = highlight.toObject();
-            contentData.highlightUrl = `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/video/upload/e_accelerate:50,so_${highlight.startTime},eo_${highlight.endTime}/${content.cloudinary_video_id}.mp4`;
+            if (highlight.storageProvider === 'cloudinary' && content.cloudinary_video_id) {
+                contentData.highlightUrl = `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/video/upload/e_accelerate:50,so_${highlight.startTime},eo_${highlight.endTime}/${content.cloudinary_video_id}.mp4`;
+            } else if (highlight.storageProvider === 'r2' && highlight.storageKey) {
+                contentData.highlightUrl = storageService.getUrl(highlight.storageKey, 'r2');
+            }
         }
     }
 
@@ -287,6 +294,10 @@ const getContentById = asyncHandler(async (req, res) => {
     delete contentData.viewers;
     delete contentData.viewerIPs;
     delete contentData.cloudinary_video_id;
+    delete contentData.videoKey;
+    delete contentData.thumbnailKey;
+    delete contentData.highlightKey;
+    delete contentData.audioKey;
 
     res.status(200).json(contentData);
 });
@@ -312,8 +323,8 @@ const createContent = asyncHandler(async (req, res) => {
         if (!title || !category || !description || !credit || !video) {
             return res.status(400).json({ error: 'Important fields, including video data, are missing!' });
         }
-        if (!video.public_id || !video.url) {
-            return res.status(400).json({ error: 'Video data must include a public_id and a url.' });
+        if (!video.url || (!video.public_id && !video.key)) {
+            return res.status(400).json({ error: 'Video data must include a url and either a public_id (Cloudinary) or key (R2).' });
         }
         const start = parseFloat(previewStart);
         const end = parseFloat(previewEnd);
@@ -327,9 +338,19 @@ const createContent = asyncHandler(async (req, res) => {
             return res.status(403).json({ error: 'Unauthorized to create content' });
         }
 
-        // 3. Create initial content document with 'completed' status and final URLs
-        let thumbnailUrl = thumbnail ? thumbnail.url : `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/video/upload/so_2/${video.public_id}.jpg`;
-        let thumbnailPublicId = thumbnail ? thumbnail.public_id : ''; // May be empty
+        // 3. Create initial content document with 'processing' status
+        const isR2 = video.key && !video.public_id;
+        const storageProvider = isR2 ? 'r2' : 'cloudinary';
+        const processingStatus = isR2 ? 'pending' : 'ready';
+
+        // For R2, the 'video.url' provided by client might be the raw URL,
+        // we will update it to the CDN URL after processing.
+        let videoUrl = video.url;
+        let thumbnailUrl = thumbnail ? thumbnail.url : '';
+
+        if (!isR2 && !thumbnailUrl) {
+            thumbnailUrl = `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/video/upload/so_2/${video.public_id}.jpg`;
+        }
 
         const content = await contentSchema.create({
             user: userId,
@@ -338,11 +359,15 @@ const createContent = asyncHandler(async (req, res) => {
             description,
             credit,
             shortPreview: { start, end },
-            status: 'completed', // Set status to completed immediately
-            video: video.url,
+            status: 'processing',
+            processingStatus,
+            storageProvider,
+            video: videoUrl,
+            videoKey: video.key,
             cloudinary_video_id: video.public_id,
             thumbnail: thumbnailUrl,
-            cloudinary_thumbnail_id: thumbnailPublicId,
+            thumbnailKey: thumbnail ? thumbnail.key : '',
+            cloudinary_thumbnail_id: thumbnail ? thumbnail.public_id : '',
             isApproved: user.role === 'admin', // Admins' content is auto-approved
             aiModerationStatus: 'processing', // Set AI moderation status
         });
@@ -354,10 +379,12 @@ const createContent = asyncHandler(async (req, res) => {
             video: {
                 url: video.url,
                 public_id: video.public_id,
+                key: video.key,
             },
             thumbnail: thumbnail ? {
                 url: thumbnail.url,
                 public_id: thumbnail.public_id,
+                key: thumbnail.key,
             } : null,
         };
 
@@ -377,44 +404,51 @@ const createContent = asyncHandler(async (req, res) => {
     }
 });
 
-// @desc    Generate a signature for direct client-side uploads
+// @desc    Generate a signature or presigned URL for direct client-side uploads
 // @route   POST /api/content/signature
 // @access  Private
 const generateUploadSignature = asyncHandler(async (req, res) => {
     try {
-        const { type } = req.body; // type is now optional
+        const { type, fileName, contentType, provider = 'r2' } = req.body;
         const userId = req.user.id;
 
-        // The 'type' parameter is optional. If not provided, a generic folder is used.
-        let folder;
-        if (type && ['videos', 'images'].includes(type)) {
-            folder = `user-uploads/${userId}/${type}`;
-        } else {
-            // A generic folder for uploads where the type is not specified.
-            folder = `user-uploads/${userId}/mixed`;
+        if (provider === 'cloudinary') {
+            // Legacy Cloudinary signature logic
+            let folder;
+            if (type && ['videos', 'images'].includes(type)) {
+                folder = `user-uploads/${userId}/${type}`;
+            } else {
+                folder = `user-uploads/${userId}/mixed`;
+            }
+
+            const timestamp = Math.round((new Date).getTime() / 1000);
+            const params_to_sign = { timestamp };
+            const signature = cloudinary.utils.api_sign_request(params_to_sign, process.env.CLOUDINARY_API_SECRET);
+
+            return res.status(200).json({
+                provider: 'cloudinary',
+                signature,
+                timestamp,
+                folder,
+                api_key: process.env.CLOUDINARY_API_KEY,
+            });
         }
 
-        const timestamp = Math.round((new Date).getTime() / 1000);
+        // R2 Presigned URL logic
+        if (!fileName || !contentType) {
+            return res.status(400).json({ error: 'fileName and contentType are required for R2 uploads.' });
+        }
 
-        // Parameters to sign
-        // The 'folder' parameter is intentionally excluded from the signature.
-        // The client-side upload is not including it in the signed request,
-        // which causes a signature mismatch.
-        const params_to_sign = {
-            timestamp: timestamp,
-        };
+        const uniqueFileName = storageService.generateFileName(fileName, `${userId}/`);
+        const { url, key } = await storageService.getPresignedUploadUrl(uniqueFileName, contentType);
 
-        const signature = cloudinary.utils.api_sign_request(params_to_sign, process.env.CLOUDINARY_API_SECRET);
-
-        // Respond with the signature and other necessary data
         res.status(200).json({
-            signature,
-            timestamp,
-            folder,
-            api_key: process.env.CLOUDINARY_API_KEY,
+            provider: 'r2',
+            uploadUrl: url,
+            key: key,
         });
     } catch (error) {
-        console.error('Error generating Cloudinary signature:', error);
+        console.error('Error generating upload signature/URL:', error);
         res.status(500).json({ error: 'Server error while generating upload signature.' });
     }
 });
@@ -725,8 +759,24 @@ const updateContent = asyncHandler(async (req, res) => {
         content.category = category || content.category;
         content.description = description || content.description;
         content.credit = credit || content.credit;
-        content.thumbnail = thumbnail || content.thumbnail;
-        content.video = video || content.video;
+
+        if (thumbnail) {
+            if (typeof thumbnail === 'object' && thumbnail.key) {
+                content.thumbnail = thumbnail.url;
+                content.thumbnailKey = thumbnail.key;
+            } else {
+                content.thumbnail = thumbnail;
+            }
+        }
+
+        if (video) {
+            if (typeof video === 'object' && video.key) {
+                content.video = video.url;
+                content.videoKey = video.key;
+            } else {
+                content.video = video;
+            }
+        }
 
         const updatedContent = await content.save();
         res.status(200).json(updatedContent);
@@ -748,12 +798,24 @@ const deleteContent = asyncHandler(async (req, res) => {
             return res.status(404).json({ error: 'Content not found' });
         }
 
-        if (content.cloudinary_video_id) {
-            await cloudinary.uploader.destroy(content.cloudinary_video_id);
+        const provider = content.storageProvider || 'cloudinary';
+
+        // Delete video
+        const videoKey = content.videoKey || content.cloudinary_video_id;
+        if (videoKey) {
+            await storageService.delete(videoKey, provider);
         }
 
-        if (content.cloudinary_thumbnail_id) {
-            await cloudinary.uploader.destroy(content.cloudinary_thumbnail_id);
+        // Delete thumbnail
+        const thumbKey = content.thumbnailKey || content.cloudinary_thumbnail_id;
+        if (thumbKey) {
+            await storageService.delete(thumbKey, provider);
+        }
+
+        // Delete other R2 assets
+        if (provider === 'r2') {
+            if (content.highlightKey) await storageService.delete(content.highlightKey, 'r2');
+            if (content.audioKey) await storageService.delete(content.audioKey, 'r2');
         }
 
         await contentSchema.findByIdAndDelete(id);

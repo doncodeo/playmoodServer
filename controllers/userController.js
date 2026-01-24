@@ -6,6 +6,7 @@ const contentSchema = require('../models/contentModel');
 const jwt = require("jsonwebtoken");
 const bcryptjs = require("bcryptjs");
 const cloudinary = require('../config/cloudinary');
+const storageService = require('../services/storageService');
 const Token = require("../models/token");
 const crypto = require("crypto");
 const DatauriParser = require('datauri/parser');
@@ -260,12 +261,11 @@ const deleteUser = asyncHandler(async (req, res) => {
       return;
     }
 
-    // Delete the user's profile image from Cloudinary
-    const publicId = user.profileImage && user.cloudinary_id;
-    // console.log('Before image deletion - Public ID:', publicId);
-    if (publicId) {
-
-      await cloudinary.uploader.destroy(publicId);
+    // Delete the user's profile image
+    const provider = user.profileImageProvider || 'cloudinary';
+    const key = user.profileImageKey || user.cloudinary_id;
+    if (key) {
+      await storageService.delete(key, provider);
     }
     // Delete the user from MongoDB
     await user.deleteOne();
@@ -522,45 +522,36 @@ const updateUser = asyncHandler(async (req, res) => {
                 });
             }
 
-            // Upload new image to Cloudinary
-            const result = await cloudinary.uploader.upload(file64.content, {
-                folder: 'profile-images',
-                public_id: `${userId}-${Date.now()}`,
-            });
+            // Upload new image to R2
+            const fileName = storageService.generateFileName(req.file.originalname, `profile-images/${userId}/`);
+            const uploadResult = await storageService.uploadToR2(fileBuffer, fileName, req.file.mimetype, storageService.namespaces.THUMBNAILS); // Using thumbnails namespace for images
 
-            // Delete old image from Cloudinary if it exists
-            if (user.cloudinary_id) {
+            // Delete old image if it exists
+            const oldProvider = user.profileImageProvider || 'cloudinary';
+            const oldKey = user.profileImageKey || user.cloudinary_id;
+
+            if (oldKey) {
                 try {
-                    await cloudinary.uploader.destroy(user.cloudinary_id);
+                    await storageService.delete(oldKey, oldProvider);
                     console.log(
-                        `[${getTimestamp()}] INFO: Old Cloudinary image deleted - userId: ${userId}, cloudinaryId: ${
-                            user.cloudinary_id
-                        }`
+                        `[${getTimestamp()}] INFO: Old profile image deleted - userId: ${userId}, key: ${oldKey}`
                     );
                 } catch (error) {
                     console.log(
-                        `[${getTimestamp()}] WARN: Failed to delete old Cloudinary image - userId: ${userId}, cloudinaryId: ${
-                            user.cloudinary_id
-                        }, error: ${error.message}`
+                        `[${getTimestamp()}] WARN: Failed to delete old profile image - userId: ${userId}, key: ${oldKey}, error: ${error.message}`
                     );
                 }
             }
 
-            // Update profile image and Cloudinary ID
-            user.profileImage = result.secure_url.replace(/^http:\/\//i, 'https://');
-            user.cloudinary_id = result.public_id;
+            // Update profile image and key
+            user.profileImage = uploadResult.url;
+            user.profileImageKey = uploadResult.key;
+            user.profileImageProvider = 'r2';
             updatedFields.push('profileImage');
         } catch (error) {
-            // Handle specific Cloudinary errors
             let errorMessage = 'Failed to upload profile image.';
-            if (error.http_code === 429) {
-                errorMessage = 'Cloudinary rate limit exceeded. Please try again later.';
-            } else if (error.http_code === 400) {
-                errorMessage = 'Invalid image file provided to Cloudinary.';
-            }
-
             console.error(
-                `[${getTimestamp()}] ERROR: Cloudinary upload failed - userId: ${userId}, error: ${
+                `[${getTimestamp()}] ERROR: Profile image upload failed - userId: ${userId}, error: ${
                     error.message || 'Unknown error'
                 }, stack: ${error.stack}`
             );
@@ -603,6 +594,8 @@ const updateUser = asyncHandler(async (req, res) => {
             email: updatedUser.email,
             role: updatedUser.role,
             profileImage: updatedUser.profileImage,
+            profileImageKey: updatedUser.profileImageKey,
+            profileImageProvider: updatedUser.profileImageProvider,
             cloudinary_id: updatedUser.cloudinary_id,
             country: updatedUser.country,
             isEmailVerified: updatedUser.isEmailVerified,
@@ -742,6 +735,8 @@ const loginUser = asyncHandler(async (req, res) => {
             email: user.email,
             role: user.role,
             profileImage: user.profileImage,
+            profileImageKey: user.profileImageKey,
+            profileImageProvider: user.profileImageProvider,
             cloudinary_id: user.cloudinary_id,
             likes: user.likes,
             watchlist: user.watchlist,
@@ -774,6 +769,8 @@ const getUserprofile = asyncHandler(async (req, res) => {
         email: user.email,
         role: user.role,
         profileImage: user.profileImage,
+        profileImageKey: user.profileImageKey,
+        profileImageProvider: user.profileImageProvider,
         country: user.country,
         isEmailVerified: user.isEmailVerified,
         likes: user.likes,

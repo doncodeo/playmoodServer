@@ -262,7 +262,7 @@ router.route('/:userId').put(protect, updateChannelInfo);
  * /{userId}/banner:
  *   put:
  *     summary: Update creator channel banner image
- *     description: Updates the creator's channel banner image by uploading a new image to Cloudinary. Only the authenticated creator can update their own channel.
+ *     description: Updates the creator's channel banner image. Supports both Cloudinary and R2.
  *     tags: [Channels]
  *     security:
  *       - BearerAuth: []
@@ -285,12 +285,20 @@ router.route('/:userId').put(protect, updateChannelInfo);
  *             properties:
  *               url:
  *                 type: string
- *                 description: The new banner image URL from Cloudinary
+ *                 description: The new banner image URL
  *                 example: https://res.cloudinary.com/.../banner.jpg
  *               public_id:
  *                 type: string
- *                 description: The public_id of the new banner image from Cloudinary
+ *                 description: The public_id of the new banner image (Cloudinary only)
  *                 example: user-uploads/6873bd41369264c373b0373a/mixed/random_id
+ *               key:
+ *                 type: string
+ *                 description: The R2 storage key (R2 only)
+ *                 example: banner-images/6873bd41369264c373b0373a/banner.jpg
+ *               provider:
+ *                 type: string
+ *                 enum: [cloudinary, r2]
+ *                 default: r2
  *     responses:
  *       200:
  *         description: Channel banner image updated successfully

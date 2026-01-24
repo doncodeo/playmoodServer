@@ -23,6 +23,14 @@ const highlightSchema = new mongoose.Schema(
             type: Number,
             required: true,
         },
+        storageProvider: {
+            type: String,
+            enum: ['cloudinary', 'r2'],
+            default: 'cloudinary'
+        },
+        storageKey: {
+            type: String,
+        },
     },
     {
         timestamps: true,

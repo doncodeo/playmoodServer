@@ -8,12 +8,15 @@
     "start": "nodemon server.js",
     "server": "server.js",
     "heroku-prebuild": "npm cache clean --force",
-    "postinstall": "rm -rf node_modules/onnxruntime-node/bin/napi-v6/darwin && rm -rf node_modules/onnxruntime-node/bin/napi-v6/win32"
+    "postinstall": "node -e \"const fs = require('fs'); ['node_modules/onnxruntime-node/bin/napi-v6/darwin', 'node_modules/onnxruntime-node/bin/napi-v6/win32'].forEach(p => fs.rmSync(p, { recursive: true, force: true }))\""
   },
   "author": "Dada",
   "license": "ISC",
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.972.0",
+    "@aws-sdk/s3-request-presigner": "^3.972.0",
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "@ffprobe-installer/ffprobe": "^2.1.2",
     "@remotion/renderer": "^4.0.131",
     "@xenova/transformers": "2.15.0",
     "axios": "^1.11.0",

@@ -2,6 +2,7 @@ const asyncHandler = require('express-async-handler');
 const User = require('../models/userModel');
 const Content = require('../models/contentModel');
 const cloudinary = require('../config/cloudinary');
+const storageService = require('../services/storageService');
 const mongoose = require('mongoose');
 const DatauriParser = require('datauri/parser');
 const path = require('path');
@@ -107,7 +108,7 @@ const updateChannelInfo = asyncHandler(async (req, res) => {
 // @access Private (authenticated, creator only)
 const updateChannelBannerImage = asyncHandler(async (req, res) => {
   const { userId } = req.params;
-  const { url, public_id } = req.body;
+  const { url, public_id, key, provider = 'r2' } = req.body;
 
   if (!userId) {
     return res.status(400).json({ error: 'User ID is required' });
@@ -131,13 +132,17 @@ const updateChannelBannerImage = asyncHandler(async (req, res) => {
     return res.status(400).json({ error: 'Image URL and public_id are required' });
   }
 
-  // If there's an old banner, delete it from Cloudinary
-  if (user.bannerImageId) {
-    await cloudinary.uploader.destroy(user.bannerImageId);
+  // If there's an old banner, delete it
+  const oldProvider = user.bannerImageProvider || 'cloudinary';
+  const oldKey = user.bannerImageKey || user.bannerImageId;
+  if (oldKey) {
+    await storageService.delete(oldKey, oldProvider);
   }
 
   user.bannerImage = url.replace(/^http:\/\//i, 'https://');
+  user.bannerImageKey = key;
   user.bannerImageId = public_id;
+  user.bannerImageProvider = provider;
   await user.save();
 
   res.status(200).json({

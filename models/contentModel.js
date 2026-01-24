@@ -52,12 +52,26 @@ const contentSchema = new mongoose.Schema(
             required: true,
             get: enforceHttps,
         },
+        videoKey: String,
+        storageProvider: {
+            type: String,
+            enum: ['cloudinary', 'r2'],
+            default: 'cloudinary'
+        },
+        processingStatus: {
+            type: String,
+            enum: ['pending', 'processing', 'ready', 'failed'],
+            default: 'ready'
+        },
         cloudinary_video_id: {
             type: String,
         },
         cloudinary_thumbnail_id: {
             type: String,
         },
+        thumbnailKey: String,
+        highlightKey: String,
+        audioKey: String,
         isApproved: {
             type: Boolean,
             default: false,
@@ -107,7 +121,13 @@ const contentSchema = new mongoose.Schema(
             eta: {
                 type: Number, // Estimated completion time in seconds
             },
-            cloudinary_video_id: String
+            cloudinary_video_id: String,
+            storageKey: String,
+            storageProvider: {
+                type: String,
+                enum: ['cloudinary', 'r2'],
+                default: 'cloudinary'
+            },
         }],
         views: {
             type: Number,

@@ -60,31 +60,36 @@ const createLiveProgram = asyncHandler(async (req, res) => {
         return res.status(404).json({ error: 'Video content not found' });
     }
 
-    // Ensure the content has a Cloudinary ID before proceeding
-    if (!video.cloudinary_video_id) {
-        return res.status(400).json({ error: 'The selected video content is missing a Cloudinary ID and cannot be scheduled.' });
-    }
+    let durationInSeconds = video.duration;
 
-    // Fetch video details from Cloudinary to get the actual duration
-    let durationInSeconds;
-    try {
-        const videoDetails = await cloudinary.api.resource(video.cloudinary_video_id, { resource_type: 'video' });
-        if (!videoDetails || !videoDetails.duration) {
-            // Fallback to a default if duration is not available, and log an error
-            console.error(`Could not retrieve duration for video ${video.cloudinary_video_id}. Falling back to 1 hour.`);
-            durationInSeconds = 3600;
-        } else {
-            durationInSeconds = Math.round(videoDetails.duration);
+    if (!durationInSeconds) {
+        if (video.storageProvider === 'r2') {
+             return res.status(400).json({ error: 'Video duration is missing for this R2 content.' });
         }
-    } catch (error) {
-        // Securely log only the relevant, non-sensitive error information
-        const safeError = {
-            message: error.message,
-            http_code: error.http_code,
-            name: error.name,
-        };
-        console.error('Failed to fetch video details from Cloudinary:', JSON.stringify(safeError));
-        return res.status(500).json({ error: 'Failed to retrieve video metadata for scheduling.' });
+
+        // Fetch video details from Cloudinary to get the actual duration
+        try {
+            if (!video.cloudinary_video_id) {
+                return res.status(400).json({ error: 'The selected video content is missing a Cloudinary ID and cannot be scheduled.' });
+            }
+            const videoDetails = await cloudinary.api.resource(video.cloudinary_video_id, { resource_type: 'video' });
+            if (!videoDetails || !videoDetails.duration) {
+                // Fallback to a default if duration is not available, and log an error
+                console.error(`Could not retrieve duration for video ${video.cloudinary_video_id}. Falling back to 1 hour.`);
+                durationInSeconds = 3600;
+            } else {
+                durationInSeconds = Math.round(videoDetails.duration);
+            }
+        } catch (error) {
+            // Securely log only the relevant, non-sensitive error information
+            const safeError = {
+                message: error.message,
+                http_code: error.http_code,
+                name: error.name,
+            };
+            console.error('Failed to fetch video details from Cloudinary:', JSON.stringify(safeError));
+            return res.status(500).json({ error: 'Failed to retrieve video metadata for scheduling.' });
+        }
     }
 
     const programStartTime = new Date(`${date}T${startTime}:00`);

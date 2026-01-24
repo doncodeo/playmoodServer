@@ -34,6 +34,8 @@ const swaggerDefinition = {
           _id: { type: 'string', description: 'The highlight ID.' },
           startTime: { type: 'number', description: 'Start time of the highlight in seconds.' },
           endTime: { type: 'number', description: 'End time of the highlight in seconds.' },
+          storageKey: { type: 'string', description: 'R2 storage key for the highlight video.' },
+          storageProvider: { type: 'string', enum: ['cloudinary', 'r2'], default: 'cloudinary' },
           user: {
             type: 'object',
             properties: {
@@ -89,8 +91,8 @@ const swaggerDefinition = {
     {
       name: 'Content',
       description: `Endpoints for content management. The content creation process is a two-step flow:
-      1. **Generate Signature**: The client first requests a secure signature from the server via the \`/api/content/signature\` endpoint.
-      2. **Direct Upload & Create Record**: The client uses this signature to upload the video file directly to Cloudinary. Once the upload is complete, the client sends the Cloudinary response (including the public_id and URL) along with other metadata to the \`/api/content\` endpoint to create the content record in the database.`,
+      1. **Generate Signature/URL**: The client first requests a secure signature (Cloudinary) or Presigned URL (R2) from the server via the \`/api/content/signature\` endpoint.
+      2. **Direct Upload & Create Record**: The client uses this signature/URL to upload the video file directly to the storage provider. Once the upload is complete, the client sends the provider's response (including the key or public_id and URL) along with other metadata to the \`/api/content\` endpoint to create the content record in the database.`,
     },
     {
       name: 'Highlights',

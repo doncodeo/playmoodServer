@@ -43,6 +43,12 @@ const userSchema = new mongoose.Schema(
             type: String,
             get: enforceHttps,
         },
+        profileImageKey: String,
+        profileImageProvider: {
+            type: String,
+            enum: ['cloudinary', 'r2'],
+            default: 'cloudinary'
+        },
         cloudinary_id: {
             type: String,
         },
@@ -103,6 +109,12 @@ const userSchema = new mongoose.Schema(
             type: String,
             default: 'https://img.freepik.com/free-vector/gradient-colored-youtube-banner_23-2149209334.jpg',
             get: enforceHttps,
+        },
+        bannerImageKey: String,
+        bannerImageProvider: {
+            type: String,
+            enum: ['cloudinary', 'r2'],
+            default: 'cloudinary'
         },
         bannerImageId: {
             type: String,

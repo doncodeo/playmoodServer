@@ -52,6 +52,14 @@ const { loginLimiter } = require('../middleware/rateLimiter');
  *         profileImage:
  *           type: string
  *           example: https://res.cloudinary.com/.../image.jpg
+ *         profileImageKey:
+ *           type: string
+ *           description: "The R2 storage key for the profile image (if using R2)."
+ *           example: profile-images/65a8025e3af4e7929b379e7b/1715727120-abcd.jpg
+ *         profileImageProvider:
+ *           type: string
+ *           enum: [cloudinary, r2]
+ *           default: cloudinary
  *         cloudinary_id:
  *           type: string
  *           example: user-uploads/qdayeocck7k6zzqqery15
