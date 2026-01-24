@@ -45,14 +45,12 @@ class StorageService {
         });
 
         // R2 is very sensitive to signed headers.
-        // By default, AWS SDK signs 'host' and 'content-type' if provided in the command.
-        // We must ensure the client sends EXACTLY the same content-type.
+        // We ensure only the absolute minimum headers are signed to avoid mismatches.
+        // "No date provided" error in Postman is usually caused by an 'Authorization' header
+        // being present in the request, which forces the server to ignore query string auth.
         const url = await getSignedUrl(r2Client, command, {
             expiresIn: 3600,
-            // We explicitly specify which headers to sign to avoid surprises from SDK middleware
             signableHeaders: new Set(['host', 'content-type']),
-            // Ensure parameters stay in query string
-            unhoistableHeaders: new Set(['x-amz-content-sha256', 'x-amz-user-agent']),
         });
 
         return { url, key };
