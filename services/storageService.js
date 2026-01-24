@@ -116,6 +116,10 @@ class StorageService {
      */
     getR2PublicUrl(key) {
         if (!key) return null;
+        if (!publicDomain) {
+            console.error('[StorageService] publicDomain is not configured. Check R2_PUBLIC_DOMAIN env var.');
+            return null;
+        }
         // Ensure publicDomain doesn't have a trailing slash
         const domain = publicDomain.replace(/\/$/, '');
         return `${domain}/${key}`;
