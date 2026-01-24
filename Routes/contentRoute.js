@@ -358,6 +358,9 @@ router.route('/').get(getContent);
  *                 key:
  *                   type: string
  *                   description: "The storage key/path to be sent back in Step 2."
+ *                 publicUrl:
+ *                   type: string
+ *                   description: "The predicted public URL of the resource. Use this in the 'video.url' field in Step 2."
  *                 signature:
  *                   type: string
  *                   description: "(Cloudinary only) The generated signature."

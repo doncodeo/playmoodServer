@@ -446,6 +446,7 @@ const generateUploadSignature = asyncHandler(async (req, res) => {
             provider: 'r2',
             uploadUrl: url,
             key: key,
+            publicUrl: storageService.getR2PublicUrl(key),
         });
     } catch (error) {
         console.error('Error generating upload signature/URL:', error);
