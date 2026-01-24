@@ -1,4 +1,4 @@
-const { PutObjectCommand, DeleteObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
+const { PutObjectCommand, DeleteObjectCommand, GetObjectCommand, HeadObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const { r2Client, bucketName, publicDomain } = require('../config/r2');
 const cloudinary = require('../config/cloudinary');
@@ -93,6 +93,25 @@ class StorageService {
             writer.on('finish', resolve);
             writer.on('error', reject);
         });
+    }
+
+    /**
+     * Check if an object exists in R2
+     */
+    async checkFileExists(key) {
+        try {
+            const command = new HeadObjectCommand({
+                Bucket: bucketName,
+                Key: key,
+            });
+            await r2Client.send(command);
+            return true;
+        } catch (error) {
+            if (error.name === 'NotFound' || error.$metadata?.httpStatusCode === 404) {
+                return false;
+            }
+            throw error;
+        }
     }
 
     /**

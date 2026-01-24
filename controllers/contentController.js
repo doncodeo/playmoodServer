@@ -338,8 +338,27 @@ const createContent = asyncHandler(async (req, res) => {
             return res.status(403).json({ error: 'Unauthorized to create content' });
         }
 
-        // 3. Create initial content document with 'processing' status
         const isR2 = video.key && !video.public_id;
+
+        // 3. Validate R2 keys if applicable
+        if (isR2) {
+            const videoExists = await storageService.checkFileExists(video.key);
+            if (!videoExists) {
+                return res.status(400).json({
+                    error: `The specified video key '${video.key}' does not exist in R2. Please ensure the upload completed successfully before creating the content record.`
+                });
+            }
+            if (thumbnail && thumbnail.key) {
+                const thumbExists = await storageService.checkFileExists(thumbnail.key);
+                if (!thumbExists) {
+                    return res.status(400).json({
+                        error: `The specified thumbnail key '${thumbnail.key}' does not exist in R2.`
+                    });
+                }
+            }
+        }
+
+        // 4. Create initial content document with 'processing' status
         const storageProvider = isR2 ? 'r2' : 'cloudinary';
         const processingStatus = isR2 ? 'pending' : 'ready';
 
@@ -409,8 +428,19 @@ const createContent = asyncHandler(async (req, res) => {
 // @access  Private
 const generateUploadSignature = asyncHandler(async (req, res) => {
     try {
-        const { type, fileName, contentType, provider = 'r2' } = req.body;
+        let { type, fileName, contentType, provider = 'r2' } = req.body;
         const userId = req.user.id;
+
+        // If a file was uploaded via multipart/form-data, extract metadata from it
+        if (req.file) {
+            fileName = req.file.originalname;
+            contentType = req.file.mimetype;
+            // Infer type for Cloudinary if not provided
+            if (!type) {
+                if (contentType.startsWith('video/')) type = 'videos';
+                else if (contentType.startsWith('image/')) type = 'images';
+            }
+        }
 
         if (provider === 'cloudinary') {
             // Legacy Cloudinary signature logic

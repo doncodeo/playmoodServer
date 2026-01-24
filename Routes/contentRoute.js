@@ -374,7 +374,7 @@ router.route('/').get(getContent);
  *       500:
  *         description: "Server error while generating credentials."
  */
-router.route('/signature').post(protect, upload.upload.none(), generateUploadSignature);
+router.route('/signature').post(protect, upload.single('file'), generateUploadSignature);
 
 /**
  * @swagger
