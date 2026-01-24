@@ -51,6 +51,8 @@ class StorageService {
             expiresIn: 3600,
             // We explicitly specify which headers to sign to avoid surprises from SDK middleware
             signableHeaders: new Set(['host', 'content-type']),
+            // Ensure parameters stay in query string
+            unhoistableHeaders: new Set(['x-amz-content-sha256', 'x-amz-user-agent']),
         });
 
         return { url, key };

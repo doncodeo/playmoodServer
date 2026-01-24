@@ -18,6 +18,9 @@ const r2Client = new S3Client({
     // R2 doesn't support all S3 features like checksums in the same way,
     // so we use a more compatible configuration for presigning.
     forcePathStyle: false,
+    // Explicitly disable automatic checksum calculation which can break signatures in Postman/R2
+    requestChecksumCalculation: 'WHEN_REQUIRED',
+    responseChecksumValidation: 'WHEN_REQUIRED',
 });
 
 module.exports = {
