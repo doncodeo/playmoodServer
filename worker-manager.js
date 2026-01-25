@@ -170,86 +170,126 @@ const handleR2UploadProcessing = async (content, video, thumbnail) => {
     const userId = content.user._id ? content.user._id.toString() : content.user.toString();
     try {
         console.log(`[Worker] Processing R2 upload for content ${content._id}`);
+
+        // Ensure we have the latest state and mark as processing
         content.processingStatus = 'processing';
         await content.save();
 
-        // 1. Download raw video from R2
-        await storageService.downloadFromR2(video.key, tempVideoPath);
-
-        // 2. Extract Metadata
-        const metadata = await mediaProcessor.getMetadata(tempVideoPath);
-        content.duration = metadata.format.duration;
-
-        // 3. Handle Thumbnail
-        if (!thumbnail || !thumbnail.key) {
-            // Generate thumbnail from video
-            const thumbPath = await mediaProcessor.extractThumbnail(tempVideoPath);
-            const thumbStream = fs.createReadStream(thumbPath);
-            const thumbName = storageService.generateFileName('thumb.jpg', `${userId}/`);
-            const uploadResult = await storageService.uploadToR2(thumbStream, thumbName, 'image/jpeg', storageService.namespaces.THUMBNAILS);
-
-            // Re-fetch to ensure clean state before atomic update
-            await contentSchema.findByIdAndUpdate(content._id, {
-                thumbnail: uploadResult.url,
-                thumbnailKey: uploadResult.key
-            });
-            console.log(`[Worker] Generated and saved thumbnail for content ${content._id}`);
-
-            content.thumbnail = uploadResult.url;
-            content.thumbnailKey = uploadResult.key;
-            fs.unlinkSync(thumbPath);
+        // 1. Download raw video from R2 (if it still exists)
+        const rawVideoExists = await storageService.checkFileExists(video.key);
+        if (rawVideoExists) {
+            await storageService.downloadFromR2(video.key, tempVideoPath);
+            const stats = fs.statSync(tempVideoPath);
+            console.log(`[Worker] Downloaded raw video (${(stats.size / (1024 * 1024)).toFixed(2)} MB)`);
         } else {
-            // Move user-provided thumbnail from raw to processed
-            const tempThumbPath = path.join(os.tmpdir(), `t-${Date.now()}.jpg`);
-            try {
-                await storageService.downloadFromR2(thumbnail.key, tempThumbPath);
-                const thumbStream = fs.createReadStream(tempThumbPath);
-                const thumbName = storageService.generateFileName('thumb.jpg', `${userId}/`);
-                const uploadResult = await storageService.uploadToR2(thumbStream, thumbName, 'image/jpeg', storageService.namespaces.THUMBNAILS);
+            console.warn(`[Worker] Raw video ${video.key} not found. Checking if already processed...`);
+        }
 
-                // Re-fetch and update atomically
+        // 2. Handle Thumbnail
+        const isThumbnailProcessed = content.thumbnailKey && content.thumbnailKey.startsWith(storageService.namespaces.THUMBNAILS);
+        if (!isThumbnailProcessed) {
+            console.log(`[Worker] Processing thumbnail for content ${content._id}`);
+            if (thumbnail && thumbnail.key) {
+                const rawThumbExists = await storageService.checkFileExists(thumbnail.key);
+                if (rawThumbExists) {
+                    const tempThumbPath = path.join(os.tmpdir(), `t-${Date.now()}.jpg`);
+                    try {
+                        await storageService.downloadFromR2(thumbnail.key, tempThumbPath);
+                        const thumbStream = fs.createReadStream(tempThumbPath);
+                        const thumbName = storageService.generateFileName('thumb.jpg', `${userId}/`);
+                        const uploadResult = await storageService.uploadToR2(thumbStream, thumbName, 'image/jpeg', storageService.namespaces.THUMBNAILS);
+
+                        await contentSchema.findByIdAndUpdate(content._id, {
+                            thumbnail: uploadResult.url,
+                            thumbnailKey: uploadResult.key
+                        });
+                        content.thumbnail = uploadResult.url;
+                        content.thumbnailKey = uploadResult.key;
+
+                        await storageService.delete(thumbnail.key);
+                        console.log(`[Worker] Successfully moved user thumbnail to ${uploadResult.key}`);
+                    } finally {
+                        if (fs.existsSync(tempThumbPath)) fs.unlinkSync(tempThumbPath);
+                    }
+                } else {
+                    console.warn(`[Worker] Raw thumbnail missing and not processed. Skipping user thumbnail.`);
+                }
+            }
+
+            // If still no thumbnail (or user thumb failed/missing), generate from video
+            if (!content.thumbnailKey || !content.thumbnailKey.startsWith(storageService.namespaces.THUMBNAILS)) {
+                if (fs.existsSync(tempVideoPath)) {
+                    const thumbPath = await mediaProcessor.extractThumbnail(tempVideoPath);
+                    const thumbStream = fs.createReadStream(thumbPath);
+                    const thumbName = storageService.generateFileName('thumb.jpg', `${userId}/`);
+                    const uploadResult = await storageService.uploadToR2(thumbStream, thumbName, 'image/jpeg', storageService.namespaces.THUMBNAILS);
+
+                    await contentSchema.findByIdAndUpdate(content._id, {
+                        thumbnail: uploadResult.url,
+                        thumbnailKey: uploadResult.key
+                    });
+                    content.thumbnail = uploadResult.url;
+                    content.thumbnailKey = uploadResult.key;
+                    fs.unlinkSync(thumbPath);
+                    console.log(`[Worker] Generated thumbnail from video: ${uploadResult.key}`);
+                }
+            }
+        } else {
+            console.log(`[Worker] Thumbnail already processed: ${content.thumbnailKey}`);
+        }
+
+        // 3. Extract Metadata & Generate Audio (if needed)
+        if (!content.duration || !content.audioKey) {
+            if (fs.existsSync(tempVideoPath)) {
+                const metadata = await mediaProcessor.getMetadata(tempVideoPath);
+                content.duration = metadata.format.duration;
+
+                const audioPath = await mediaProcessor.extractAudio(tempVideoPath);
+                const audioStream = fs.createReadStream(audioPath);
+                const audioName = storageService.generateFileName('audio.mp3', `${userId}/`);
+                const audioResult = await storageService.uploadToR2(audioStream, audioName, 'audio/mpeg', storageService.namespaces.AUDIO);
+                content.audioKey = audioResult.key;
+                fs.unlinkSync(audioPath);
+
                 await contentSchema.findByIdAndUpdate(content._id, {
-                    thumbnail: uploadResult.url,
-                    thumbnailKey: uploadResult.key
+                    duration: content.duration,
+                    audioKey: content.audioKey
                 });
-                console.log(`[Worker] Moved and saved user thumbnail for content ${content._id}`);
-
-                content.thumbnail = uploadResult.url;
-                content.thumbnailKey = uploadResult.key;
-
-                await storageService.delete(thumbnail.key);
-            } finally {
-                if (fs.existsSync(tempThumbPath)) fs.unlinkSync(tempThumbPath);
+                console.log(`[Worker] Extracted metadata (duration: ${content.duration}s) and audio`);
+            } else if (content.videoKey && content.videoKey.startsWith(storageService.namespaces.VIDEOS)) {
+                 console.log(`[Worker] Video already processed, skipping metadata/audio extraction from raw.`);
+            } else {
+                throw new Error("Raw video missing and processed video not found. Cannot proceed.");
             }
         }
 
-        // 4. Generate Audio proxy for AI
-        const audioPath = await mediaProcessor.extractAudio(tempVideoPath);
-        const audioStream = fs.createReadStream(audioPath);
-        const audioName = storageService.generateFileName('audio.mp3', `${userId}/`);
-        const audioResult = await storageService.uploadToR2(audioStream, audioName, 'audio/mpeg', storageService.namespaces.AUDIO);
-        content.audioKey = audioResult.key;
-        fs.unlinkSync(audioPath);
+        // 4. Move video to processed namespace (if needed)
+        const isVideoProcessed = content.videoKey && content.videoKey.startsWith(storageService.namespaces.VIDEOS);
+        if (!isVideoProcessed) {
+            if (fs.existsSync(tempVideoPath)) {
+                const videoStream = fs.createReadStream(tempVideoPath);
+                const videoName = storageService.generateFileName('video.mp4', `${userId}/`);
+                const videoResult = await storageService.uploadToR2(videoStream, videoName, 'video/mp4', storageService.namespaces.VIDEOS);
 
-        // 5. Move video to processed namespace
-        const videoStream = fs.createReadStream(tempVideoPath);
-        const videoName = storageService.generateFileName('video.mp4', `${userId}/`);
-        const videoResult = await storageService.uploadToR2(videoStream, videoName, 'video/mp4', storageService.namespaces.VIDEOS);
+                await contentSchema.findByIdAndUpdate(content._id, {
+                    video: videoResult.url,
+                    videoKey: videoResult.key,
+                    duration: content.duration, // Ensure these are persisted
+                    audioKey: content.audioKey
+                });
+                content.video = videoResult.url;
+                content.videoKey = videoResult.key;
 
-        // Re-fetch and update atomically
-        await contentSchema.findByIdAndUpdate(content._id, {
-            video: videoResult.url,
-            videoKey: videoResult.key,
-            duration: content.duration,
-            audioKey: content.audioKey
-        });
-        console.log(`[Worker] Moved and saved video for content ${content._id}`);
-
-        content.video = videoResult.url;
-        content.videoKey = videoResult.key;
-
-        // 6. Cleanup Raw File in R2
-        await storageService.delete(video.key);
+                if (rawVideoExists) {
+                    await storageService.delete(video.key);
+                }
+                console.log(`[Worker] Successfully moved video to ${videoResult.key}`);
+            } else {
+                throw new Error("Raw video file missing for processing.");
+            }
+        } else {
+            console.log(`[Worker] Video already processed: ${content.videoKey}`);
+        }
 
         console.log(`[Worker] R2 processing complete for content ${content._id}`);
     } catch (error) {

@@ -2,7 +2,7 @@ const asyncHandler = require('express-async-handler');
 const mongoose = require('mongoose');
 const User = require('../models/userModel');
 const Content = require('../models/contentModel');
-const Playlist = require('../models/playlistMoldel');
+const Playlist = require('../models/playlistModel');
 
 // @desc    Create a new playlist
 // @route   POST /api/playlists

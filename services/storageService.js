@@ -1,4 +1,5 @@
 const { PutObjectCommand, DeleteObjectCommand, GetObjectCommand, HeadObjectCommand } = require('@aws-sdk/client-s3');
+const { Upload } = require('@aws-sdk/lib-storage');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const { r2Client, bucketName, publicDomain } = require('../config/r2');
 const cloudinary = require('../config/cloudinary');
@@ -58,27 +59,33 @@ class StorageService {
 
     /**
      * Upload a buffer or stream to R2 (used for processed assets)
-     * Includes manual retry logic for streams to avoid "non-retryable streaming request" errors.
+     * Uses @aws-sdk/lib-storage for automatic multipart uploads and resilience.
      */
     async uploadToR2(body, fileName, contentType, namespace = this.namespaces.VIDEOS) {
         const key = `${namespace}/${fileName}`;
 
         const performUpload = async (currentBody) => {
-            const command = new PutObjectCommand({
-                Bucket: bucketName,
-                Key: key,
-                Body: currentBody,
-                ContentType: contentType,
+            const upload = new Upload({
+                client: r2Client,
+                params: {
+                    Bucket: bucketName,
+                    Key: key,
+                    Body: currentBody,
+                    ContentType: contentType,
+                },
+                queueSize: 4, // concurrent parts
+                partSize: 1024 * 1024 * 5, // 5MB minimum
+                leavePartsOnError: false,
             });
-            return await r2Client.send(command);
+
+            return await upload.done();
         };
 
         let lastError;
         for (let attempt = 1; attempt <= 3; attempt++) {
             try {
-                // For the first attempt, use the provided body
-                // For subsequent attempts, if it's a stream, we MUST recreate it
                 let bodyToUse = body;
+                // If retry and it's a file stream, we must recreate it because streams are consumed
                 if (attempt > 1 && body instanceof fs.ReadStream && body.path) {
                     bodyToUse = fs.createReadStream(body.path);
                 }
@@ -90,17 +97,19 @@ class StorageService {
                 };
             } catch (error) {
                 lastError = error;
-                const transientCodes = ['ECONNRESET', 'ECONNABORTED', 'ETIMEDOUT'];
+                // Treat common network errors and 5xx as transient
+                const transientCodes = ['ECONNRESET', 'ECONNABORTED', 'ETIMEDOUT', 'EPIPE', 'ENOTFOUND'];
                 const isTransient =
                     error.$metadata?.httpStatusCode >= 500 ||
                     error.name === 'TimeoutError' ||
+                    error.name === 'NetworkingError' ||
                     transientCodes.includes(error.code);
 
                 console.error(`[StorageService] Upload attempt ${attempt} failed for ${key} (${error.code || error.name}):`, error.message);
 
                 if (!isTransient || attempt === 3) break;
 
-                // Exponential backoff
+                // Exponential backoff: 1s, 2s, 3s
                 await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
             }
         }
