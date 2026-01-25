@@ -188,6 +188,13 @@ const handleR2UploadProcessing = async (content, video, thumbnail) => {
             const thumbName = storageService.generateFileName('thumb.jpg', `${userId}/`);
             const uploadResult = await storageService.uploadToR2(thumbStream, thumbName, 'image/jpeg', storageService.namespaces.THUMBNAILS);
 
+            // Re-fetch to ensure clean state before atomic update
+            await contentSchema.findByIdAndUpdate(content._id, {
+                thumbnail: uploadResult.url,
+                thumbnailKey: uploadResult.key
+            });
+            console.log(`[Worker] Generated and saved thumbnail for content ${content._id}`);
+
             content.thumbnail = uploadResult.url;
             content.thumbnailKey = uploadResult.key;
             fs.unlinkSync(thumbPath);
@@ -200,11 +207,17 @@ const handleR2UploadProcessing = async (content, video, thumbnail) => {
                 const thumbName = storageService.generateFileName('thumb.jpg', `${userId}/`);
                 const uploadResult = await storageService.uploadToR2(thumbStream, thumbName, 'image/jpeg', storageService.namespaces.THUMBNAILS);
 
+                // Re-fetch and update atomically
+                await contentSchema.findByIdAndUpdate(content._id, {
+                    thumbnail: uploadResult.url,
+                    thumbnailKey: uploadResult.key
+                });
+                console.log(`[Worker] Moved and saved user thumbnail for content ${content._id}`);
+
                 content.thumbnail = uploadResult.url;
                 content.thumbnailKey = uploadResult.key;
 
                 await storageService.delete(thumbnail.key);
-                await content.save(); // PERSIST: Thumbnail moved to processed
             } finally {
                 if (fs.existsSync(tempThumbPath)) fs.unlinkSync(tempThumbPath);
             }
@@ -223,6 +236,15 @@ const handleR2UploadProcessing = async (content, video, thumbnail) => {
         const videoName = storageService.generateFileName('video.mp4', `${userId}/`);
         const videoResult = await storageService.uploadToR2(videoStream, videoName, 'video/mp4', storageService.namespaces.VIDEOS);
 
+        // Re-fetch and update atomically
+        await contentSchema.findByIdAndUpdate(content._id, {
+            video: videoResult.url,
+            videoKey: videoResult.key,
+            duration: content.duration,
+            audioKey: content.audioKey
+        });
+        console.log(`[Worker] Moved and saved video for content ${content._id}`);
+
         content.video = videoResult.url;
         content.videoKey = videoResult.key;
 
@@ -230,7 +252,6 @@ const handleR2UploadProcessing = async (content, video, thumbnail) => {
         await storageService.delete(video.key);
 
         console.log(`[Worker] R2 processing complete for content ${content._id}`);
-        await content.save(); // PERSIST: Video moved to processed
     } catch (error) {
         console.error(`[Worker] R2 processing error for content ${content._id}:`, error);
         throw error;
@@ -284,10 +305,11 @@ const processUpload = async (job) => {
             }
         }
 
-        // Mark as completed
-        content.status = 'completed';
-        content.processingStatus = 'ready';
-        await content.save();
+        // Mark as completed - re-fetch to ensure we don't overwrite with stale local state
+        await contentSchema.findByIdAndUpdate(contentId, {
+            status: 'completed',
+            processingStatus: 'ready'
+        });
 
         console.log(`[Worker] Finished 'process-upload' for content ID: ${contentId}`);
 

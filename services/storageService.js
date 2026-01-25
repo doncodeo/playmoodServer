@@ -90,9 +90,13 @@ class StorageService {
                 };
             } catch (error) {
                 lastError = error;
-                const isTransient = error.$metadata?.httpStatusCode >= 500 || error.name === 'TimeoutError';
+                const transientCodes = ['ECONNRESET', 'ECONNABORTED', 'ETIMEDOUT'];
+                const isTransient =
+                    error.$metadata?.httpStatusCode >= 500 ||
+                    error.name === 'TimeoutError' ||
+                    transientCodes.includes(error.code);
 
-                console.error(`[StorageService] Upload attempt ${attempt} failed for ${key}:`, error.message);
+                console.error(`[StorageService] Upload attempt ${attempt} failed for ${key} (${error.code || error.name}):`, error.message);
 
                 if (!isTransient || attempt === 3) break;
 
@@ -130,9 +134,14 @@ class StorageService {
                 return await performDownload();
             } catch (error) {
                 lastError = error;
-                const isTransient = error.$metadata?.httpStatusCode >= 500 || error.name === 'TimeoutError' || error.name === 'NetworkingError';
+                const transientCodes = ['ECONNRESET', 'ECONNABORTED', 'ETIMEDOUT'];
+                const isTransient =
+                    error.$metadata?.httpStatusCode >= 500 ||
+                    error.name === 'TimeoutError' ||
+                    error.name === 'NetworkingError' ||
+                    transientCodes.includes(error.code);
 
-                console.error(`[StorageService] Download attempt ${attempt} failed for ${key}:`, error.message);
+                console.error(`[StorageService] Download attempt ${attempt} failed for ${key} (${error.code || error.name}):`, error.message);
 
                 if (!isTransient || attempt === 3) break;
 

@@ -1,4 +1,5 @@
 const { S3Client } = require('@aws-sdk/client-s3');
+const { NodeHttpHandler } = require('@smithy/node-http-handler');
 
 /**
  * Cloudflare R2 Client Configuration
@@ -15,6 +16,13 @@ const r2Client = new S3Client({
         accessKeyId: process.env.R2_ACCESS_KEY_ID,
         secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
     },
+    // For R2 streaming uploads, we disable internal retries (maxAttempts: 1)
+    // and use our manual retry logic in StorageService that recreates the stream.
+    maxAttempts: 1,
+    requestHandler: new NodeHttpHandler({
+        connectionTimeout: 120000, // 120 seconds
+        socketTimeout: 120000,
+    }),
     // R2 doesn't support all S3 features like checksums in the same way,
     // so we use a more compatible configuration for presigning.
     forcePathStyle: false,
