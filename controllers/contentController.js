@@ -407,8 +407,15 @@ const createContent = asyncHandler(async (req, res) => {
             } : null,
         };
 
-        // 5. Add the job to the queue
-        await uploadQueue.add('process-upload', jobData);
+        // 5. Add the job to the queue with retries
+        await uploadQueue.add('process-upload', jobData, {
+            attempts: 3,
+            backoff: {
+                type: 'exponential',
+                delay: 5000, // Start with 5s delay
+            },
+            removeOnComplete: true,
+        });
 
         // 6. Respond to the user immediately
         return res.status(202).json({
@@ -1127,7 +1134,7 @@ const combineVideosByIds = asyncHandler(async (req, res) => {
         return res.status(400).json({ error: 'Please provide between 2 and 5 content IDs.' });
     }
 
-    // 2. Add job to the queue
+    // 2. Add job to the queue with retries
     await uploadQueue.add('combine-videos', {
         contentIds,
         title,
@@ -1135,6 +1142,13 @@ const combineVideosByIds = asyncHandler(async (req, res) => {
         description,
         credit,
         userId,
+    }, {
+        attempts: 3,
+        backoff: {
+            type: 'exponential',
+            delay: 10000, // 10s for combinations
+        },
+        removeOnComplete: true,
     });
 
     // 3. Respond to the user immediately

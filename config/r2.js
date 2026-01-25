@@ -20,8 +20,8 @@ const r2Client = new S3Client({
     // and use our manual retry logic in StorageService that recreates the stream.
     maxAttempts: 1,
     requestHandler: new NodeHttpHandler({
-        connectionTimeout: 120000, // 120 seconds
-        socketTimeout: 120000,
+        connectionTimeout: 300000, // 300 seconds
+        socketTimeout: 300000,
     }),
     // R2 doesn't support all S3 features like checksums in the same way,
     // so we use a more compatible configuration for presigning.
