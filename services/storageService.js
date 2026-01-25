@@ -58,41 +58,89 @@ class StorageService {
 
     /**
      * Upload a buffer or stream to R2 (used for processed assets)
+     * Includes manual retry logic for streams to avoid "non-retryable streaming request" errors.
      */
-    async uploadToR2(fileBuffer, fileName, contentType, namespace = this.namespaces.VIDEOS) {
+    async uploadToR2(body, fileName, contentType, namespace = this.namespaces.VIDEOS) {
         const key = `${namespace}/${fileName}`;
-        const command = new PutObjectCommand({
-            Bucket: bucketName,
-            Key: key,
-            Body: fileBuffer,
-            ContentType: contentType,
-        });
 
-        await r2Client.send(command);
-        return {
-            key,
-            url: this.getR2PublicUrl(key)
+        const performUpload = async (currentBody) => {
+            const command = new PutObjectCommand({
+                Bucket: bucketName,
+                Key: key,
+                Body: currentBody,
+                ContentType: contentType,
+            });
+            return await r2Client.send(command);
         };
+
+        let lastError;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+                // For the first attempt, use the provided body
+                // For subsequent attempts, if it's a stream, we MUST recreate it
+                let bodyToUse = body;
+                if (attempt > 1 && body instanceof fs.ReadStream && body.path) {
+                    bodyToUse = fs.createReadStream(body.path);
+                }
+
+                await performUpload(bodyToUse);
+                return {
+                    key,
+                    url: this.getR2PublicUrl(key)
+                };
+            } catch (error) {
+                lastError = error;
+                const isTransient = error.$metadata?.httpStatusCode >= 500 || error.name === 'TimeoutError';
+
+                console.error(`[StorageService] Upload attempt ${attempt} failed for ${key}:`, error.message);
+
+                if (!isTransient || attempt === 3) break;
+
+                // Exponential backoff
+                await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+            }
+        }
+        throw lastError;
     }
 
     /**
-     * Download a file from R2 to a local path
+     * Download a file from R2 to a local path with retry logic
      */
     async downloadFromR2(key, localPath) {
-        const command = new GetObjectCommand({
-            Bucket: bucketName,
-            Key: key,
-        });
+        const performDownload = async () => {
+            const command = new GetObjectCommand({
+                Bucket: bucketName,
+                Key: key,
+            });
 
-        const response = await r2Client.send(command);
-        const writer = fs.createWriteStream(localPath);
+            const response = await r2Client.send(command);
+            const writer = fs.createWriteStream(localPath);
 
-        return new Promise((resolve, reject) => {
-            response.Body.on('error', reject);
-            response.Body.pipe(writer);
-            writer.on('finish', resolve);
-            writer.on('error', reject);
-        });
+            return new Promise((resolve, reject) => {
+                response.Body.on('error', reject);
+                response.Body.pipe(writer);
+                writer.on('finish', resolve);
+                writer.on('error', reject);
+            });
+        };
+
+        let lastError;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+                return await performDownload();
+            } catch (error) {
+                lastError = error;
+                const isTransient = error.$metadata?.httpStatusCode >= 500 || error.name === 'TimeoutError' || error.name === 'NetworkingError';
+
+                console.error(`[StorageService] Download attempt ${attempt} failed for ${key}:`, error.message);
+
+                if (!isTransient || attempt === 3) break;
+
+                // Wait before retrying
+                await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+            }
+        }
+        throw lastError;
     }
 
     /**
