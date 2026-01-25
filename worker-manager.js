@@ -204,6 +204,7 @@ const handleR2UploadProcessing = async (content, video, thumbnail) => {
                 content.thumbnailKey = uploadResult.key;
 
                 await storageService.delete(thumbnail.key);
+                await content.save(); // PERSIST: Thumbnail moved to processed
             } finally {
                 if (fs.existsSync(tempThumbPath)) fs.unlinkSync(tempThumbPath);
             }
@@ -229,6 +230,7 @@ const handleR2UploadProcessing = async (content, video, thumbnail) => {
         await storageService.delete(video.key);
 
         console.log(`[Worker] R2 processing complete for content ${content._id}`);
+        await content.save(); // PERSIST: Video moved to processed
     } catch (error) {
         console.error(`[Worker] R2 processing error for content ${content._id}:`, error);
         throw error;
@@ -301,12 +303,13 @@ const processUpload = async (job) => {
         return { success: true };
     } catch (error) {
         console.error(`[Worker] Error in 'process-upload' for job ${job.id}:`, error);
-        // Optionally, update content status to 'failed'
-        const content = await contentSchema.findById(contentId);
-        if (content) {
-            content.status = 'failed';
-            content.processingError = error.message;
-            await content.save();
+
+        // Re-fetch to get the most recent state (including any middle-saves)
+        const failedContent = await contentSchema.findById(contentId);
+        if (failedContent) {
+            failedContent.status = 'failed';
+            failedContent.processingError = error.message;
+            await failedContent.save();
         }
         throw error; // Re-throw to let BullMQ handle the job failure
     }
