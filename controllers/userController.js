@@ -436,6 +436,12 @@ const updateUser = asyncHandler(async (req, res) => {
         'tiktok',
         'linkedin',
         'twitter',
+        'profileImage',
+        'profileImageKey',
+        'profileImageProvider',
+        'bannerImage',
+        'bannerImageKey',
+        'bannerImageProvider',
     ];
 
     // Admin-only fields
@@ -494,7 +500,12 @@ const updateUser = asyncHandler(async (req, res) => {
     // Update fields from req.body
     allowedFields.forEach(field => {
         if (req.body[field] !== undefined) {
-            user[field] = req.body[field];
+            let value = req.body[field];
+            // Enforce HTTPS for image URLs
+            if ((field === 'profileImage' || field === 'bannerImage') && typeof value === 'string') {
+                value = value.replace(/^http:\/\//i, 'https://');
+            }
+            user[field] = value;
             updatedFields.push(field);
         }
     });
