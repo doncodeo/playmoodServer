@@ -220,6 +220,10 @@ router.route('/combine').post(protect, admin, combineVideosByIds);
  *           type: string
  *           description: "The R2 storage key for the video (if using R2)."
  *           example: processed/videos/65a8025e3af4e7929b379e7b/video.mp4
+ *         duration:
+ *           type: number
+ *           description: "The duration of the video in seconds."
+ *           example: 120.5
  *         thumbnailKey:
  *           type: string
  *           description: "The R2 storage key for the thumbnail (if using R2)."

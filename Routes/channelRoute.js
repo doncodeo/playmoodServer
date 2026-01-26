@@ -199,6 +199,21 @@ router.route('/:userId').get(getChannelDetails);
  *               profileImage:
  *                 type: string
  *                 example: https://res.cloudinary.com/.../new-image.jpg
+ *               profileImageKey:
+ *                 type: string
+ *                 example: profiles/65a8025e3af4e7929b379e7b/image.jpg
+ *               profileImageProvider:
+ *                 type: string
+ *                 enum: [cloudinary, r2]
+ *               bannerImage:
+ *                 type: string
+ *                 example: https://res.cloudinary.com/.../new-banner.jpg
+ *               bannerImageKey:
+ *                 type: string
+ *                 example: banners/65a8025e3af4e7929b379e7b/banner.jpg
+ *               bannerImageProvider:
+ *                 type: string
+ *                 enum: [cloudinary, r2]
  *               instagram:
  *                 type: string
  *                 example: https://instagram.com/janedoe
