@@ -454,7 +454,47 @@ router.route('/creators').get(getCreators);
  *           type: string
  *         description: User ID
  *     requestBody:
- *       required  content:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: Jane Doe
+ *               email:
+ *                 type: string
+ *                 example: jane@example.com
+ *               about:
+ *                 type: string
+ *                 example: About me...
+ *               profileImage:
+ *                 type: string
+ *                 example: https://res.cloudinary.com/.../new-image.jpg
+ *               profileImageKey:
+ *                 type: string
+ *                 example: profiles/65a8025e3af4e7929b379e7b/image.jpg
+ *               profileImageProvider:
+ *                 type: string
+ *                 enum: [cloudinary, r2]
+ *               bannerImage:
+ *                 type: string
+ *                 example: https://res.cloudinary.com/.../new-banner.jpg
+ *               bannerImageKey:
+ *                 type: string
+ *                 example: banners/65a8025e3af4e7929b379e7b/banner.jpg
+ *               bannerImageProvider:
+ *                 type: string
+ *                 enum: [cloudinary, r2]
+ *               instagram:
+ *                 type: string
+ *               tiktok:
+ *                 type: string
+ *               linkedin:
+ *                 type: string
+ *               twitter:
+ *                 type: string
  *         multipart/form-data:
  *           schema:
  *             type: object
@@ -474,7 +514,7 @@ router.route('/creators').get(getCreators);
  *               hasReadPrivacyPolicy:
  *                 type: boolean
  *                 example: true
- *               image:
+ *               profileImage:
  *                 type: string
  *                 format: binary
  *     responses:
