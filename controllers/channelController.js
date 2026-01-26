@@ -81,10 +81,29 @@ const updateChannelInfo = asyncHandler(async (req, res) => {
     return res.status(403).json({ error: 'You are not authorized to update this channel' });
   }
 
-  const allowedFields = ['about', 'name', 'profileImage', 'bannerImage', 'instagram', 'tiktok', 'linkedin', 'twitter'];
+  const allowedFields = [
+    'about',
+    'name',
+    'profileImage',
+    'profileImageKey',
+    'profileImageProvider',
+    'bannerImage',
+    'bannerImageKey',
+    'bannerImageProvider',
+    'instagram',
+    'tiktok',
+    'linkedin',
+    'twitter'
+  ];
+
   Object.keys(updates).forEach((key) => {
     if (allowedFields.includes(key)) {
-      user[key] = updates[key] || user[key]; // Preserve existing value if update is empty
+      let value = updates[key];
+      // Enforce HTTPS for image URLs
+      if ((key === 'profileImage' || key === 'bannerImage') && typeof value === 'string') {
+        value = value.replace(/^http:\/\//i, 'https://');
+      }
+      user[key] = value || user[key];
     }
   });
 
