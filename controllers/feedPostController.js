@@ -16,17 +16,28 @@ const createFeedPost = asyncHandler(async (req, res) => {
     }
 
     const processedMedia = media.map(item => {
-        if (type === 'video' && !item.thumbnail && item.public_id) {
+        // Enforce HTTPS
+        if (item.url) {
+            item.url = item.url.replace(/^http:\/\//i, 'https://');
+        }
+        if (item.thumbnail && item.thumbnail.url) {
+            item.thumbnail.url = item.thumbnail.url.replace(/^http:\/\//i, 'https://');
+        }
+
+        const provider = item.provider || 'cloudinary';
+
+        if (type === 'video' && !item.thumbnail && provider === 'cloudinary' && item.public_id) {
             const thumbnailUrl = `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/video/upload/so_1/${item.public_id}.jpg`;
             return {
                 ...item,
+                provider,
                 thumbnail: {
                     url: thumbnailUrl,
                     public_id: ''
                 }
             };
         }
-        return item;
+        return { ...item, provider };
     });
 
     const post = await FeedPost.create({

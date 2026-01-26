@@ -53,6 +53,9 @@ const contentSchema = new mongoose.Schema(
             get: enforceHttps,
         },
         videoKey: String,
+        duration: {
+            type: Number,
+        },
         storageProvider: {
             type: String,
             enum: ['cloudinary', 'r2'],

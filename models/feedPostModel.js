@@ -25,11 +25,17 @@ const feedPostSchema = new mongoose.Schema(
                 },
                 public_id: {
                     type: String,
-                    required: true,
+                },
+                key: String,
+                provider: {
+                    type: String,
+                    enum: ['cloudinary', 'r2'],
+                    default: 'cloudinary'
                 },
                 thumbnail: {
                     url: String,
                     public_id: String,
+                    key: String,
                 },
             },
         ],
