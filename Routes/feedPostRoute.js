@@ -99,6 +99,13 @@ router.route('/all').get(getAllCreatorsFeed);
  *               public_id:
  *                 type: string
  *                 example: feed/image123
+ *               key:
+ *                 type: string
+ *                 example: feed/image123.jpg
+ *               provider:
+ *                 type: string
+ *                 enum: [cloudinary, r2]
+ *                 default: cloudinary
  *               thumbnail:
  *                 type: object
  *                 properties:
@@ -108,6 +115,9 @@ router.route('/all').get(getAllCreatorsFeed);
  *                   public_id:
  *                     type: string
  *                     example: feed_thumbnails/thumbnail123
+ *                   key:
+ *                     type: string
+ *                     example: feed_thumbnails/thumbnail123.jpg
  *         likes:
  *           type: array
  *           items:
@@ -172,12 +182,19 @@ router.route('/all').get(getAllCreatorsFeed);
  *                       type: string
  *                     public_id:
  *                       type: string
+ *                     key:
+ *                       type: string
+ *                     provider:
+ *                       type: string
+ *                       enum: [cloudinary, r2]
  *                     thumbnail:
  *                       type: object
  *                       properties:
  *                         url:
  *                           type: string
  *                         public_id:
+ *                           type: string
+ *                         key:
  *                           type: string
  *     responses:
  *       201:
