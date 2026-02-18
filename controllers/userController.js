@@ -836,7 +836,7 @@ const getLikedContents = asyncHandler(async (req, res) => {
 
     try {
         const likedContents = await contentSchema.find({ likes: userId, isApproved: true })
-            .select('title category description thumbnail video shortPreview isApproved comments')
+            .select('title category description thumbnail video shortPreview shortPreviewUrl shortPreviewViews isApproved comments')
             .populate({
                 path: 'user',
                 select: 'name profileImage',

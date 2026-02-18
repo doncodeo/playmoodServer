@@ -26,8 +26,9 @@ const {
     likeContent,
     unlikeContent,
     getHomepageFeed,
+    trackShortPreviewView,
 } = require('../controllers/contentController');
-const { protect, admin } = require('../middleware/authmiddleware');
+const { protect, admin, optionalProtect } = require('../middleware/authmiddleware');
 const upload = require('../middleware/multer');
 
 /**
@@ -220,6 +221,14 @@ router.route('/combine').post(protect, admin, combineVideosByIds);
  *           type: string
  *           description: "The R2 storage key for the video (if using R2)."
  *           example: processed/videos/65a8025e3af4e7929b379e7b/video.mp4
+ *         shortPreviewUrl:
+ *           type: string
+ *           description: "The URL to the optimized 10-second preview video clip."
+ *           example: https://r2.playmoodtv.com/processed/short-previews/preview.mp4
+ *         shortPreviewViews:
+ *           type: integer
+ *           description: "The number of unique views the short preview has received."
+ *           example: 42
  *         duration:
  *           type: number
  *           description: "The duration of the video in seconds."
@@ -1057,7 +1066,7 @@ router.route('/watchlist/remove').post(protect, removeWatchlist);
  *       500:
  *         description: Server error
  */
-router.route('/:id').get(getContentById);
+router.route('/:id').get(optionalProtect, getContentById);
 
 /**
  * @swagger
@@ -1375,6 +1384,43 @@ router.route('/progress/:contentId').post(protect, saveVideoProgress);
  *         description: Server error
  */
 router.route('/progress/:contentId').get(protect, getVideoProgress);
+
+/**
+ * @swagger
+ * /api/content/{id}/preview-view:
+ *   post:
+ *     summary: Track a unique view for a short preview
+ *     description: Increments the unique view count for a content's short preview. Tracking is based on User ID (if authenticated) or IP address (for guests).
+ *     tags: [Content]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: MongoDB ObjectId of the content
+ *     responses:
+ *       200:
+ *         description: Short preview view tracked successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Short preview view tracked successfully
+ *                 shortPreviewViews:
+ *                   type: integer
+ *                   example: 43
+ *       400:
+ *         description: Invalid content ID
+ *       404:
+ *         description: Content not found
+ *       500:
+ *         description: Server error
+ */
+router.route('/:id/preview-view').post(optionalProtect, trackShortPreviewView);
 
 /**
  * @swagger

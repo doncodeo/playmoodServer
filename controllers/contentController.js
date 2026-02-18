@@ -21,7 +21,7 @@ const storageService = require('../services/storageService');
 // @access Private
 const getContent = asyncHandler(async (req, res) => {
     const content = await contentSchema.find({ isApproved: true })
-    .select('title thumbnail user views createdAt category video description credit likes updatedAt captions')
+    .select('title thumbnail user views createdAt category video description credit likes updatedAt captions shortPreviewUrl shortPreviewViews')
     .populate('user', 'name').lean();
     const lastUpdated = content.length > 0 ? Math.max(...content.map(c => c.updatedAt.getTime())) : 0;
     const etag = `"all-${content.length}-${lastUpdated}"`;
@@ -40,7 +40,7 @@ const getRecentContent = asyncHandler(async (req, res) => {
         const recentContents = await contentSchema.find({ isApproved: true })
             .sort({ createdAt: -1 })
             .limit(10)
-            .select('title thumbnail user views createdAt category video description credit likes updatedAt captions')
+            .select('title thumbnail user views createdAt category video description credit likes updatedAt captions shortPreviewUrl shortPreviewViews')
             .populate('user', 'name');
 
         // Generate an ETag based on recent content
@@ -70,7 +70,7 @@ const getTopTenContent = asyncHandler(async (req, res) => {
         const topContents = await contentSchema.find({ isApproved: true })
             .sort({ views: -1 })
             .limit(10)
-            .select('title thumbnail user views createdAt category video description credit likes updatedAt captions')
+            .select('title thumbnail user views createdAt category video description credit likes updatedAt captions shortPreviewUrl shortPreviewViews')
             .populate('user', 'name')
             .lean();
 
@@ -244,7 +244,7 @@ const getContentById = asyncHandler(async (req, res) => {
     const userId = req.user ? req.user._id : null;
     const viewerIP = req.ip;
 
-    const content = await contentSchema.findById(id).select('title thumbnail user views createdAt category video description credit likes comments updatedAt shortPreview highlights viewers viewerIPs captions').populate('user', 'name');
+    const content = await contentSchema.findById(id).select('title thumbnail user views createdAt category video description credit likes comments updatedAt shortPreview shortPreviewUrl shortPreviewViews highlights viewers viewerIPs captions').populate('user', 'name');
     if (!content) {
         return res.status(404).json({ error: 'Content not found' });
     }
@@ -293,10 +293,13 @@ const getContentById = asyncHandler(async (req, res) => {
     // Remove unnecessary fields before sending the response
     delete contentData.viewers;
     delete contentData.viewerIPs;
+    delete contentData.shortPreviewViewers;
+    delete contentData.shortPreviewViewerIPs;
     delete contentData.cloudinary_video_id;
     delete contentData.videoKey;
     delete contentData.thumbnailKey;
     delete contentData.highlightKey;
+    delete contentData.shortPreviewKey;
     delete contentData.audioKey;
 
     res.status(200).json(contentData);
@@ -965,7 +968,7 @@ const ContinueWatching = asyncHandler(async (req, res) => {
     try {
         const user = await userSchema.findById(userId).populate({
             path: 'videoProgress.contentId',
-            select: 'title category description thumbnail video videoPreviewUrl duration views likes createdAt',
+            select: 'title category description thumbnail video videoPreviewUrl shortPreviewUrl shortPreviewViews duration views likes createdAt',
             match: { isApproved: true },
         });
 
@@ -1060,7 +1063,7 @@ const getWatchlist = asyncHandler(async (req, res) => {
     try {
         const user = await userSchema.findById(userId).populate({
             path: 'watchlist',
-            select: 'title category description thumbnail video shortPreview previewUrl isApproved comments',
+            select: 'title category description thumbnail video shortPreview shortPreviewUrl shortPreviewViews previewUrl isApproved comments',
             match: { isApproved: true }, // Optional: Only approved content
             populate: {
                 path: 'comments.user',
@@ -1325,6 +1328,43 @@ const unlikeContent = asyncHandler(async (req, res) => {
     });
 });
 
+// @desc    Track a view for a short preview
+// @route   POST /api/content/:id/preview-view
+// @access  Public
+const trackShortPreviewView = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const userId = req.user ? req.user._id : null;
+    const viewerIP = req.ip;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(400).json({ error: 'Invalid content ID' });
+    }
+
+    const content = await contentSchema.findById(id);
+    if (!content) {
+        return res.status(404).json({ error: 'Content not found' });
+    }
+
+    // Check if the viewer has already viewed this preview
+    const hasViewed = (userId && content.shortPreviewViewers.some(viewer => viewer.toString() === userId.toString())) ||
+                      content.shortPreviewViewerIPs.includes(viewerIP);
+
+    if (!hasViewed) {
+        content.shortPreviewViews += 1;
+        if (userId) {
+            content.shortPreviewViewers.push(userId);
+        } else {
+            content.shortPreviewViewerIPs.push(viewerIP);
+        }
+        await content.save();
+    }
+
+    res.status(200).json({
+        message: 'Short preview view tracked successfully',
+        shortPreviewViews: content.shortPreviewViews
+    });
+});
+
 module.exports = {
     getContent,
     getRecentContent,
@@ -1351,6 +1391,7 @@ module.exports = {
     likeContent,
     unlikeContent,
     getHomepageFeed,
+    trackShortPreviewView,
 }
 
 function cosineSimilarity(vecA, vecB) {
