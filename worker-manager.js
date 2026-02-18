@@ -37,7 +37,7 @@ const sendEmail = (to, subject, html) => {
 };
 
 const mainProcessor = async (job) => {
-    console.log(`[Worker] Received job ${job.id} with name ${job.name} from queue ${job.queueName}`);
+    console.log(`[Worker] Received job ${job.id} with name "${job.name}" from queue ${job.queueName}`);
     switch (job.name) {
         case 'process-upload':
             return await processUpload(job);
