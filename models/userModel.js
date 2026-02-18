@@ -146,6 +146,26 @@ const userSchema = new mongoose.Schema(
                     },
                 },
                 progress: { type: Number, default: 0 },
+                watchCount: { type: Number, default: 0 },
+                lastWatchedAt: { type: Date, default: Date.now },
+            },
+        ],
+        hoverHistory: [
+            {
+                contentId: {
+                    type: mongoose.Schema.Types.ObjectId,
+                    ref: 'Contents',
+                },
+                hoveredAt: { type: Date, default: Date.now },
+            },
+        ],
+        unfollowedCreators: [
+            {
+                creatorId: {
+                    type: mongoose.Schema.Types.ObjectId,
+                    ref: 'profiles',
+                },
+                unfollowedAt: { type: Date, default: Date.now },
             },
         ],
         instagram: {

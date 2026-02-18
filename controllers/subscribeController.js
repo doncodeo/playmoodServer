@@ -22,7 +22,10 @@ const subscribe = async (req, res) => {
         await subscription.save();
 
         // Update subscriber and creator profiles
-        await User.findByIdAndUpdate(subscriberId, { $push: { subscriptions: creatorId } });
+        await User.findByIdAndUpdate(subscriberId, {
+            $push: { subscriptions: creatorId },
+            $pull: { unfollowedCreators: { creatorId: creatorId } }
+        });
         await User.findByIdAndUpdate(creatorId, { $push: { subscribers: subscriberId } });
 
         // Fetch updated subscriptions
@@ -58,7 +61,10 @@ const unsubscribe = async (req, res) => {
         }
 
         // Update subscriber and creator profiles
-        await User.findByIdAndUpdate(subscriberId, { $pull: { subscriptions: creatorId } });
+        await User.findByIdAndUpdate(subscriberId, {
+            $pull: { subscriptions: creatorId },
+            $push: { unfollowedCreators: { creatorId: creatorId, unfollowedAt: new Date() } }
+        });
         await User.findByIdAndUpdate(creatorId, { $pull: { subscribers: subscriberId } });
 
         // Fetch updated subscriptions
