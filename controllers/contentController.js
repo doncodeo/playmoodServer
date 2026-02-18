@@ -15,6 +15,7 @@ const { getWss } = require('../websocket');
 const WebSocket = require('ws');
 const { createHighlightForContent } = require('../worker-manager');
 const storageService = require('../services/storageService');
+const recommendationService = require('../services/recommendationService');
 
 // @desc Get All Content
 // @route GET /api/content 
@@ -95,44 +96,24 @@ const getRecommendedContent = asyncHandler(async (req, res) => {
     try {
         const content = await contentSchema.findById(req.params.id);
 
-        // DIAGNOSTIC LOGGING START
-        console.log(`[DIAGNOSTIC] Looking for recommendations for content ID: ${req.params.id}`);
-        if (content) {
-            console.log(`[DIAGNOSTIC] Found source content: ${content.title}`);
-            console.log(`[DIAGNOSTIC] Source content has embedding: ${!!content.contentEmbedding && content.contentEmbedding.length > 0}`);
-        } else {
-            console.log(`[DIAGNOSTIC] Source content with ID ${req.params.id} NOT FOUND.`);
-        }
-        // DIAGNOSTIC LOGGING END
-
-        if (!content || !content.contentEmbedding || content.contentEmbedding.length === 0) {
-            return res.status(404).json({ error: 'Content not found or does not have an embedding for recommendations.' });
+        if (!content) {
+            return res.status(404).json({ error: 'Content not found.' });
         }
 
-        // This is a simplified cosine similarity calculation.
-        // For production, a dedicated vector database would be more efficient.
-        const allContent = await contentSchema.find({
-            isApproved: true,
-            _id: { $ne: req.params.id },
-            contentEmbedding: { $exists: true, $ne: [] }
-        }).lean();
+        let userId = null;
+        if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+            try {
+                const token = req.headers.authorization.split(' ')[1];
+                const decoded = jwt.verify(token, process.env.JWT_SECRET);
+                userId = decoded.id;
+            } catch (error) {
+                console.log('Invalid token provided for recommendations, serving non-personalized.');
+            }
+        }
 
-        // DIAGNOSTIC LOGGING START
-        console.log(`[DIAGNOSTIC] Found ${allContent.length} other content documents with embeddings.`);
-        // DIAGNOSTIC LOGGING END
+        const recommendations = await recommendationService.getRecommendations(userId, 10, content);
 
-        const recommendedContents = allContent.map(otherContent => {
-            const similarity = cosineSimilarity(content.contentEmbedding, otherContent.contentEmbedding);
-            return { ...otherContent, similarity };
-        })
-        .sort((a, b) => b.similarity - a.similarity)
-        .slice(0, 10); // Get top 10 recommendations
-
-        // DIAGNOSTIC LOGGING START
-        console.log(`[DIAGNOSTIC] Generated ${recommendedContents.length} recommendations.`);
-        // DIAGNOSTIC LOGGING END
-
-        res.status(200).json(recommendedContents);
+        res.status(200).json(recommendations);
     } catch (error) {
         console.error('Error getting recommended content:', error);
         res.status(500).json({ error: 'Server error' });
@@ -895,14 +876,31 @@ const saveVideoProgress = asyncHandler(async (req, res) => {
         }
 
         // Find or create progress record
-        const existingRecord = user.videoProgress.find(record =>
+        let existingRecord = user.videoProgress.find(record =>
             record.contentId.equals(contentId)
         );
 
         if (existingRecord) {
+            // Rewatch logic: if they previously watched >80% and are now starting over (<10%)
+            const duration = content.duration || 0;
+            if (duration > 0) {
+                const prevPercentage = (existingRecord.progress / duration) * 100;
+                const currentPercentage = (progress / duration) * 100;
+
+                if (prevPercentage > 80 && currentPercentage < 10) {
+                    existingRecord.watchCount = (existingRecord.watchCount || 0) + 1;
+                }
+            }
+
             existingRecord.progress = progress;
+            existingRecord.lastWatchedAt = new Date();
         } else {
-            user.videoProgress.push({ contentId, progress });
+            user.videoProgress.push({
+                contentId,
+                progress,
+                watchCount: 0,
+                lastWatchedAt: new Date()
+            });
         }
 
         await user.save();
@@ -1230,52 +1228,13 @@ const getHomepageFeed = asyncHandler(async (req, res) => {
         }
     }
 
-    // Scenario 1: User is logged in
-    if (userId) {
-        const user = await userSchema.findById(userId).populate('videoProgress.contentId');
-        if (user && user.videoProgress && user.videoProgress.length > 0) {
-            // User has a viewing history, generate a personalized feed
-            const recentHistory = user.videoProgress
-                .filter(p => p.contentId && p.contentId.contentEmbedding && p.contentId.contentEmbedding.length > 0)
-                .slice(-10); // Use last 10 viewed items with embeddings
-
-            if (recentHistory.length > 0) {
-                // Calculate the user's average interest vector
-                const userVector = recentHistory
-                    .map(p => p.contentId.contentEmbedding)
-                    .reduce((acc, vec) => {
-                        for (let i = 0; i < vec.length; i++) {
-                            acc[i] = (acc[i] || 0) + vec[i];
-                        }
-                        return acc;
-                    }, [])
-                    .map(v => v / recentHistory.length);
-
-                const viewedContentIds = recentHistory.map(p => p.contentId._id);
-
-                // Find content similar to the user's interest vector
-                const allContent = await contentSchema.find({
-                    isApproved: true,
-                    _id: { $nin: viewedContentIds }, // Exclude already watched content
-                    contentEmbedding: { $exists: true, $ne: [] }
-                }).lean();
-
-                const recommendations = allContent.map(content => {
-                    const similarity = cosineSimilarity(userVector, content.contentEmbedding);
-                    return { ...content, similarity };
-                })
-                .sort((a, b) => b.similarity - a.similarity)
-                .slice(0, 10);
-
-                return res.status(200).json(recommendations);
-            }
-        }
+    try {
+        const recommendations = await recommendationService.getRecommendations(userId, 10);
+        res.status(200).json(recommendations);
+    } catch (error) {
+        console.error('Error getting homepage feed:', error);
+        res.status(500).json({ error: 'Server error' });
     }
-
-    // Scenario 2 & 3: User is new (no history) or not logged in
-    // Fallback to the generic "Top Ten" content
-    console.log('Serving generic top-ten content for homepage.');
-    getTopTenContent(req, res);
 });
 
 // @desc    Unlike a piece of content
@@ -1357,6 +1316,20 @@ const trackShortPreviewView = asyncHandler(async (req, res) => {
             content.shortPreviewViewerIPs.push(viewerIP);
         }
         await content.save();
+    }
+
+    if (userId) {
+        // Track/Update in user's hover history for recommendations
+        const result = await userSchema.updateOne(
+            { _id: userId, 'hoverHistory.contentId': id },
+            { $set: { 'hoverHistory.$.hoveredAt': new Date() } }
+        );
+        if (result.matchedCount === 0) {
+            await userSchema.updateOne(
+                { _id: userId },
+                { $push: { hoverHistory: { contentId: id, hoveredAt: new Date() } } }
+            );
+        }
     }
 
     res.status(200).json({
