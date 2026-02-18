@@ -18,6 +18,7 @@ class StorageService {
             VIDEOS: 'processed/videos',
             THUMBNAILS: 'processed/thumbnails',
             HIGHLIGHTS: 'processed/highlights',
+            SHORT_PREVIEWS: 'processed/short-previews',
             AUDIO: 'processed/audio'
         };
     }

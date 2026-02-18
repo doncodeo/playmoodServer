@@ -43,6 +43,11 @@ const contentSchema = new mongoose.Schema(
                 message: 'Preview segment must be exactly 10 seconds.',
             },
         },
+        shortPreviewUrl: {
+            type: String,
+            get: enforceHttps,
+        },
+        shortPreviewKey: String,
         credit: {
             type: String,
             required: true,
@@ -138,6 +143,12 @@ const contentSchema = new mongoose.Schema(
         },
         viewers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'profiles' }],
         viewerIPs: [{ type: String }],
+        shortPreviewViews: {
+            type: Number,
+            default: 0,
+        },
+        shortPreviewViewers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'profiles' }],
+        shortPreviewViewerIPs: [{ type: String }],
         highlights: [{
             type: mongoose.Schema.Types.ObjectId,
             ref: 'Highlights',

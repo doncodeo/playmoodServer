@@ -192,7 +192,7 @@ const getCreatorFeed = asyncHandler(async (req, res) => {
 
     if (shortPreviews) {
         const contentsWithPreviews = await Content.find({ user: userId, shortPreview: { $ne: null } })
-            .select('user title shortPreview createdAt')
+            .select('user title shortPreview shortPreviewUrl shortPreviewViews createdAt')
             .populate('user', 'name profileImage')
             .lean();
         combinedFeed.push(...contentsWithPreviews.map(c => ({ ...c, feedType: 'shortPreview' })));
@@ -256,7 +256,7 @@ const getAllCreatorsFeed = asyncHandler(async (req, res) => {
     }
     if (settingsMap.shortPreviews.length > 0) {
         const contentsWithPreviews = await Content.find({ user: { $in: settingsMap.shortPreviews }, shortPreview: { $ne: null } })
-            .select('user title shortPreview createdAt')
+            .select('user title shortPreview shortPreviewUrl shortPreviewViews createdAt')
             .populate('user', 'name profileImage')
             .lean();
         combinedFeed.push(...contentsWithPreviews.map(c => ({ ...c, feedType: 'shortPreview' })));

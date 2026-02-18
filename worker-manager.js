@@ -49,9 +49,29 @@ const mainProcessor = async (job) => {
             return await processVideoCombination(job);
         case 'aggregate-platform-stats':
             return await aggregatePlatformStats(job);
+        case 'generate-short-preview':
+            return await processShortPreviewGeneration(job);
         default:
             throw new Error(`Unknown job name: ${job.name}`);
     }
+};
+
+const processShortPreviewGeneration = async (job) => {
+    const { contentId } = job.data;
+    console.log(`[Worker] Starting 'generate-short-preview' for content ID: ${contentId}`);
+
+    const content = await contentSchema.findById(contentId);
+    if (!content) {
+        throw new Error(`Content with ID ${contentId} not found.`);
+    }
+
+    if (content.storageProvider !== 'r2') {
+        console.log(`[Worker] Content ${contentId} is not R2. Skipping short preview generation.`);
+        return { success: true, message: 'Not an R2 asset.' };
+    }
+
+    await generateShortPreviewForContent(content);
+    return { success: true };
 };
 
 const processEmbeddingGeneration = async (job) => {
@@ -79,6 +99,53 @@ const processEmbeddingGeneration = async (job) => {
 
 const processVideoCombination = async (job) => {
     // ... (existing implementation)
+};
+
+const generateShortPreviewForContent = async (content) => {
+    try {
+        console.log(`[Worker] Generating short preview for content ID: ${content._id}`);
+
+        if (!content.shortPreview || typeof content.shortPreview.start !== 'number') {
+            throw new Error('Content does not have shortPreview timestamps.');
+        }
+
+        if (content.storageProvider !== 'r2') {
+            throw new Error('Short preview generation only supported for R2 assets.');
+        }
+
+        const tempVideoPath = path.join(os.tmpdir(), `v-pre-${Date.now()}.mp4`);
+        try {
+            await storageService.downloadFromR2(content.videoKey, tempVideoPath);
+
+            const startTime = content.shortPreview.start;
+            const duration = content.shortPreview.end - content.shortPreview.start;
+
+            const previewPath = await mediaProcessor.extractHighlight(tempVideoPath, startTime, duration);
+            const previewStream = fs.createReadStream(previewPath);
+            const userId = content.user._id ? content.user._id.toString() : content.user.toString();
+            const previewFileName = storageService.generateFileName('preview.mp4', `${userId}/`);
+
+            const uploadResult = await storageService.uploadToR2(
+                previewStream,
+                previewFileName,
+                'video/mp4',
+                storageService.namespaces.SHORT_PREVIEWS
+            );
+
+            await contentSchema.findByIdAndUpdate(content._id, {
+                shortPreviewUrl: uploadResult.url,
+                shortPreviewKey: uploadResult.key
+            });
+
+            console.log(`[Worker] Successfully generated short preview for content ${content._id}`);
+            if (fs.existsSync(previewPath)) fs.unlinkSync(previewPath);
+        } finally {
+            if (fs.existsSync(tempVideoPath)) fs.unlinkSync(tempVideoPath);
+        }
+    } catch (error) {
+        console.error(`[Worker] Error generating short preview for content ${content._id}:`, error);
+        // Do not re-throw if it's not a critical job failure
+    }
 };
 
 const createHighlightForContent = async (content) => {
@@ -289,6 +356,32 @@ const handleR2UploadProcessing = async (content, video, thumbnail) => {
             }
         } else {
             console.log(`[Worker] Video already processed: ${content.videoKey}`);
+        }
+
+        // 5. Generate Short Preview
+        if (content.shortPreview && content.shortPreview.start !== undefined) {
+            // We use the already downloaded tempVideoPath if available
+            if (fs.existsSync(tempVideoPath)) {
+                const startTime = content.shortPreview.start;
+                const duration = content.shortPreview.end - content.shortPreview.start;
+                const previewPath = await mediaProcessor.extractHighlight(tempVideoPath, startTime, duration);
+                const previewStream = fs.createReadStream(previewPath);
+                const previewFileName = storageService.generateFileName('preview.mp4', `${userId}/`);
+
+                const uploadResult = await storageService.uploadToR2(
+                    previewStream,
+                    previewFileName,
+                    'video/mp4',
+                    storageService.namespaces.SHORT_PREVIEWS
+                );
+
+                await contentSchema.findByIdAndUpdate(content._id, {
+                    shortPreviewUrl: uploadResult.url,
+                    shortPreviewKey: uploadResult.key
+                });
+                fs.unlinkSync(previewPath);
+                console.log(`[Worker] Generated short preview: ${uploadResult.key}`);
+            }
         }
 
         console.log(`[Worker] R2 processing complete for content ${content._id}`);
