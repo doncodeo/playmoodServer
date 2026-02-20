@@ -12,6 +12,7 @@ const cloudinary = require('./config/cloudinary');
 const contentSchema = require('./models/contentModel');
 const userSchema = require('./models/userModel');
 const Highlight = require('./models/highlightModel');
+const LiveProgram = require('./models/liveProgramModel');
 const aiService = require('./ai/ai-service');
 const { aggregatePlatformStats } = require('./workers/analyticsWorker');
 const storageService = require('./services/storageService');
@@ -435,6 +436,36 @@ const processUpload = async (job) => {
                 } else {
                     content.captions.push({ languageCode, text: captionText });
                 }
+            }
+        }
+
+        // Check for automatic scheduling
+        if (job.data.scheduling) {
+            const { date, startTime } = job.data.scheduling;
+            console.log(`[Worker] Auto-scheduling content ${contentId} for ${date} at ${startTime}`);
+
+            try {
+                const durationInSeconds = Math.round(content.duration || 0);
+                const programStartTime = new Date(`${date}T${startTime}:00Z`);
+                const programEndTime = new Date(programStartTime.getTime() + durationInSeconds * 1000);
+
+                await LiveProgram.create({
+                    contentId: content._id,
+                    title: content.title,
+                    description: content.description,
+                    thumbnail: content.thumbnail,
+                    date,
+                    startTime,
+                    endTime: programEndTime.toISOString().slice(11, 16),
+                    scheduledStart: programStartTime,
+                    scheduledEnd: programEndTime,
+                    duration: durationInSeconds,
+                    status: 'scheduled',
+                });
+                console.log(`[Worker] Successfully auto-scheduled content ${contentId}`);
+            } catch (schedError) {
+                console.error(`[Worker] Failed to auto-schedule content ${contentId}:`, schedError);
+                // We don't fail the whole job for scheduling errors, but we log it.
             }
         }
 

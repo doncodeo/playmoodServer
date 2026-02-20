@@ -1,5 +1,6 @@
 const Content = require('../models/contentModel');
 const User = require('../models/userModel');
+const LiveProgram = require('../models/liveProgramModel');
 
 const WEIGHTS = {
     LIKE: 50,
@@ -31,11 +32,20 @@ class RecommendationService {
         }
 
         // Fetch approved content.
+        // Exclude content scheduled for future live programs
+        const upcomingPrograms = await LiveProgram.find({
+            scheduledStart: { $gt: new Date() }
+        }).select('contentId');
+        const scheduledContentIds = upcomingPrograms.map(p => p.contentId);
+
         // OPTIMIZATION: In production, use a more restricted query or vector database.
         // For now, we fetch a limited set of recent/popular content to score to avoid OOM.
-        const query = { isApproved: true };
+        const query = {
+            isApproved: true,
+            _id: { $nin: scheduledContentIds }
+        };
         if (seedContent) {
-            query._id = { $ne: seedContent._id };
+            query._id = { ...query._id, $ne: seedContent._id };
         }
 
         // Fetch top 500 recently active items to score, instead of everything.

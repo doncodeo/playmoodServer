@@ -56,6 +56,14 @@ const { protect, admin } = require('../middleware/authmiddleware');
  *           type: string
  *           description: The calculated end time of the broadcast in HH:mm format.
  *           example: "10:00"
+ *         scheduledStart:
+ *           type: string
+ *           format: date-time
+ *           description: The absolute UTC start time of the program.
+ *         scheduledEnd:
+ *           type: string
+ *           format: date-time
+ *           description: The absolute UTC end time of the program.
  *         duration:
  *           type: number
  *           description: The duration of the program in seconds.
@@ -87,8 +95,10 @@ const { protect, admin } = require('../middleware/authmiddleware');
  *     summary: Get today's programming schedule
  *     description: |
  *       Retrieves the schedule for the current day.
+ *       - **Only approved content** is returned in the schedule.
  *       - `liveProgram`: The program that is currently on air. This object will include a `currentPlaybackTime` field, which represents the number of seconds into the video the broadcast currently is (the "live edge"). The client-side player should not allow seeking beyond this point.
  *       - `upcomingPrograms`: A list of programs scheduled to air later today.
+ *       This endpoint is timezone-robust and handles transitions (scheduled -> live -> ended) automatically based on UTC time.
  *     tags: [LivePrograms]
  *     responses:
  *       200:

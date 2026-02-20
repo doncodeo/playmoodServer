@@ -31,6 +31,12 @@ const liveProgramSchema = new mongoose.Schema(
             type: String,
             required: true,
         },
+        scheduledStart: {
+            type: Date,
+        },
+        scheduledEnd: {
+            type: Date,
+        },
         duration: {
             type: Number,
             required: true,

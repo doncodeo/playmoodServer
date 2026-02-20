@@ -1,6 +1,7 @@
 const asyncHandler = require('express-async-handler');
 const contentSchema = require('../models/contentModel');
 const Highlight = require('../models/highlightModel');
+const LiveProgram = require('../models/liveProgramModel');
 const userSchema = require('../models/userModel');
 const cloudinary = require('../config/cloudinary');
 const mongoose = require('mongoose'); // Add mongoose import
@@ -21,7 +22,16 @@ const recommendationService = require('../services/recommendationService');
 // @route GET /api/content 
 // @access Private
 const getContent = asyncHandler(async (req, res) => {
-    const content = await contentSchema.find({ isApproved: true })
+    // Exclude content scheduled for future live programs
+    const upcomingPrograms = await LiveProgram.find({
+        scheduledStart: { $gt: new Date() }
+    }).select('contentId');
+    const scheduledContentIds = upcomingPrograms.map(p => p.contentId);
+
+    const content = await contentSchema.find({
+        isApproved: true,
+        _id: { $nin: scheduledContentIds }
+    })
     .select('title thumbnail user views createdAt category video description credit likes updatedAt captions shortPreviewUrl shortPreviewViews')
     .populate('user', 'name').lean();
     const lastUpdated = content.length > 0 ? Math.max(...content.map(c => c.updatedAt.getTime())) : 0;
@@ -38,7 +48,16 @@ const getContent = asyncHandler(async (req, res) => {
 // @access Private
 const getRecentContent = asyncHandler(async (req, res) => {
     try {
-        const recentContents = await contentSchema.find({ isApproved: true })
+        // Exclude content scheduled for future live programs
+        const upcomingPrograms = await LiveProgram.find({
+            scheduledStart: { $gt: new Date() }
+        }).select('contentId');
+        const scheduledContentIds = upcomingPrograms.map(p => p.contentId);
+
+        const recentContents = await contentSchema.find({
+            isApproved: true,
+            _id: { $nin: scheduledContentIds }
+        })
             .sort({ createdAt: -1 })
             .limit(10)
             .select('title thumbnail user views createdAt category video description credit likes updatedAt captions shortPreviewUrl shortPreviewViews')
@@ -68,7 +87,16 @@ const getRecentContent = asyncHandler(async (req, res) => {
 // @access Private
 const getTopTenContent = asyncHandler(async (req, res) => {
     try {
-        const topContents = await contentSchema.find({ isApproved: true })
+        // Exclude content scheduled for future live programs
+        const upcomingPrograms = await LiveProgram.find({
+            scheduledStart: { $gt: new Date() }
+        }).select('contentId');
+        const scheduledContentIds = upcomingPrograms.map(p => p.contentId);
+
+        const topContents = await contentSchema.find({
+            isApproved: true,
+            _id: { $nin: scheduledContentIds }
+        })
             .sort({ views: -1 })
             .limit(10)
             .select('title thumbnail user views createdAt category video description credit likes updatedAt captions shortPreviewUrl shortPreviewViews')
@@ -146,10 +174,17 @@ const getRecentCreatorContent = asyncHandler(async (req, res) => {
             return res.status(400).json({ error: 'User is not a creator' });
         }
 
+        // Fetch upcoming programs to exclude them
+        const upcomingPrograms = await LiveProgram.find({
+            scheduledStart: { $gt: new Date() }
+        }).select('contentId');
+        const scheduledContentIds = upcomingPrograms.map(p => p.contentId);
+
         // Fetch the most recent approved content
         const recentContent = await contentSchema.findOne({
             user: userId,
             isApproved: true,
+            _id: { $nin: scheduledContentIds }
         })
             .sort({ createdAt: -1 })
             .populate('user', 'name')
@@ -230,6 +265,21 @@ const getContentById = asyncHandler(async (req, res) => {
         return res.status(404).json({ error: 'Content not found' });
     }
 
+    // Check if content is scheduled for a future live program
+    const upcomingProgram = await LiveProgram.findOne({
+        contentId: id,
+        scheduledStart: { $gt: new Date() }
+    });
+
+    // Admins can bypass the schedule restriction
+    if (upcomingProgram && (!req.user || req.user.role !== 'admin')) {
+        return res.status(403).json({
+            error: 'This content is scheduled for a future live broadcast.',
+            scheduledStart: upcomingProgram.scheduledStart,
+            title: upcomingProgram.title
+        });
+    }
+
     // Check if the viewer has already viewed this content
     const hasViewed = (userId && content.viewers.some(viewer => viewer.toString() === userId.toString())) ||
                       content.viewerIPs.includes(viewerIP);
@@ -292,7 +342,7 @@ const getContentById = asyncHandler(async (req, res) => {
 const createContent = asyncHandler(async (req, res) => {
     try {
         // The file data now comes from the client after a direct upload to Cloudinary
-        const { title, category, description, credit, previewStart, previewEnd, languageCode, video, thumbnail } = req.body;
+        const { title, category, description, credit, previewStart, previewEnd, languageCode, video, thumbnail, scheduledDate, scheduledStartTime } = req.body;
         const userId = req.user.id; // Use the authenticated user's ID
 
         // Enforce HTTPS
@@ -389,6 +439,10 @@ const createContent = asyncHandler(async (req, res) => {
                 public_id: thumbnail.public_id,
                 key: thumbnail.key,
             } : null,
+            scheduling: (scheduledDate && scheduledStartTime) ? {
+                date: scheduledDate,
+                startTime: scheduledStartTime
+            } : null
         };
 
         // 5. Add the job to the queue with retries
@@ -721,6 +775,9 @@ const rejectContent = asyncHandler(async (req, res) => {
         content.rejectionReason = rejectionReason.trim();
         await content.save();
 
+        // Remove from live schedule if it was scheduled
+        await LiveProgram.deleteMany({ contentId: id });
+
         // Populate user details
         const populatedContent = await contentSchema.findById(id).populate('user', 'name profileImage');
 
@@ -844,6 +901,9 @@ const deleteContent = asyncHandler(async (req, res) => {
             if (content.highlightKey) await storageService.delete(content.highlightKey, 'r2');
             if (content.audioKey) await storageService.delete(content.audioKey, 'r2');
         }
+
+        // Delete any associated live programs
+        await LiveProgram.deleteMany({ contentId: id });
 
         await contentSchema.findByIdAndDelete(id);
         res.status(200).json({ message: 'Content deleted successfully' });
@@ -969,10 +1029,19 @@ const ContinueWatching = asyncHandler(async (req, res) => {
     }
 
     try {
+        // Exclude content scheduled for future live programs
+        const upcomingPrograms = await LiveProgram.find({
+            scheduledStart: { $gt: new Date() }
+        }).select('contentId');
+        const scheduledContentIds = upcomingPrograms.map(p => p.contentId);
+
         const user = await userSchema.findById(userId).populate({
             path: 'videoProgress.contentId',
             select: 'title category description thumbnail video videoPreviewUrl shortPreviewUrl shortPreviewViews duration views likes createdAt',
-            match: { isApproved: true },
+            match: {
+                isApproved: true,
+                _id: { $nin: scheduledContentIds }
+            },
         });
 
         if (!user) {
@@ -1064,10 +1133,19 @@ const getWatchlist = asyncHandler(async (req, res) => {
     }
 
     try {
+        // Exclude content scheduled for future live programs
+        const upcomingPrograms = await LiveProgram.find({
+            scheduledStart: { $gt: new Date() }
+        }).select('contentId');
+        const scheduledContentIds = upcomingPrograms.map(p => p.contentId);
+
         const user = await userSchema.findById(userId).populate({
             path: 'watchlist',
             select: 'title category description thumbnail video shortPreview shortPreviewUrl shortPreviewViews previewUrl isApproved comments',
-            match: { isApproved: true }, // Optional: Only approved content
+            match: {
+                isApproved: true,
+                _id: { $nin: scheduledContentIds }
+            },
             populate: {
                 path: 'comments.user',
                 select: 'name profileImage',

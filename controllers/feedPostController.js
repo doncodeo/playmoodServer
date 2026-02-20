@@ -2,6 +2,7 @@ const FeedPost = require('../models/feedPostModel');
 const User = require('../models/userModel');
 const Content = require('../models/contentModel');
 const Highlight = require('../models/highlightModel');
+const LiveProgram = require('../models/liveProgramModel');
 const asyncHandler = require('express-async-handler');
 const { getWss, sendToUser } = require('../websocket');
 // @desc    Create a new feed post
@@ -182,8 +183,18 @@ const getCreatorFeed = asyncHandler(async (req, res) => {
         combinedFeed.push(...posts.map(p => ({ ...p, feedType: 'feedPost' })));
     }
 
+    // Exclude content scheduled for future live programs
+    const upcomingPrograms = await LiveProgram.find({
+        scheduledStart: { $gt: new Date() }
+    }).select('contentId');
+    const scheduledContentIds = upcomingPrograms.map(p => p.contentId);
+
     if (thumbnails) {
-        const contentsWithThumbnails = await Content.find({ user: userId, thumbnail: { $ne: null } })
+        const contentsWithThumbnails = await Content.find({
+            user: userId,
+            thumbnail: { $ne: null },
+            _id: { $nin: scheduledContentIds }
+        })
             .select('user title thumbnail createdAt')
             .populate('user', 'name profileImage')
             .lean();
@@ -191,7 +202,11 @@ const getCreatorFeed = asyncHandler(async (req, res) => {
     }
 
     if (shortPreviews) {
-        const contentsWithPreviews = await Content.find({ user: userId, shortPreview: { $ne: null } })
+        const contentsWithPreviews = await Content.find({
+            user: userId,
+            shortPreview: { $ne: null },
+            _id: { $nin: scheduledContentIds }
+        })
             .select('user title shortPreview shortPreviewUrl shortPreviewViews createdAt')
             .populate('user', 'name profileImage')
             .lean();
@@ -199,7 +214,10 @@ const getCreatorFeed = asyncHandler(async (req, res) => {
     }
 
     if (highlights) {
-        const userHighlights = await Highlight.find({ user: userId })
+        const userHighlights = await Highlight.find({
+            user: userId,
+            content: { $nin: scheduledContentIds }
+        })
             .populate('user', 'name profileImage')
             .populate('content', 'title thumbnail')
             .lean();
@@ -240,6 +258,12 @@ const getAllCreatorsFeed = asyncHandler(async (req, res) => {
         if (settings.highlights) settingsMap.highlights.push(creator._id);
     });
 
+    // Exclude content scheduled for future live programs
+    const upcomingPrograms = await LiveProgram.find({
+        scheduledStart: { $gt: new Date() }
+    }).select('contentId');
+    const scheduledContentIds = upcomingPrograms.map(p => p.contentId);
+
     if (settingsMap.feedPosts.length > 0) {
         const posts = await FeedPost.find({ user: { $in: settingsMap.feedPosts } })
             .populate('user', 'name profileImage')
@@ -248,21 +272,32 @@ const getAllCreatorsFeed = asyncHandler(async (req, res) => {
         combinedFeed.push(...posts.map(p => ({ ...p, feedType: 'feedPost' })));
     }
     if (settingsMap.thumbnails.length > 0) {
-        const contentsWithThumbnails = await Content.find({ user: { $in: settingsMap.thumbnails }, thumbnail: { $ne: null } })
+        const contentsWithThumbnails = await Content.find({
+            user: { $in: settingsMap.thumbnails },
+            thumbnail: { $ne: null },
+            _id: { $nin: scheduledContentIds }
+        })
             .select('user title thumbnail createdAt')
             .populate('user', 'name profileImage')
             .lean();
         combinedFeed.push(...contentsWithThumbnails.map(c => ({ ...c, feedType: 'thumbnail' })));
     }
     if (settingsMap.shortPreviews.length > 0) {
-        const contentsWithPreviews = await Content.find({ user: { $in: settingsMap.shortPreviews }, shortPreview: { $ne: null } })
+        const contentsWithPreviews = await Content.find({
+            user: { $in: settingsMap.shortPreviews },
+            shortPreview: { $ne: null },
+            _id: { $nin: scheduledContentIds }
+        })
             .select('user title shortPreview shortPreviewUrl shortPreviewViews createdAt')
             .populate('user', 'name profileImage')
             .lean();
         combinedFeed.push(...contentsWithPreviews.map(c => ({ ...c, feedType: 'shortPreview' })));
     }
     if (settingsMap.highlights.length > 0) {
-        const userHighlights = await Highlight.find({ user: { $in: settingsMap.highlights } })
+        const userHighlights = await Highlight.find({
+            user: { $in: settingsMap.highlights },
+            content: { $nin: scheduledContentIds }
+        })
             .populate('user', 'name profileImage')
             .populate('content', 'title thumbnail')
             .lean();
