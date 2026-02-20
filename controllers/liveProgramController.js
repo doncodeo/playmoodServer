@@ -9,17 +9,29 @@ const mediaProcessor = require('../utils/mediaProcessor');
 // @route   GET /api/live-programs/today
 // @access  Public
 const getTodaysProgramming = asyncHandler(async (req, res) => {
-    const today = new Date().toISOString().slice(0, 10); // Get YYYY-MM-DD
-
-    const programs = await LiveProgram.find({ date: today }).sort({ startTime: 'asc' }).populate('contentId', 'title description thumbnail video');
-
     const now = new Date();
+    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const today = now.toISOString().slice(0, 10);
+    const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+    // Fetch programs from yesterday, today, and tomorrow to cover all timezones
+    const programs = await LiveProgram.find({
+        date: { $in: [yesterday, today, tomorrow] }
+    }).sort({ date: 1, startTime: 'asc' }).populate({
+        path: 'contentId',
+        select: 'title description thumbnail video isApproved'
+    });
+
+    // Only show programs with approved content
+    const approvedPrograms = programs.filter(p => p.contentId && p.contentId.isApproved);
+
     let liveProgram = null;
     const upcomingPrograms = [];
 
-    for (const program of programs) {
-        const programStartTime = new Date(`${program.date}T${program.startTime}:00`);
-        const programEndTime = new Date(programStartTime.getTime() + program.duration * 1000);
+    for (const program of approvedPrograms) {
+        // Use scheduledStart/End if available, otherwise fallback to parsing strings as UTC
+        const programStartTime = program.scheduledStart || new Date(`${program.date}T${program.startTime}:00Z`);
+        const programEndTime = program.scheduledEnd || new Date(programStartTime.getTime() + program.duration * 1000);
 
         if (now >= programStartTime && now < programEndTime) {
             // This is the currently live program
@@ -29,9 +41,19 @@ const getTodaysProgramming = asyncHandler(async (req, res) => {
                 status: 'live',
                 currentPlaybackTime, // The "live edge"
             };
+
+            // Update status in DB if it's still 'scheduled'
+            if (program.status === 'scheduled') {
+                program.status = 'live';
+                await program.save();
+            }
         } else if (now < programStartTime) {
             // This program is upcoming
             upcomingPrograms.push(program.toObject());
+        } else if (now >= programEndTime && program.status !== 'ended') {
+            // Mark as ended if it has passed
+            program.status = 'ended';
+            await program.save();
         }
     }
 
@@ -107,7 +129,7 @@ const createLiveProgram = asyncHandler(async (req, res) => {
         }
     }
 
-    const programStartTime = new Date(`${date}T${startTime}:00`);
+    const programStartTime = new Date(`${date}T${startTime}:00Z`);
     const programEndTime = new Date(programStartTime.getTime() + durationInSeconds * 1000);
 
     const newProgram = await LiveProgram.create({
@@ -117,7 +139,9 @@ const createLiveProgram = asyncHandler(async (req, res) => {
         thumbnail: video.thumbnail,
         date,
         startTime,
-        endTime: programEndTime.toTimeString().slice(0, 5),
+        endTime: programEndTime.toISOString().slice(11, 16),
+        scheduledStart: programStartTime,
+        scheduledEnd: programEndTime,
         duration: durationInSeconds,
         status: 'scheduled',
     });
@@ -162,9 +186,11 @@ const updateLiveProgram = asyncHandler(async (req, res) => {
 
     // Recalculate end time if start time or date changes
     const durationInSeconds = program.duration;
-    const programStartTime = new Date(`${program.date}T${program.startTime}:00`);
+    const programStartTime = new Date(`${program.date}T${program.startTime}:00Z`);
     const programEndTime = new Date(programStartTime.getTime() + durationInSeconds * 1000);
-    program.endTime = programEndTime.toTimeString().slice(0, 5);
+    program.endTime = programEndTime.toISOString().slice(11, 16);
+    program.scheduledStart = programStartTime;
+    program.scheduledEnd = programEndTime;
 
     const updatedProgram = await program.save();
     res.status(200).json(updatedProgram);

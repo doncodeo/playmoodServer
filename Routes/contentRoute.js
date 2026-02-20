@@ -394,7 +394,14 @@ router.route('/signature').post(protect, upload.single('file'), generateUploadSi
  * /api/content:
  *   post:
  *     summary: "Step 2: Create Content Record After Direct Upload"
- *     description: "This is the **second and final step** of the content creation process. After the client has successfully uploaded the video (and optionally, a thumbnail) directly to Cloudinary using the signature from Step 1, it must call this endpoint. The request should include the Cloudinary response (`public_id` and `url` for the video) and all other content metadata. The server will then create the content record in the database and queue a background job for video processing and AI analysis."
+ *     description: |
+ *       This is the **second and final step** of the content creation process.
+ *       After the client has successfully uploaded the video directly to storage, it must call this endpoint to finalize the record.
+ *
+ *       **New: Auto-Scheduling**
+ *       Creators can now optionally provide `scheduledDate` and `scheduledStartTime`.
+ *       If provided, the system will automatically create a PlaymoodTV LIVE schedule entry once background processing is complete.
+ *       Scheduled content is automatically hidden from public feeds and blocked from direct viewing until the broadcast time begins.
  *     tags: [Content]
  *     security:
  *       - BearerAuth: []
@@ -442,6 +449,15 @@ router.route('/signature').post(protect, upload.single('file'), generateUploadSi
  *                 type: string
  *                 description: "Optional language code for the video (e.g., 'en-US')."
  *                 example: "en-US"
+ *               scheduledDate:
+ *                 type: string
+ *                 format: date
+ *                 description: "Optional: The date to schedule the video for a Live broadcast (YYYY-MM-DD). If omitted, the video is treated as a standard VOD upload."
+ *                 example: "2024-06-20"
+ *               scheduledStartTime:
+ *                 type: string
+ *                 description: "Optional: The start time for the Live broadcast in UTC (HH:mm). Required if scheduledDate is provided."
+ *                 example: "14:00"
  *               video:
  *                 type: object
  *                 description: "Upload data for the video. Requires either 'key' (R2) or 'public_id' (Cloudinary)."
@@ -637,6 +653,21 @@ router.route('/:contentId/comment').post(protect, addComment);
  *                       createdAt: { type: string, format: date-time }
  *       400:
  *         description: Invalid content ID
+ *       403:
+ *         description: "Forbidden - This content is scheduled for a future live broadcast and cannot be viewed yet (unless you are an Admin)."
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "This content is scheduled for a future live broadcast."
+ *                 scheduledStart:
+ *                   type: string
+ *                   format: date-time
+ *                 title:
+ *                   type: string
  *       404:
  *         description: Content not found
  *       500:
@@ -1137,7 +1168,7 @@ router.route('/:id').put(protect, updateContent);
  * /{id}:
  *   delete:
  *     summary: Delete content
- *     description: Deletes a specific content item by ID, including its video and thumbnail from Cloudinary.
+ *     description: Deletes a specific content item by ID, including its video and thumbnail, as well as any associated Live Programs.
  *     tags: [Content]
  *     security:
  *       - BearerAuth: []
@@ -1234,7 +1265,7 @@ router.route('/approve/:id').put(protect, approveContent);
  * /api/content/reject/{id}:
  *   put:
  *     summary: Reject content
- *     description: Rejects a specific content item by ID with a reason (admin only).
+ *     description: Rejects a specific content item by ID with a reason (admin only). If the content was scheduled for a Live Program, it will be removed from the schedule.
  *     tags: [Content]
  *     security:
  *       - BearerAuth: []
