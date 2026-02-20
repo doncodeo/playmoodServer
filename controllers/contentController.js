@@ -519,6 +519,11 @@ const addComment = asyncHandler(async (req, res) => {
         content.comments.push(newComment);
         await content.save();
 
+        // Track interaction for recommendations
+        await userSchema.findByIdAndUpdate(userId, {
+            $push: { commentedContent: { contentId, commentedAt: new Date() } }
+        });
+
         // Populate user details for the new comment
         const updatedContent = await contentSchema
             .findById(contentId)

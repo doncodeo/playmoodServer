@@ -7,6 +7,7 @@ const WEIGHTS = {
     WATCH_MEDIUM: 15, // 30-70%
     REWATCH: 60,
     HOVER: 5,
+    COMMENT: 40,
     SHORT_WATCH_PENALTY: -20, // <= 10%
     UNFOLLOW_PENALTY: -100
 };
@@ -67,7 +68,9 @@ class RecommendationService {
         const interests = (user.videoProgress || [])
             .filter(p => {
                 const percentage = p.contentId && p.contentId.duration ? (p.progress / p.contentId.duration) * 100 : 0;
-                return percentage >= 70 || (user.likes && user.likes.some(id => id.toString() === p.contentId?._id.toString()));
+                return percentage >= 70 ||
+                       (user.likes && user.likes.some(id => id.toString() === p.contentId?._id.toString())) ||
+                       (user.commentedContent && user.commentedContent.some(c => c.contentId.toString() === p.contentId?._id.toString()));
             })
             .filter(p => p.contentId && p.contentId.contentEmbedding && p.contentId.contentEmbedding.length > 0)
             .map(p => p.contentId.contentEmbedding);
@@ -83,7 +86,8 @@ class RecommendationService {
             likes: new Set((user.likes || []).map(id => id.toString())),
             progress: {},
             hovers: {},
-            unfollows: {}
+            unfollows: {},
+            comments: {}
         };
         (user.videoProgress || []).forEach(p => {
             if (p.contentId) map.progress[p.contentId._id.toString()] = p;
@@ -93,6 +97,9 @@ class RecommendationService {
         });
         (user.unfollowedCreators || []).forEach(u => {
             if (u.creatorId) map.unfollows[u.creatorId.toString()] = u;
+        });
+        (user.commentedContent || []).forEach(c => {
+            if (c.contentId) map.comments[c.contentId.toString()] = c;
         });
         return map;
     }
@@ -166,6 +173,13 @@ class RecommendationService {
             if (daysSinceUnfollow <= 30) {
                 score += WEIGHTS.UNFOLLOW_PENALTY * (1 - daysSinceUnfollow / 30);
             }
+        }
+
+        // 5. Comments
+        const commentRecord = behaviorMap.comments[contentIdStr];
+        if (commentRecord) {
+            const daysSinceComment = (now - new Date(commentRecord.commentedAt)) / (1000 * 60 * 60 * 24);
+            score += WEIGHTS.COMMENT * Math.exp(-DECAY_LAMBDA * daysSinceComment);
         }
 
         return score;

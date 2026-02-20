@@ -168,6 +168,15 @@ const userSchema = new mongoose.Schema(
                 unfollowedAt: { type: Date, default: Date.now },
             },
         ],
+        commentedContent: [
+            {
+                contentId: {
+                    type: mongoose.Schema.Types.ObjectId,
+                    ref: 'Contents',
+                },
+                commentedAt: { type: Date, default: Date.now },
+            },
+        ],
         instagram: {
             type: String,
             default: '',
