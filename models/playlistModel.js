@@ -18,16 +18,21 @@ const playlistSchema = new mongoose.Schema(
             trim: true,
             maxlength: [500, 'Description cannot exceed 500 characters'],
         },
-        videos: [
-            {
-                type: mongoose.Schema.Types.ObjectId,
-                ref: 'Contents',
-                validate: {
-                    validator: mongoose.Types.ObjectId.isValid,
-                    message: 'Invalid content ID in playlist',
+        videos: {
+            type: [
+                {
+                    type: mongoose.Schema.Types.ObjectId,
+                    ref: 'Contents',
                 },
+            ],
+            validate: {
+                validator: function (v) {
+                    const videoStrings = v.map((id) => id.toString());
+                    return new Set(videoStrings).size === videoStrings.length;
+                },
+                message: 'Duplicate videos are not allowed in a playlist.',
             },
-        ],
+        },
         visibility: {
             type: String,
             enum: ['public', 'private', 'unlisted'],
@@ -51,9 +56,18 @@ const playlistSchema = new mongoose.Schema(
 
 // Prevent duplicate videos in playlist
 playlistSchema.pre('save', function (next) {
-    const { ObjectId } = mongoose.Types;
-    this.videos = [...new Set(this.videos.map(String))].map((id) => new ObjectId(id));
-    this.likes = [...new Set(this.likes.map(String))].map((id) => new ObjectId(id));
+    const videoStrings = this.videos.map((id) => id.toString());
+    const uniqueVideos = new Set(videoStrings);
+    if (uniqueVideos.size !== videoStrings.length) {
+        return next(new Error('Playlist already contains one or more of these videos'));
+    }
+
+    const likeStrings = this.likes.map((id) => id.toString());
+    const uniqueLikes = new Set(likeStrings);
+    if (uniqueLikes.size !== likeStrings.length) {
+        const { ObjectId } = mongoose.Types;
+        this.likes = [...uniqueLikes].map((id) => new ObjectId(id));
+    }
     next();
 });
 
