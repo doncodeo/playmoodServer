@@ -32,7 +32,7 @@ const getContent = asyncHandler(async (req, res) => {
         isApproved: true,
         _id: { $nin: scheduledContentIds }
     })
-    .select('title thumbnail user views createdAt category video description credit likes updatedAt captions shortPreviewUrl shortPreviewViews')
+    .select('title thumbnail user views createdAt category video description credit likes updatedAt captions shortPreviewUrl shortPreviewViews highlightUrl')
     .populate('user', 'name').lean();
     const lastUpdated = content.length > 0 ? Math.max(...content.map(c => c.updatedAt.getTime())) : 0;
     const etag = `"all-${content.length}-${lastUpdated}"`;
@@ -60,7 +60,7 @@ const getRecentContent = asyncHandler(async (req, res) => {
         })
             .sort({ createdAt: -1 })
             .limit(10)
-            .select('title thumbnail user views createdAt category video description credit likes updatedAt captions shortPreviewUrl shortPreviewViews')
+            .select('title thumbnail user views createdAt category video description credit likes updatedAt captions shortPreviewUrl shortPreviewViews highlightUrl')
             .populate('user', 'name');
 
         // Generate an ETag based on recent content
@@ -99,7 +99,7 @@ const getTopTenContent = asyncHandler(async (req, res) => {
         })
             .sort({ views: -1 })
             .limit(10)
-            .select('title thumbnail user views createdAt category video description credit likes updatedAt captions shortPreviewUrl shortPreviewViews')
+            .select('title thumbnail user views createdAt category video description credit likes updatedAt captions shortPreviewUrl shortPreviewViews highlightUrl')
             .populate('user', 'name')
             .lean();
 
@@ -260,7 +260,7 @@ const getContentById = asyncHandler(async (req, res) => {
     const userId = req.user ? req.user._id : null;
     const viewerIP = req.ip;
 
-    const content = await contentSchema.findById(id).select('title thumbnail user views createdAt category video description credit likes comments updatedAt shortPreview shortPreviewUrl shortPreviewViews highlights viewers viewerIPs captions').populate('user', 'name');
+    const content = await contentSchema.findById(id).select('title thumbnail user views createdAt category video description credit likes comments updatedAt shortPreview shortPreviewUrl shortPreviewViews highlightUrl highlights viewers viewerIPs captions').populate('user', 'name');
     if (!content) {
         return res.status(404).json({ error: 'Content not found' });
     }
@@ -313,10 +313,17 @@ const getContentById = asyncHandler(async (req, res) => {
         const highlight = await Highlight.findById(highlightId);
         if (highlight) {
             contentData.highlight = highlight.toObject();
-            if (highlight.storageProvider === 'cloudinary' && content.cloudinary_video_id) {
-                contentData.highlightUrl = `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/video/upload/e_accelerate:50,so_${highlight.startTime},eo_${highlight.endTime}/${content.cloudinary_video_id}.mp4`;
-            } else if (highlight.storageProvider === 'r2' && highlight.storageKey) {
-                contentData.highlightUrl = storageService.getUrl(highlight.storageKey, 'r2');
+
+            // Prefer the stored highlightUrl from the highlight document itself if available
+            if (highlight.highlightUrl) {
+                contentData.highlightUrl = highlight.highlightUrl;
+            } else if (!contentData.highlightUrl) {
+                // Fallback to construction if neither content nor highlight has it
+                if (highlight.storageProvider === 'cloudinary' && content.cloudinary_video_id) {
+                    contentData.highlightUrl = `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/video/upload/e_accelerate:50,so_${highlight.startTime},eo_${highlight.endTime}/${content.cloudinary_video_id}.mp4`;
+                } else if (highlight.storageProvider === 'r2' && highlight.storageKey) {
+                    contentData.highlightUrl = storageService.getUrl(highlight.storageKey, 'r2');
+                }
             }
         }
     }
@@ -1037,7 +1044,7 @@ const ContinueWatching = asyncHandler(async (req, res) => {
 
         const user = await userSchema.findById(userId).populate({
             path: 'videoProgress.contentId',
-            select: 'title category description thumbnail video videoPreviewUrl shortPreviewUrl shortPreviewViews duration views likes createdAt',
+            select: 'title category description thumbnail video videoPreviewUrl shortPreviewUrl shortPreviewViews highlightUrl duration views likes createdAt',
             match: {
                 isApproved: true,
                 _id: { $nin: scheduledContentIds }
@@ -1152,7 +1159,7 @@ const getWatchlist = asyncHandler(async (req, res) => {
 
         const user = await userSchema.findById(userId).populate({
             path: 'watchlist',
-            select: 'title category description thumbnail video shortPreview shortPreviewUrl shortPreviewViews previewUrl isApproved comments',
+            select: 'title category description thumbnail video shortPreview shortPreviewUrl shortPreviewViews highlightUrl previewUrl isApproved comments',
             match: {
                 isApproved: true,
                 _id: { $nin: scheduledContentIds }

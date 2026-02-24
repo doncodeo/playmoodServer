@@ -48,6 +48,10 @@ const contentSchema = new mongoose.Schema(
             get: enforceHttps,
         },
         shortPreviewKey: String,
+        highlightUrl: {
+            type: String,
+            get: enforceHttps,
+        },
         credit: {
             type: String,
             required: true,

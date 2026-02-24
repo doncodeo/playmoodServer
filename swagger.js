@@ -35,6 +35,7 @@ const swaggerDefinition = {
           startTime: { type: 'number', description: 'Start time of the highlight in seconds.' },
           endTime: { type: 'number', description: 'End time of the highlight in seconds.' },
           storageKey: { type: 'string', description: 'R2 storage key for the highlight video.' },
+          highlightUrl: { type: 'string', description: 'The URL to the optimized video highlight clip.' },
           storageProvider: { type: 'string', enum: ['cloudinary', 'r2'], default: 'cloudinary' },
           user: {
             type: 'object',

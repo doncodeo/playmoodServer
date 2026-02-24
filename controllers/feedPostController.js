@@ -245,7 +245,7 @@ const getCreatorFeed = asyncHandler(async (req, res) => {
                         }
                     },
                     { $addFields: { feedType: 'shortPreview' } },
-                    { $project: { user: 1, title: 1, shortPreview: 1, shortPreviewUrl: 1, shortPreviewViews: 1, createdAt: 1, feedType: 1 } }
+                    { $project: { user: 1, title: 1, shortPreview: 1, shortPreviewUrl: 1, shortPreviewViews: 1, highlightUrl: 1, createdAt: 1, feedType: 1 } }
                 ]
             }
         });
@@ -365,7 +365,7 @@ const getAllCreatorsFeed = asyncHandler(async (req, res) => {
                         }
                     },
                     { $addFields: { feedType: 'shortPreview' } },
-                    { $project: { user: 1, title: 1, shortPreview: 1, shortPreviewUrl: 1, shortPreviewViews: 1, createdAt: 1, feedType: 1 } }
+                    { $project: { user: 1, title: 1, shortPreview: 1, shortPreviewUrl: 1, shortPreviewViews: 1, highlightUrl: 1, createdAt: 1, feedType: 1 } }
                 ]
             }
         });

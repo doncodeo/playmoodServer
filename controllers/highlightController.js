@@ -39,17 +39,32 @@ const createHighlight = asyncHandler(async (req, res) => {
         return res.status(400).json({ error: 'Highlight timeline overlaps with an existing highlight.' });
     }
 
+    let highlightUrl = null;
+    if (content.storageProvider === 'cloudinary' && content.cloudinary_video_id) {
+        highlightUrl = `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/video/upload/e_accelerate:50,so_${startTime},eo_${endTime}/${content.cloudinary_video_id}.mp4`;
+    } else if (content.storageProvider === 'r2' && content.videoKey) {
+        // For R2, manual highlight creation via API doesn't automatically trigger the media processor
+        // to cut the video. In a real-world scenario, we'd either queue a job or handle it here.
+        // For now, we'll mark the URL if we can, but usually manual highlights might need processing.
+        // If there's no storageKey yet, it won't have a URL.
+    }
+
     const highlight = new Highlight({
         user: userId,
         content: contentId,
         startTime,
         endTime,
         title: title || content.title,
+        storageProvider: content.storageProvider,
+        highlightUrl: highlightUrl,
     });
 
     const createdHighlight = await highlight.save();
 
     content.highlights.push(createdHighlight._id);
+    if (highlightUrl) {
+        content.highlightUrl = highlightUrl;
+    }
     await content.save();
 
     res.status(201).json(createdHighlight);
