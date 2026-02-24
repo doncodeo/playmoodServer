@@ -1049,14 +1049,25 @@ const ContinueWatching = asyncHandler(async (req, res) => {
         }
 
         const continueWatching = user.videoProgress
-            .filter(record => record.progress > 0 && record.contentId)
+            .filter(record => {
+                // Must have progress and content still exists/is approved
+                if (!record.progress || record.progress <= 0 || !record.contentId) return false;
+
+                // Exclude "finished" videos (more than 95% watched)
+                const duration = record.contentId.duration || 0;
+                if (duration > 0 && (record.progress / duration) > 0.95) return false;
+
+                return true;
+            })
             .map(record => ({
                 ...record.contentId.toObject(),
                 progress: record.progress,
+                lastWatchedAt: record.lastWatchedAt,
             }))
-            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+            .sort((a, b) => new Date(b.lastWatchedAt) - new Date(a.lastWatchedAt))
+            .slice(0, 20); // Limit to top 20 items
 
-        const etag = `"continue-watching-${userId}-${JSON.stringify(continueWatching.map(v => `${v._id}-${v.progress}`))}"`;
+        const etag = `"continue-watching-${userId}-${JSON.stringify(continueWatching.map(v => `${v._id}-${v.progress}-${v.lastWatchedAt}`))}"`;
 
         if (req.get('If-None-Match') === etag) {
             return res.status(304).end();
