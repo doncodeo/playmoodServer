@@ -64,6 +64,7 @@ class MediaProcessor {
                     '-crf 28', // Lower quality/filesize for highlights
                     '-c:a aac',
                     '-b:a 128k',
+                    '-movflags +faststart',
                     '-threads 1' // Limit CPU usage
                 ]);
 

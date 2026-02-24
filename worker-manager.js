@@ -155,6 +155,7 @@ const createHighlightForContent = async (content) => {
 
         let duration = content.duration;
         let highlightKey = null;
+        let highlightUrl = null;
 
         if (content.storageProvider === 'cloudinary') {
             if (!content.cloudinary_video_id) {
@@ -196,12 +197,20 @@ const createHighlightForContent = async (content) => {
                 const uploadResult = await storageService.uploadToR2(highlightStream, highlightName, 'video/mp4', storageService.namespaces.HIGHLIGHTS);
 
                 highlightKey = uploadResult.key;
+                highlightUrl = uploadResult.url;
                 content.highlightKey = highlightKey;
+                content.highlightUrl = highlightUrl;
 
                 if (fs.existsSync(highlightPath)) fs.unlinkSync(highlightPath);
             } finally {
                 if (fs.existsSync(tempVideoPath)) fs.unlinkSync(tempVideoPath);
             }
+        }
+
+        // If Cloudinary, we can construct the highlight URL
+        if (content.storageProvider === 'cloudinary' && content.cloudinary_video_id) {
+            highlightUrl = `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/video/upload/e_accelerate:50,so_${startTime},eo_${endTime}/${content.cloudinary_video_id}.mp4`;
+            content.highlightUrl = highlightUrl;
         }
 
         // 3. Create and save the new highlight
@@ -213,6 +222,7 @@ const createHighlightForContent = async (content) => {
             title: content.title,
             storageProvider: content.storageProvider,
             storageKey: highlightKey,
+            highlightUrl: highlightUrl,
         });
         await newHighlight.save();
 

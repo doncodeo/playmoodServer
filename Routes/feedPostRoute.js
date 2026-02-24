@@ -118,6 +118,8 @@ router.route('/all').get(getAllCreatorsFeed);
  *           type: object
  *         shortPreviewUrl:
  *           type: string
+ *         highlightUrl:
+ *           type: string
  *         shortPreviewViews:
  *           type: integer
  *         createdAt:
@@ -145,6 +147,8 @@ router.route('/all').get(getAllCreatorsFeed);
  *               type: string
  *             thumbnail:
  *               type: string
+ *         highlightUrl:
+ *           type: string
  *         createdAt:
  *           type: string
  *           format: date-time

@@ -229,6 +229,10 @@ router.route('/combine').post(protect, admin, combineVideosByIds);
  *           type: integer
  *           description: "The number of unique views the short preview has received."
  *           example: 42
+ *         highlightUrl:
+ *           type: string
+ *           description: "The URL to the optimized video highlight clip."
+ *           example: https://r2.playmoodtv.com/processed/highlights/highlight.mp4
  *         duration:
  *           type: number
  *           description: "The duration of the video in seconds."

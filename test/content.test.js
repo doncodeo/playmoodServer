@@ -137,7 +137,7 @@ describe('Content API', function() {
       request(app)
         .post('/api/content/signature')
         .set('Authorization', `Bearer ${token}`)
-        .send({})
+        .send({ provider: 'cloudinary' })
         .expect(200)
         .end((err, res) => {
           if (err) return done(err);
@@ -155,7 +155,7 @@ describe('Content API', function() {
       request(app)
         .post('/api/content/signature')
         .set('Authorization', `Bearer ${token}`)
-        .send({ type: 'videos' })
+        .send({ type: 'videos', provider: 'cloudinary' })
         .expect(200)
         .end((err, res) => {
           if (err) return done(err);
@@ -170,7 +170,7 @@ describe('Content API', function() {
       request(app)
         .post('/api/content/signature')
         .set('Authorization', `Bearer ${token}`)
-        .send({ type: 'images' })
+        .send({ type: 'images', provider: 'cloudinary' })
         .expect(200)
         .end((err, res) => {
           if (err) return done(err);
@@ -185,7 +185,7 @@ describe('Content API', function() {
       request(app)
         .post('/api/content/signature')
         .set('Authorization', `Bearer ${token}`)
-        .send({ type: 'invalid' })
+        .send({ type: 'invalid', provider: 'cloudinary' })
         .expect(200)
         .end((err, res) => {
           if (err) return done(err);
