@@ -49,13 +49,16 @@ class RecommendationService {
         }
 
         // Fetch top 500 recently active items to score, instead of everything.
+        // Include fields needed for both scoring and frontend.
         const allContent = await Content.find(query)
+            .select('title thumbnail user views createdAt category video description credit likes updatedAt captions shortPreviewUrl shortPreviewViews highlightUrl duration contentEmbedding')
             .sort({ updatedAt: -1 })
             .limit(500)
             .lean();
 
         if (!user && !seedContent) {
-            return this.getGlobalTopContent(allContent, limit);
+            const topContent = this.getGlobalTopContent(allContent, limit);
+            return await Content.populate(topContent, { path: 'user', select: 'name' });
         }
 
         // Pre-map behavior for faster lookup in the loop
@@ -64,14 +67,20 @@ class RecommendationService {
         // 2. Calculate scores for each content item
         const scoredContent = allContent.map(content => {
             const score = this.calculateScore(content, user, seedContent, userVector, behaviorMap);
-            return { ...content, recommendationScore: score };
+
+            // Clean up internal fields before returning
+            const { contentEmbedding, captions, ...leanContent } = content;
+            return { ...leanContent, recommendationScore: score };
         });
 
         // 3. Sort by score
         scoredContent.sort((a, b) => b.recommendationScore - a.recommendationScore);
 
         // 4. Apply Diversity Control
-        return this.applyDiversity(scoredContent, limit);
+        const diverseContent = this.applyDiversity(scoredContent, limit);
+
+        // 5. Populate user field for the final results
+        return await Content.populate(diverseContent, { path: 'user', select: 'name' });
     }
 
     precalculateUserVector(user) {
@@ -263,7 +272,10 @@ class RecommendationService {
 
     getGlobalTopContent(allContent, limit) {
         const scored = allContent
-            .map(content => ({ ...content, recommendationScore: this.calculatePopularityScore(content) }))
+            .map(content => {
+                const { contentEmbedding, captions, ...leanContent } = content;
+                return { ...leanContent, recommendationScore: this.calculatePopularityScore(content) };
+            })
             .sort((a, b) => b.recommendationScore - a.recommendationScore);
 
         return this.applyDiversity(scored, limit);
