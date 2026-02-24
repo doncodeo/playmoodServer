@@ -154,7 +154,8 @@ const addVideoToPlaylist = asyncHandler(async (req, res) => {
         }
 
         // Add video if not already in playlist
-        if (playlist.videos.map(String).includes(contentId)) {
+        const videoExists = playlist.videos.some((id) => id.toString() === contentId);
+        if (videoExists) {
             return res.status(400).json({ error: 'Video already in playlist' });
         }
 
