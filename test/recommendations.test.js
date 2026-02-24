@@ -83,7 +83,7 @@ describe('Recommendation API', function() {
   });
 
   describe('GET /api/content/homepage-feed', () => {
-    it('should return recommendations for anonymous user', (done) => {
+    it('should return recommendations for anonymous user with specific fields only', (done) => {
       request(app)
         .get('/api/content/homepage-feed')
         .expect(200)
@@ -91,6 +91,13 @@ describe('Recommendation API', function() {
           if (err) return done(err);
           if (!Array.isArray(res.body)) {
             return done(new Error('Response should be an array'));
+          }
+          if (res.body.length > 0) {
+            const item = res.body[0];
+            if (item.contentEmbedding) return done(new Error('contentEmbedding should not be returned'));
+            if (item.captions) return done(new Error('captions should not be returned'));
+            if (!item.title) return done(new Error('title should be returned'));
+            if (!item.user || typeof item.user !== 'object') return done(new Error('user should be a populated object'));
           }
           done();
         });
