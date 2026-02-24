@@ -119,7 +119,7 @@ const getTopTenContent = asyncHandler(async (req, res) => {
 
 // @desc Get Recommended Content
 // @route GET /api/content/recommended/:id
-// @access Private
+// @access Public (Optional Auth)
 const getRecommendedContent = asyncHandler(async (req, res) => {
     try {
         const content = await contentSchema.findById(req.params.id);
@@ -128,16 +128,7 @@ const getRecommendedContent = asyncHandler(async (req, res) => {
             return res.status(404).json({ error: 'Content not found.' });
         }
 
-        let userId = null;
-        if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-            try {
-                const token = req.headers.authorization.split(' ')[1];
-                const decoded = jwt.verify(token, process.env.JWT_SECRET);
-                userId = decoded.id;
-            } catch (error) {
-                console.log('Invalid token provided for recommendations, serving non-personalized.');
-            }
-        }
+        const userId = req.user ? req.user._id : null;
 
         const recommendations = await recommendationService.getRecommendations(userId, 10, content);
 
@@ -1313,21 +1304,9 @@ const likeContent = asyncHandler(async (req, res) => {
 
 // @desc Get Homepage Feed (Personalized or Generic)
 // @route GET /api/content/homepage-feed
-// @access Public
+// @access Public (Optional Auth)
 const getHomepageFeed = asyncHandler(async (req, res) => {
-    let userId = null;
-
-    // Check for an Authorization header
-    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-        try {
-            const token = req.headers.authorization.split(' ')[1];
-            const decoded = jwt.verify(token, process.env.JWT_SECRET);
-            userId = decoded.id;
-        } catch (error) {
-            // Invalid token, treat as anonymous user
-            console.log('Invalid token provided for homepage feed, serving generic content.');
-        }
-    }
+    const userId = req.user ? req.user._id : null;
 
     try {
         const recommendations = await recommendationService.getRecommendations(userId, 10);
