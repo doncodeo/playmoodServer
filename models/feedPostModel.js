@@ -59,20 +59,19 @@ const feedPostSchema = new mongoose.Schema(
                 },
             },
         ],
-        viewers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'profiles' }],
-        viewerIPs: [{ type: String }],
+        views: {
+            type: Number,
+            default: 0,
+        },
     },
     {
         timestamps: true,
     }
 );
 
-// Virtual for views count
+// Virtual for views count (backward compatibility)
 feedPostSchema.virtual('viewsCount').get(function () {
-    // Combine unique user IDs and IP addresses for a more accurate count
-    const uniqueViewers = new Set(this.viewers.map(id => id.toString()));
-    this.viewerIPs.forEach(ip => uniqueViewers.add(ip));
-    return uniqueViewers.size;
+    return this.views;
 });
 
 // Virtual for likes count

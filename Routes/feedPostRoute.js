@@ -2,14 +2,17 @@ const express = require('express');
 const router = express.Router();
 const {
     createFeedPost,
+    updateFeedPost,
+    deleteFeedPost,
     likeFeedPost,
     unlikeFeedPost,
     addCommentToFeedPost,
+    deleteFeedPostComment,
     getCreatorFeed,
     getAllCreatorsFeed,
     viewFeedPost,
 } = require('../controllers/feedPostController');
-const { protect, creator } = require('../middleware/authmiddleware');
+const { protect, optionalProtect, creator } = require('../middleware/authmiddleware');
 
 /**
  * @swagger
@@ -46,7 +49,11 @@ const { protect, creator } = require('../middleware/authmiddleware');
  *                 feed:
  *                   type: array
  *                   items:
- *                     type: object
+ *                     oneOf:
+ *                       - $ref: '#/components/schemas/FeedPostItem'
+ *                       - $ref: '#/components/schemas/ThumbnailItem'
+ *                       - $ref: '#/components/schemas/ShortPreviewItem'
+ *                       - $ref: '#/components/schemas/HighlightItem'
  *                 seed:
  *                   type: integer
  */
@@ -63,6 +70,87 @@ router.route('/all').get(getAllCreatorsFeed);
  * @swagger
  * components:
  *   schemas:
+ *     FeedPostItem:
+ *       allOf:
+ *         - $ref: '#/components/schemas/FeedPost'
+ *         - type: object
+ *           properties:
+ *             feedType:
+ *               type: string
+ *               example: feedPost
+ *     ThumbnailItem:
+ *       type: object
+ *       properties:
+ *         _id:
+ *           type: string
+ *         user:
+ *           type: object
+ *           properties:
+ *             name:
+ *               type: string
+ *             profileImage:
+ *               type: string
+ *         title:
+ *           type: string
+ *         thumbnail:
+ *           type: string
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *         feedType:
+ *           type: string
+ *           example: thumbnail
+ *     ShortPreviewItem:
+ *       type: object
+ *       properties:
+ *         _id:
+ *           type: string
+ *         user:
+ *           type: object
+ *           properties:
+ *             name:
+ *               type: string
+ *             profileImage:
+ *               type: string
+ *         title:
+ *           type: string
+ *         shortPreview:
+ *           type: object
+ *         shortPreviewUrl:
+ *           type: string
+ *         shortPreviewViews:
+ *           type: integer
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *         feedType:
+ *           type: string
+ *           example: shortPreview
+ *     HighlightItem:
+ *       type: object
+ *       properties:
+ *         _id:
+ *           type: string
+ *         user:
+ *           type: object
+ *           properties:
+ *             name:
+ *               type: string
+ *             profileImage:
+ *               type: string
+ *         content:
+ *           type: object
+ *           properties:
+ *             title:
+ *               type: string
+ *             thumbnail:
+ *               type: string
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *         feedType:
+ *           type: string
+ *           example: highlight
  *     FeedPost:
  *       type: object
  *       properties:
@@ -208,6 +296,80 @@ router.route('/').post(protect, creator, createFeedPost);
 
 /**
  * @swagger
+ * /api/feed/{id}:
+ *   put:
+ *     summary: Update a feed post
+ *     tags: [Feed]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               caption:
+ *                 type: string
+ *               media:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *     responses:
+ *       200:
+ *         description: Post updated successfully
+ *   delete:
+ *     summary: Delete a feed post
+ *     tags: [Feed]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Post deleted successfully
+ */
+router.route('/:id')
+    .put(protect, updateFeedPost)
+    .delete(protect, deleteFeedPost);
+
+/**
+ * @swagger
+ * /api/feed/{id}/comment/{commentId}:
+ *   delete:
+ *     summary: Delete a comment from a feed post
+ *     tags: [Feed]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: commentId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Comment deleted successfully
+ */
+router.route('/:id/comment/:commentId').delete(protect, deleteFeedPostComment);
+
+/**
+ * @swagger
  * /api/feed/{id}/like:
  *   put:
  *     summary: Like a feed post
@@ -309,12 +471,11 @@ router.route('/:id/comment').post(protect, addCommentToFeedPost);
  *             schema:
  *               type: array
  *               items:
- *                 type: object
- *                 properties:
- *                   feedType:
- *                     type: string
- *                     enum: [feedPost, thumbnail, shortPreview, highlight]
- *                     description: The type of the feed item.
+ *                 oneOf:
+ *                   - $ref: '#/components/schemas/FeedPostItem'
+ *                   - $ref: '#/components/schemas/ThumbnailItem'
+ *                   - $ref: '#/components/schemas/ShortPreviewItem'
+ *                   - $ref: '#/components/schemas/HighlightItem'
  */
 router.route('/user/:userId').get(getCreatorFeed);
 
@@ -336,6 +497,6 @@ router.route('/user/:userId').get(getCreatorFeed);
  *       200:
  *         description: View count updated
  */
-router.route('/:id/view').put(viewFeedPost);
+router.route('/:id/view').put(optionalProtect, viewFeedPost);
 
 module.exports = router;
