@@ -27,6 +27,8 @@ const {
     unlikeContent,
     getHomepageFeed,
     trackShortPreviewView,
+    getOnlyOnPlaymoodContent,
+    getSoonOnPlaymoodContent,
 } = require('../controllers/contentController');
 const { protect, admin, optionalProtect } = require('../middleware/authmiddleware');
 const upload = require('../middleware/multer');
@@ -258,6 +260,15 @@ router.route('/combine').post(protect, admin, combineVideosByIds);
  *         isApproved:
  *           type: boolean
  *           example: true
+ *         isOnlyOnPlaymood:
+ *           type: boolean
+ *           description: "If true, the content is exclusive to PlaymoodTV."
+ *           example: true
+ *         scheduledReleaseDate:
+ *           type: string
+ *           format: date-time
+ *           description: "The scheduled date and time when the content will be publicly available."
+ *           example: 2024-12-25T10:00:00Z
  *         views:
  *           type: integer
  *           example: 100
@@ -449,6 +460,15 @@ router.route('/signature').post(protect, upload.single('file'), generateUploadSi
  *                 type: number
  *                 description: "The end time (in seconds) for the 10-second video preview. Must be exactly 10 seconds after previewStart."
  *                 example: 40
+ *               isOnlyOnPlaymood:
+ *                 type: boolean
+ *                 description: "Optional: If true, the content is exclusive to PlaymoodTV."
+ *                 example: true
+ *               scheduledReleaseDate:
+ *                 type: string
+ *                 format: date-time
+ *                 description: "Optional: The date and time when the content should be released publicly."
+ *                 example: "2024-12-25T10:00:00Z"
  *               languageCode:
  *                 type: string
  *                 description: "Optional language code for the video (e.g., 'en-US')."
@@ -1089,6 +1109,62 @@ router.route('/watchlist/remove').post(protect, removeWatchlist);
 
 /**
  * @swagger
+ * /api/content/only-on-playmood:
+ *   get:
+ *     summary: Get "Only on Playmood" exclusive content
+ *     description: Retrieves a list of approved content items that are marked as exclusive to PlaymoodTV.
+ *     tags: [Content]
+ *     responses:
+ *       200:
+ *         description: List of exclusive content
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Content'
+ *       500:
+ *         description: Server error
+ */
+router.route('/only-on-playmood').get(getOnlyOnPlaymoodContent);
+
+/**
+ * @swagger
+ * /api/content/soon:
+ *   get:
+ *     summary: Get "Soon on Playmood" scheduled content
+ *     description: |
+ *       Retrieves a list of content items that are scheduled for a future release.
+ *       These items are visible to users (thumbnail, title, etc.) but cannot be played yet.
+ *     tags: [Content]
+ *     responses:
+ *       200:
+ *         description: List of upcoming content
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   _id: { type: string }
+ *                   title: { type: string }
+ *                   thumbnail: { type: string }
+ *                   category: { type: string }
+ *                   description: { type: string }
+ *                   scheduledReleaseDate: { type: string, format: date-time }
+ *                   user:
+ *                     type: object
+ *                     properties:
+ *                       _id: { type: string }
+ *                       name: { type: string }
+ *       500:
+ *         description: Server error
+ */
+router.route('/soon').get(getSoonOnPlaymoodContent);
+
+/**
+ * @swagger
  * /{id}:
  *   get:
  *     summary: Get content by ID
@@ -1106,19 +1182,29 @@ router.route('/watchlist/remove').post(protect, removeWatchlist);
  *     responses:
  *       200:
  *         description: Content retrieved successfully
- *         headers:
- *           Cache-Control:
- *             schema:
- *               type: string
- *               example: private, max-age=3600
- *           ETag:
- *             schema:
- *               type: string
- *               example: "65a6fc7b72128447ad32024e-1697059200000"
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/Content'
+ *       403:
+ *         description: "Forbidden - This content is scheduled for a future broadcast or release and cannot be played yet."
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "This content is scheduled for a future release."
+ *                 scheduledReleaseDate:
+ *                   type: string
+ *                   format: date-time
+ *                 isSoon:
+ *                   type: boolean
+ *                   example: true
+ *                 title: { type: string }
+ *                 thumbnail: { type: string }
+ *                 description: { type: string }
  *       304:
  *         description: Not Modified (ETag match)
  *       401:

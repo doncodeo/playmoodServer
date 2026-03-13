@@ -189,8 +189,9 @@ const getCreatorFeed = asyncHandler(async (req, res) => {
     };
 
     // Exclude content scheduled for future live programs
+    const now = new Date();
     const upcomingPrograms = await LiveProgram.find({
-        scheduledStart: { $gt: new Date() }
+        scheduledStart: { $gt: now }
     }).select('contentId');
     const scheduledContentIds = upcomingPrograms.map(p => p.contentId);
 
@@ -221,7 +222,11 @@ const getCreatorFeed = asyncHandler(async (req, res) => {
                             user: new mongoose.Types.ObjectId(userId),
                             isApproved: true,
                             thumbnail: { $ne: null },
-                            _id: { $nin: scheduledContentIds }
+                            _id: { $nin: scheduledContentIds },
+                            $or: [
+                                { scheduledReleaseDate: { $exists: false } },
+                                { scheduledReleaseDate: { $lte: now } }
+                            ]
                         }
                     },
                     { $addFields: { feedType: 'thumbnail' } },
@@ -241,7 +246,11 @@ const getCreatorFeed = asyncHandler(async (req, res) => {
                             user: new mongoose.Types.ObjectId(userId),
                             isApproved: true,
                             shortPreview: { $ne: null },
-                            _id: { $nin: scheduledContentIds }
+                            _id: { $nin: scheduledContentIds },
+                            $or: [
+                                { scheduledReleaseDate: { $exists: false } },
+                                { scheduledReleaseDate: { $lte: now } }
+                            ]
                         }
                     },
                     { $addFields: { feedType: 'shortPreview' } },
@@ -316,8 +325,9 @@ const getAllCreatorsFeed = asyncHandler(async (req, res) => {
     });
 
     // Exclude content scheduled for future live programs
+    const now = new Date();
     const upcomingPrograms = await LiveProgram.find({
-        scheduledStart: { $gt: new Date() }
+        scheduledStart: { $gt: now }
     }).select('contentId');
     const scheduledContentIds = upcomingPrograms.map(p => p.contentId);
 
@@ -341,7 +351,11 @@ const getAllCreatorsFeed = asyncHandler(async (req, res) => {
                             user: { $in: settingsMap.thumbnails },
                             isApproved: true,
                             thumbnail: { $ne: null },
-                            _id: { $nin: scheduledContentIds }
+                            _id: { $nin: scheduledContentIds },
+                            $or: [
+                                { scheduledReleaseDate: { $exists: false } },
+                                { scheduledReleaseDate: { $lte: now } }
+                            ]
                         }
                     },
                     { $addFields: { feedType: 'thumbnail' } },
@@ -361,7 +375,11 @@ const getAllCreatorsFeed = asyncHandler(async (req, res) => {
                             user: { $in: settingsMap.shortPreviews },
                             isApproved: true,
                             shortPreview: { $ne: null },
-                            _id: { $nin: scheduledContentIds }
+                            _id: { $nin: scheduledContentIds },
+                            $or: [
+                                { scheduledReleaseDate: { $exists: false } },
+                                { scheduledReleaseDate: { $lte: now } }
+                            ]
                         }
                     },
                     { $addFields: { feedType: 'shortPreview' } },

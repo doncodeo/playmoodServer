@@ -32,9 +32,10 @@ class RecommendationService {
         }
 
         // Fetch approved content.
+        const now = new Date();
         // Exclude content scheduled for future live programs
         const upcomingPrograms = await LiveProgram.find({
-            scheduledStart: { $gt: new Date() }
+            scheduledStart: { $gt: now }
         }).select('contentId');
         const scheduledContentIds = upcomingPrograms.map(p => p.contentId);
 
@@ -42,7 +43,11 @@ class RecommendationService {
         // For now, we fetch a limited set of recent/popular content to score to avoid OOM.
         const query = {
             isApproved: true,
-            _id: { $nin: scheduledContentIds }
+            _id: { $nin: scheduledContentIds },
+            $or: [
+                { scheduledReleaseDate: { $exists: false } },
+                { scheduledReleaseDate: { $lte: now } }
+            ]
         };
         if (seedContent) {
             query._id = { ...query._id, $ne: seedContent._id };

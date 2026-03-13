@@ -22,15 +22,20 @@ const recommendationService = require('../services/recommendationService');
 // @route GET /api/content 
 // @access Private
 const getContent = asyncHandler(async (req, res) => {
+    const now = new Date();
     // Exclude content scheduled for future live programs
     const upcomingPrograms = await LiveProgram.find({
-        scheduledStart: { $gt: new Date() }
+        scheduledStart: { $gt: now }
     }).select('contentId');
     const scheduledContentIds = upcomingPrograms.map(p => p.contentId);
 
     const content = await contentSchema.find({
         isApproved: true,
-        _id: { $nin: scheduledContentIds }
+        _id: { $nin: scheduledContentIds },
+        $or: [
+            { scheduledReleaseDate: { $exists: false } },
+            { scheduledReleaseDate: { $lte: now } }
+        ]
     })
     .select('title thumbnail user views createdAt category video description credit likes updatedAt captions shortPreviewUrl shortPreviewViews highlightUrl')
     .populate('user', 'name').lean();
@@ -48,15 +53,20 @@ const getContent = asyncHandler(async (req, res) => {
 // @access Private
 const getRecentContent = asyncHandler(async (req, res) => {
     try {
+        const now = new Date();
         // Exclude content scheduled for future live programs
         const upcomingPrograms = await LiveProgram.find({
-            scheduledStart: { $gt: new Date() }
+            scheduledStart: { $gt: now }
         }).select('contentId');
         const scheduledContentIds = upcomingPrograms.map(p => p.contentId);
 
         const recentContents = await contentSchema.find({
             isApproved: true,
-            _id: { $nin: scheduledContentIds }
+            _id: { $nin: scheduledContentIds },
+            $or: [
+                { scheduledReleaseDate: { $exists: false } },
+                { scheduledReleaseDate: { $lte: now } }
+            ]
         })
             .sort({ createdAt: -1 })
             .limit(10)
@@ -87,15 +97,20 @@ const getRecentContent = asyncHandler(async (req, res) => {
 // @access Private
 const getTopTenContent = asyncHandler(async (req, res) => {
     try {
+        const now = new Date();
         // Exclude content scheduled for future live programs
         const upcomingPrograms = await LiveProgram.find({
-            scheduledStart: { $gt: new Date() }
+            scheduledStart: { $gt: now }
         }).select('contentId');
         const scheduledContentIds = upcomingPrograms.map(p => p.contentId);
 
         const topContents = await contentSchema.find({
             isApproved: true,
-            _id: { $nin: scheduledContentIds }
+            _id: { $nin: scheduledContentIds },
+            $or: [
+                { scheduledReleaseDate: { $exists: false } },
+                { scheduledReleaseDate: { $lte: now } }
+            ]
         })
             .sort({ views: -1 })
             .limit(10)
@@ -166,8 +181,9 @@ const getRecentCreatorContent = asyncHandler(async (req, res) => {
         }
 
         // Fetch upcoming programs to exclude them
+        const now = new Date();
         const upcomingPrograms = await LiveProgram.find({
-            scheduledStart: { $gt: new Date() }
+            scheduledStart: { $gt: now }
         }).select('contentId');
         const scheduledContentIds = upcomingPrograms.map(p => p.contentId);
 
@@ -175,7 +191,11 @@ const getRecentCreatorContent = asyncHandler(async (req, res) => {
         const recentContent = await contentSchema.findOne({
             user: userId,
             isApproved: true,
-            _id: { $nin: scheduledContentIds }
+            _id: { $nin: scheduledContentIds },
+            $or: [
+                { scheduledReleaseDate: { $exists: false } },
+                { scheduledReleaseDate: { $lte: now } }
+            ]
         })
             .sort({ createdAt: -1 })
             .populate('user', 'name')
@@ -251,15 +271,16 @@ const getContentById = asyncHandler(async (req, res) => {
     const userId = req.user ? req.user._id : null;
     const viewerIP = req.ip;
 
-    const content = await contentSchema.findById(id).select('title thumbnail user views createdAt category video description credit likes comments updatedAt shortPreview shortPreviewUrl shortPreviewViews highlightUrl highlights viewers viewerIPs captions').populate('user', 'name');
+    const content = await contentSchema.findById(id).select('title thumbnail user views createdAt category video description credit likes comments updatedAt shortPreview shortPreviewUrl shortPreviewViews highlightUrl highlights viewers viewerIPs captions scheduledReleaseDate').populate('user', 'name');
     if (!content) {
         return res.status(404).json({ error: 'Content not found' });
     }
 
+    const now = new Date();
     // Check if content is scheduled for a future live program
     const upcomingProgram = await LiveProgram.findOne({
         contentId: id,
-        scheduledStart: { $gt: new Date() }
+        scheduledStart: { $gt: now }
     });
 
     // Admins can bypass the schedule restriction
@@ -268,6 +289,21 @@ const getContentById = asyncHandler(async (req, res) => {
             error: 'This content is scheduled for a future live broadcast.',
             scheduledStart: upcomingProgram.scheduledStart,
             title: upcomingProgram.title
+        });
+    }
+
+    // Check if content is Soon on Playmood (scheduled release date in the future)
+    if (content.scheduledReleaseDate && content.scheduledReleaseDate > now && (!req.user || req.user.role !== 'admin')) {
+        return res.status(403).json({
+            error: 'This content is scheduled for a future release.',
+            scheduledReleaseDate: content.scheduledReleaseDate,
+            isSoon: true,
+            title: content.title,
+            thumbnail: content.thumbnail,
+            description: content.description,
+            user: content.user,
+            category: content.category,
+            createdAt: content.createdAt
         });
     }
 
@@ -340,7 +376,7 @@ const getContentById = asyncHandler(async (req, res) => {
 const createContent = asyncHandler(async (req, res) => {
     try {
         // The file data now comes from the client after a direct upload to Cloudinary
-        const { title, category, description, credit, previewStart, previewEnd, languageCode, video, thumbnail, scheduledDate, scheduledStartTime } = req.body;
+        const { title, category, description, credit, previewStart, previewEnd, languageCode, video, thumbnail, scheduledDate, scheduledStartTime, isOnlyOnPlaymood, scheduledReleaseDate } = req.body;
         const userId = req.user.id; // Use the authenticated user's ID
 
         // Enforce HTTPS
@@ -420,6 +456,8 @@ const createContent = asyncHandler(async (req, res) => {
             thumbnailKey: thumbnail ? thumbnail.key : '',
             cloudinary_thumbnail_id: thumbnail ? thumbnail.public_id : '',
             isApproved: user.role === 'admin', // Admins' content is auto-approved
+            isOnlyOnPlaymood: isOnlyOnPlaymood === true || isOnlyOnPlaymood === 'true',
+            scheduledReleaseDate: scheduledReleaseDate ? new Date(scheduledReleaseDate) : undefined,
             aiModerationStatus: 'processing', // Set AI moderation status
         });
 
@@ -1028,8 +1066,9 @@ const ContinueWatching = asyncHandler(async (req, res) => {
 
     try {
         // Exclude content scheduled for future live programs
+        const now = new Date();
         const upcomingPrograms = await LiveProgram.find({
-            scheduledStart: { $gt: new Date() }
+            scheduledStart: { $gt: now }
         }).select('contentId');
         const scheduledContentIds = upcomingPrograms.map(p => p.contentId);
 
@@ -1038,7 +1077,11 @@ const ContinueWatching = asyncHandler(async (req, res) => {
             select: 'title category description thumbnail video videoPreviewUrl shortPreviewUrl shortPreviewViews highlightUrl duration views likes createdAt',
             match: {
                 isApproved: true,
-                _id: { $nin: scheduledContentIds }
+                _id: { $nin: scheduledContentIds },
+                $or: [
+                    { scheduledReleaseDate: { $exists: false } },
+                    { scheduledReleaseDate: { $lte: now } }
+                ]
             },
         });
 
@@ -1142,9 +1185,10 @@ const getWatchlist = asyncHandler(async (req, res) => {
     }
 
     try {
+        const now = new Date();
         // Exclude content scheduled for future live programs
         const upcomingPrograms = await LiveProgram.find({
-            scheduledStart: { $gt: new Date() }
+            scheduledStart: { $gt: now }
         }).select('contentId');
         const scheduledContentIds = upcomingPrograms.map(p => p.contentId);
 
@@ -1153,7 +1197,11 @@ const getWatchlist = asyncHandler(async (req, res) => {
             select: 'title category description thumbnail video shortPreview shortPreviewUrl shortPreviewViews highlightUrl previewUrl isApproved comments',
             match: {
                 isApproved: true,
-                _id: { $nin: scheduledContentIds }
+                _id: { $nin: scheduledContentIds },
+                $or: [
+                    { scheduledReleaseDate: { $exists: false } },
+                    { scheduledReleaseDate: { $lte: now } }
+                ]
             },
             populate: {
                 path: 'comments.user',
@@ -1370,6 +1418,47 @@ const unlikeContent = asyncHandler(async (req, res) => {
 // @desc    Track a view for a short preview
 // @route   POST /api/content/:id/preview-view
 // @access  Public
+// @desc Get Only on Playmood Content
+// @route GET /api/content/only-on-playmood
+// @access Public
+const getOnlyOnPlaymoodContent = asyncHandler(async (req, res) => {
+    const now = new Date();
+    // Exclude content scheduled for future live programs
+    const upcomingPrograms = await LiveProgram.find({
+        scheduledStart: { $gt: now }
+    }).select('contentId');
+    const scheduledContentIds = upcomingPrograms.map(p => p.contentId);
+
+    const content = await contentSchema.find({
+        isApproved: true,
+        isOnlyOnPlaymood: true,
+        _id: { $nin: scheduledContentIds },
+        $or: [
+            { scheduledReleaseDate: { $exists: false } },
+            { scheduledReleaseDate: { $lte: now } }
+        ]
+    })
+    .select('title thumbnail user views createdAt category video description credit likes updatedAt captions shortPreviewUrl shortPreviewViews highlightUrl')
+    .populate('user', 'name').lean();
+
+    res.status(200).json(content);
+});
+
+// @desc Get Soon on Playmood Content
+// @route GET /api/content/soon
+// @access Public
+const getSoonOnPlaymoodContent = asyncHandler(async (req, res) => {
+    const now = new Date();
+    const content = await contentSchema.find({
+        isApproved: true,
+        scheduledReleaseDate: { $gt: now }
+    })
+    .select('title thumbnail user createdAt category description credit scheduledReleaseDate')
+    .populate('user', 'name').lean();
+
+    res.status(200).json(content);
+});
+
 const trackShortPreviewView = asyncHandler(async (req, res) => {
     const { id } = req.params;
     const userId = req.user ? req.user._id : null;
@@ -1445,6 +1534,8 @@ module.exports = {
     unlikeContent,
     getHomepageFeed,
     trackShortPreviewView,
+    getOnlyOnPlaymoodContent,
+    getSoonOnPlaymoodContent,
 }
 
 function cosineSimilarity(vecA, vecB) {
