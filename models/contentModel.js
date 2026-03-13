@@ -88,6 +88,13 @@ const contentSchema = new mongoose.Schema(
             type: Boolean,
             default: false,
         },
+        isOnlyOnPlaymood: {
+            type: Boolean,
+            default: false,
+        },
+        scheduledReleaseDate: {
+            type: Date,
+        },
         rejectionReason: {
             type: String,
             trim: true,
