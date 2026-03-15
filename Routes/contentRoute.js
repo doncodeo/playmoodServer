@@ -974,6 +974,11 @@ router.route('/unapproved').get(protect, getUnapprovedContent);
  *                         format: date-time
  *                       progress:
  *                         type: number
+ *                         description: Playback progress in seconds.
+ *                       resumeUrl:
+ *                         type: string
+ *                         description: A full absolute URL to resume playback at the last watched position. Format is FRONTEND_URL/movie/slug-id?t=seconds-s.
+ *                         example: https://playmoodtv.com/movie/my-video-65a6fc7b72128447ad32024e?t=120s
  *       304:
  *         description: Not Modified (ETag match)
  *       401:
@@ -1185,7 +1190,14 @@ router.route('/soon').get(getSoonOnPlaymoodContent);
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Content'
+ *               allOf:
+ *                 - $ref: '#/components/schemas/Content'
+ *                 - type: object
+ *                   properties:
+ *                     lastProgress:
+ *                       type: number
+ *                       description: The last saved playback progress in seconds for the authenticated user. Defaults to 0 if not logged in or no progress found.
+ *                       example: 120.5
  *       403:
  *         description: "Forbidden - This content is scheduled for a future broadcast or release and cannot be played yet."
  *         content:

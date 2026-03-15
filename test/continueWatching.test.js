@@ -101,6 +101,12 @@ describe('Continue Watching Feature', function() {
         expect(res.body.continueWatching[0]._id.toString()).to.equal(content1._id.toString());
         expect(res.body.continueWatching[0].progress).to.equal(50);
         expect(res.body.continueWatching[0]).to.have.property('lastWatchedAt');
+
+        // Verify resumeUrl
+        const expectedSlug = 'video-1';
+        expect(res.body.continueWatching[0]).to.have.property('resumeUrl');
+        expect(res.body.continueWatching[0].resumeUrl).to.contain(`/movie/${expectedSlug}-${content1._id}?t=50s`);
+        expect(res.body.continueWatching[0].resumeUrl).to.match(/^https?:\/\//);
     });
 
     it('should sort by last watched descending', async () => {
@@ -185,5 +191,39 @@ describe('Continue Watching Feature', function() {
         expect(res.body.continueWatching).to.have.lengthOf(20, 'Should be limited to 20 items');
         // The last one we watched (Extra Video 24) should be first
         expect(res.body.continueWatching[0].title).to.equal('Extra Video 24');
+    });
+
+    it('should include lastProgress in getContentById when authenticated', async () => {
+        // We know content1 has progress 60 from previous tests
+        const res = await request(app)
+            .get(`/api/content/${content1._id}`)
+            .set('Authorization', `Bearer ${token}`);
+
+        expect(res.status).to.equal(200);
+        expect(res.body).to.have.property('lastProgress', 60);
+    });
+
+    it('should default lastProgress to 0 in getContentById if no progress exists', async () => {
+        // Create new content with no progress
+        const newContent = await contentSchema.create({
+            user: userId,
+            title: 'New Video',
+            category: 'Category',
+            description: 'Description',
+            credit: 'Credit',
+            video: 'https://example.com/new.mp4',
+            thumbnail: 'https://example.com/new.jpg',
+            duration: 100,
+            isApproved: true,
+            shortPreview: { start: 0, end: 10 },
+            status: 'completed'
+        });
+
+        const res = await request(app)
+            .get(`/api/content/${newContent._id}`)
+            .set('Authorization', `Bearer ${token}`);
+
+        expect(res.status).to.equal(200);
+        expect(res.body).to.have.property('lastProgress', 0);
     });
 });

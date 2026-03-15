@@ -8,6 +8,7 @@ const mongoose = require('mongoose'); // Add mongoose import
 const fs = require('fs');
 const jwt = require('jsonwebtoken');
 const { setEtagAndCache } = require('../utils/responseHelpers');
+const { generateSlug } = require('../utils/stringHelpers');
 const { compressVideo } = require('../utils/videoCompressor');
 const aiService = require('../ai/ai-service');
 const path = require('path');
@@ -352,6 +353,17 @@ const getContentById = asyncHandler(async (req, res) => {
                     contentData.highlightUrl = storageService.getUrl(highlight.storageKey, 'r2');
                 }
             }
+        }
+    }
+
+    // If the user is authenticated, include their last progress for this content
+    if (userId) {
+        const user = await userSchema.findById(userId).select('videoProgress');
+        if (user) {
+            const progressRecord = user.videoProgress.find(record =>
+                record.contentId.toString() === id.toString()
+            );
+            contentData.lastProgress = progressRecord ? progressRecord.progress : 0;
         }
     }
 
@@ -1089,6 +1101,8 @@ const ContinueWatching = asyncHandler(async (req, res) => {
             return res.status(404).json({ error: 'User not found' });
         }
 
+        const frontendUrl = process.env.FRONTEND_URL || 'https://playmoodtv.com';
+
         const continueWatching = user.videoProgress
             .filter(record => {
                 // Must have progress and content still exists/is approved
@@ -1100,11 +1114,22 @@ const ContinueWatching = asyncHandler(async (req, res) => {
 
                 return true;
             })
-            .map(record => ({
-                ...record.contentId.toObject(),
-                progress: record.progress,
-                lastWatchedAt: record.lastWatchedAt,
-            }))
+            .map(record => {
+                const content = record.contentId;
+                const slug = generateSlug(content.title);
+                const progressSeconds = Math.floor(record.progress);
+
+                // Construct the absolute resume URL
+                // Format: FRONTEND_URL/movie/slug-id?t=seconds-s
+                const resumeUrl = `${frontendUrl}/movie/${slug}-${content._id}?t=${progressSeconds}s`;
+
+                return {
+                    ...content.toObject(),
+                    progress: record.progress,
+                    resumeUrl: resumeUrl,
+                    lastWatchedAt: record.lastWatchedAt,
+                };
+            })
             .sort((a, b) => new Date(b.lastWatchedAt) - new Date(a.lastWatchedAt))
             .slice(0, 20); // Limit to top 20 items
 
