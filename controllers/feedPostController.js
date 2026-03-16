@@ -7,6 +7,8 @@ const LiveProgram = require('../models/liveProgramModel');
 const mongoose = require('mongoose');
 const asyncHandler = require('express-async-handler');
 const { getWss, sendToUser } = require('../websocket');
+const WebSocket = require('ws');
+
 // @desc    Create a new feed post
 // @route   POST /api/feed
 // @access  Private (Creator)
@@ -64,7 +66,8 @@ const likeFeedPost = asyncHandler(async (req, res) => {
         throw new Error('Post not found');
     }
 
-    if (post.likes.includes(req.user._id)) {
+    const userId = req.user._id.toString();
+    if (post.likes.some(like => like.toString() === userId)) {
         res.status(400);
         throw new Error('You have already liked this post');
     }
@@ -97,7 +100,8 @@ const unlikeFeedPost = asyncHandler(async (req, res) => {
         throw new Error('Post not found');
     }
 
-    if (!post.likes.includes(req.user._id)) {
+    const userId = req.user._id.toString();
+    if (!post.likes.some(like => like.toString() === userId)) {
         res.status(400);
         throw new Error('You have not liked this post');
     }
