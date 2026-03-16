@@ -7,6 +7,8 @@ const LiveProgram = require('../models/liveProgramModel');
 const mongoose = require('mongoose');
 const asyncHandler = require('express-async-handler');
 const { getWss, sendToUser } = require('../websocket');
+const WebSocket = require('ws');
+
 // @desc    Create a new feed post
 // @route   POST /api/feed
 // @access  Private (Creator)
