@@ -512,7 +512,7 @@ const createContent = asyncHandler(async (req, res) => {
 
     } catch (error) {
         console.error('Create content initial error:', error);
-        res.status(500).json({ error: 'Server error during upload initiation.', details: error.message });
+        res.status(500).json({ error: "We're having trouble uploading your video. Please check your connection and try again.", details: error.message });
     }
 });
 
@@ -573,7 +573,7 @@ const generateUploadSignature = asyncHandler(async (req, res) => {
         });
     } catch (error) {
         console.error('Error generating upload signature/URL:', error);
-        res.status(500).json({ error: 'Server error while generating upload signature.' });
+        res.status(500).json({ error: "We're having trouble uploading your video. Please check your connection and try again." });
     }
 });
 
