@@ -55,6 +55,8 @@ const createFeedPost = asyncHandler(async (req, res) => {
     const hasVideo = processedMedia.some(item => {
         const url = item.url || '';
         const key = item.key || '';
+        const thumbUrl = (item.thumbnail && item.thumbnail.url) || '';
+
         // Robust video detection
         const isVideo = url.toLowerCase().includes('.mp4') ||
                         url.toLowerCase().includes('.mov') ||
@@ -62,8 +64,12 @@ const createFeedPost = asyncHandler(async (req, res) => {
                         key.toLowerCase().includes('.mp4') ||
                         key.toLowerCase().includes('.mov');
 
-        const missingThumb = !item.thumbnail || !item.thumbnail.url;
-        return isVideo && missingThumb;
+        // Thumb is missing OR is actually a video file itself
+        const isBrokenThumb = !thumbUrl ||
+                             thumbUrl.toLowerCase().includes('.mp4') ||
+                             thumbUrl.toLowerCase().includes('.mov');
+
+        return isVideo && isBrokenThumb;
     });
 
     const post = await FeedPost.create({

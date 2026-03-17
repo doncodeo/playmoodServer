@@ -15,35 +15,53 @@ const fixThumbnails = async () => {
         console.log('Connected to MongoDB');
 
         const posts = await FeedPost.find({});
-        console.log(`Checking ${posts.length} total feed posts...`);
+        console.log(`Scanning ${posts.length} total feed posts for issues...`);
 
         let fixCount = 0;
         for (const post of posts) {
             let needsFix = false;
-            for (const item of post.media) {
+            let reason = '';
+
+            for (let i = 0; i < post.media.length; i++) {
+                const item = post.media[i];
                 const url = item.url || '';
                 const key = item.key || '';
+                const thumbUrl = (item.thumbnail && item.thumbnail.url) || '';
 
-                // Extremely robust video detection
+                // Detect video
                 const isVideo = url.toLowerCase().includes('.mp4') ||
                                 url.toLowerCase().includes('.mov') ||
                                 url.toLowerCase().includes('.webm') ||
                                 key.toLowerCase().includes('.mp4') ||
                                 key.toLowerCase().includes('.mov');
 
-                const missingThumb = !item.thumbnail || !item.thumbnail.url;
+                if (!isVideo) continue;
+
+                // Check for broken or missing thumbnail
+                const isMissing = !thumbUrl;
+                const isVideoFileAsThumb = thumbUrl.toLowerCase().includes('.mp4') || thumbUrl.toLowerCase().includes('.mov');
 
                 // Also check for R2 URLs that might be mislabeled
                 const isR2Url = url.includes('r2.dev') || url.includes('r2.playmoodtv.com');
+                const mislabeledProvider = isR2Url && item.provider !== 'r2';
 
-                if (isVideo && (missingThumb || (isR2Url && item.provider !== 'r2'))) {
+                if (isMissing) {
                     needsFix = true;
+                    reason = `Media[${i}] is missing thumbnail.`;
+                    break;
+                } else if (isVideoFileAsThumb) {
+                    needsFix = true;
+                    reason = `Media[${i}] has a video file instead of an image as a thumbnail.`;
+                    break;
+                } else if (mislabeledProvider) {
+                    needsFix = true;
+                    reason = `Media[${i}] has mismatched provider (R2 URL labeled as ${item.provider}).`;
                     break;
                 }
             }
 
             if (needsFix) {
-                console.log(`Queueing job for post ID: ${post._id}`);
+                console.log(`Queueing Fix: Post ID ${post._id} - ${reason}`);
                 post.status = 'processing';
                 await post.save();
 
@@ -61,7 +79,9 @@ const fixThumbnails = async () => {
             }
         }
 
-        console.log(`Successfully queued ${fixCount} posts for thumbnail generation.`);
+        console.log(`--------------------------------------------------`);
+        console.log(`Finished scanning. Successfully queued ${fixCount} posts for repair.`);
+        console.log(`The background worker will now process these items one by one.`);
 
         setTimeout(() => {
             mongoose.disconnect();
