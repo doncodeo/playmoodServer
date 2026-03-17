@@ -14,48 +14,46 @@ const fixThumbnails = async () => {
         await mongoose.connect(process.env.MONGO_URI);
         console.log('Connected to MongoDB');
 
-        const postsToFix = await FeedPost.find({
-            'media': {
-                $elemMatch: {
-                    provider: 'r2',
-                    $or: [
-                        { 'thumbnail.url': { $exists: false } },
-                        { 'thumbnail.url': null },
-                        { 'thumbnail.url': '' }
-                    ],
-                    // Basic regex for video extensions in URL or key
-                    $or: [
-                        { url: /\.(mp4|mov|avi|wmv|flv|mkv|webm)$/i },
-                        { key: /\.(mp4|mov|avi|wmv|flv|mkv|webm)$/i }
-                    ]
+        const posts = await FeedPost.find({});
+        console.log(`Checking ${posts.length} total feed posts...`);
+
+        let fixCount = 0;
+        for (const post of posts) {
+            let needsFix = false;
+            for (const item of post.media) {
+                const url = item.url || '';
+                const key = item.key || '';
+                // Robust video detection: matches common video extensions with or without query params
+                const isVideo = url.match(/\.(mp4|mov|avi|wmv|flv|mkv|webm)(\?.*)?$/i) || key.match(/\.(mp4|mov|avi|wmv|flv|mkv|webm)$/i);
+                const missingThumb = !item.thumbnail || !item.thumbnail.url;
+
+                if (isVideo && missingThumb) {
+                    needsFix = true;
+                    break;
                 }
             }
-        });
 
-        console.log(`Found ${postsToFix.length} video posts needing thumbnail fixes.`);
+            if (needsFix) {
+                console.log(`Queueing job for post ID: ${post._id}`);
+                post.status = 'processing';
+                await post.save();
 
-        for (const post of postsToFix) {
-            console.log(`Queueing job for post ID: ${post._id}`);
-
-            // Set status to processing so it's clear it's being worked on
-            post.status = 'processing';
-            await post.save();
-
-            await uploadQueue.add('process-feed-post', {
-                postId: post._id,
-            }, {
-                attempts: 3,
-                backoff: {
-                    type: 'exponential',
-                    delay: 5000,
-                },
-                removeOnComplete: true,
-            });
+                await uploadQueue.add('process-feed-post', {
+                    postId: post._id,
+                }, {
+                    attempts: 3,
+                    backoff: {
+                        type: 'exponential',
+                        delay: 5000,
+                    },
+                    removeOnComplete: true,
+                });
+                fixCount++;
+            }
         }
 
-        console.log('All applicable posts have been queued for processing.');
+        console.log(`Successfully queued ${fixCount} posts for thumbnail generation.`);
 
-        // Give it a moment before closing
         setTimeout(() => {
             mongoose.disconnect();
             console.log('Disconnected from MongoDB');
