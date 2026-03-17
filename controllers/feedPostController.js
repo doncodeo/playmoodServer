@@ -51,6 +51,8 @@ const createFeedPost = asyncHandler(async (req, res) => {
         const key = item.key || '';
         const isVideo = url.match(/\.(mp4|mov|avi|wmv|flv|mkv|webm)(\?.*)?$/i) || key.match(/\.(mp4|mov|avi|wmv|flv|mkv|webm)$/i);
         const missingThumb = !item.thumbnail || !item.thumbnail.url;
+        // Also consider R2 videos marked as Cloudinary but needing a thumb
+        const isR2Url = url.includes('r2.dev') || url.includes('r2.playmoodtv.com');
         return isVideo && missingThumb;
     });
 
