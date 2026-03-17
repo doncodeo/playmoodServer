@@ -27,7 +27,15 @@ const fixThumbnails = async () => {
                 const isVideo = url.match(/\.(mp4|mov|avi|wmv|flv|mkv|webm)(\?.*)?$/i) || key.match(/\.(mp4|mov|avi|wmv|flv|mkv|webm)$/i);
                 const missingThumb = !item.thumbnail || !item.thumbnail.url;
 
+                // Also check for R2 URLs that might be labeled as Cloudinary
+                const isR2Url = url.includes('r2.dev') || url.includes('r2.playmoodtv.com');
+
                 if (isVideo && missingThumb) {
+                    needsFix = true;
+                    break;
+                }
+
+                if (isVideo && isR2Url && item.provider !== 'r2') {
                     needsFix = true;
                     break;
                 }
