@@ -172,7 +172,7 @@ const processFeedPost = async (job) => {
                         thumbPath = await mediaProcessor.extractThumbnail(tempVideoPath);
                         const thumbStream = fs.createReadStream(thumbPath);
 
-                        const userId = post.user._id ? post.user._id.toString() : post.user.toString();
+                        const userId = (post.user && post.user._id) ? post.user._id.toString() : (post.user ? post.user.toString() : 'anonymous');
                         const thumbName = storageService.generateFileName('thumb.jpg', `${userId}/`);
                         const uploadResult = await storageService.uploadToR2(
                             thumbStream,
@@ -190,6 +190,28 @@ const processFeedPost = async (job) => {
                         console.log(`[Worker] Generated and uploaded thumbnail to ${uploadResult.key}`);
                     } catch (err) {
                         console.error(`[Worker] Error generating thumbnail for post ${postId}, item ${i}:`, err);
+
+                        // If extraction fails and it's a broken .mp4 thumbnail, clear it to avoid showing broken image
+                        if (isBrokenThumb) {
+                            console.log(`[Worker] Clearing broken .mp4 thumbnail for post ${postId}, item ${i} due to extraction failure.`);
+                            media[i].thumbnail = { url: '', key: '', public_id: '' };
+
+                            // Try to find a fallback thumbnail from other media items if available
+                            const imageItem = media.find(m => {
+                                const mUrl = m.url || '';
+                                return mUrl.match(/\.(jpg|jpeg|png|webp|gif)(\?.*)?$/i);
+                            });
+
+                            if (imageItem) {
+                                console.log(`[Worker] Using fallback image thumbnail from another media item for post ${postId}`);
+                                media[i].thumbnail = {
+                                    url: imageItem.url,
+                                    key: imageItem.key || '',
+                                    public_id: imageItem.public_id || ''
+                                };
+                            }
+                            updated = true;
+                        }
                     } finally {
                         if (thumbPath && fs.existsSync(thumbPath)) fs.unlinkSync(thumbPath);
                         if (fs.existsSync(tempVideoPath)) fs.unlinkSync(tempVideoPath);

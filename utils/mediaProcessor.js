@@ -22,31 +22,57 @@ class MediaProcessor {
     }
 
     /**
-     * Extract thumbnail from video
+     * Extract thumbnail from video with improved robustness
      */
-    async extractThumbnail(inputPath, time = '00:00:01') {
+    async extractThumbnail(inputPath, requestedTime = '00:00:01') {
         const outputPath = path.join(os.tmpdir(), `thumb-${Date.now()}.jpg`);
-        return new Promise((resolve, reject) => {
-            const command = ffmpeg(inputPath)
-                .inputOptions([`-ss ${time}`]) // Fast seek before input
-                .outputOptions(['-vframes 1']);
 
-            const timeout = setTimeout(() => {
-                command.kill('SIGKILL');
-                reject(new Error('Thumbnail extraction timed out'));
-            }, 60000); // 1 minute timeout
+        // Helper to perform extraction
+        const performExtraction = (time) => {
+            return new Promise((resolve, reject) => {
+                const command = ffmpeg(inputPath)
+                    .inputOptions([`-ss ${time}`])
+                    .outputOptions(['-vframes 1']);
 
-            command
-                .on('end', () => {
-                    clearTimeout(timeout);
-                    resolve(outputPath);
-                })
-                .on('error', (err) => {
-                    clearTimeout(timeout);
-                    reject(err);
-                })
-                .save(outputPath);
-        });
+                const timeout = setTimeout(() => {
+                    command.kill('SIGKILL');
+                    reject(new Error('Thumbnail extraction timed out'));
+                }, 30000); // 30s timeout per attempt
+
+                command
+                    .on('end', () => {
+                        clearTimeout(timeout);
+                        if (fs.existsSync(outputPath)) {
+                            resolve(outputPath);
+                        } else {
+                            reject(new Error(`Thumbnail file not created at ${time}`));
+                        }
+                    })
+                    .on('error', (err) => {
+                        clearTimeout(timeout);
+                        reject(err);
+                    })
+                    .save(outputPath);
+            });
+        };
+
+        try {
+            // Try first at requested time
+            return await performExtraction(requestedTime);
+        } catch (error) {
+            console.warn(`[MediaProcessor] Initial thumbnail extraction failed at ${requestedTime}: ${error.message}. Retrying at 00:00:00`);
+
+            // If requested time was already 0, don't retry
+            if (requestedTime === '00:00:00') throw error;
+
+            try {
+                // Fallback to start of video
+                return await performExtraction('00:00:00');
+            } catch (fallbackError) {
+                console.error(`[MediaProcessor] Fallback thumbnail extraction failed: ${fallbackError.message}`);
+                throw fallbackError;
+            }
+        }
     }
 
     /**
