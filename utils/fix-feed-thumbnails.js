@@ -23,19 +23,20 @@ const fixThumbnails = async () => {
             for (const item of post.media) {
                 const url = item.url || '';
                 const key = item.key || '';
-                // Robust video detection: matches common video extensions with or without query params
-                const isVideo = url.match(/\.(mp4|mov|avi|wmv|flv|mkv|webm)(\?.*)?$/i) || key.match(/\.(mp4|mov|avi|wmv|flv|mkv|webm)$/i);
+
+                // Extremely robust video detection
+                const isVideo = url.toLowerCase().includes('.mp4') ||
+                                url.toLowerCase().includes('.mov') ||
+                                url.toLowerCase().includes('.webm') ||
+                                key.toLowerCase().includes('.mp4') ||
+                                key.toLowerCase().includes('.mov');
+
                 const missingThumb = !item.thumbnail || !item.thumbnail.url;
 
-                // Also check for R2 URLs that might be labeled as Cloudinary
+                // Also check for R2 URLs that might be mislabeled
                 const isR2Url = url.includes('r2.dev') || url.includes('r2.playmoodtv.com');
 
-                if (isVideo && missingThumb) {
-                    needsFix = true;
-                    break;
-                }
-
-                if (isVideo && isR2Url && item.provider !== 'r2') {
+                if (isVideo && (missingThumb || (isR2Url && item.provider !== 'r2'))) {
                     needsFix = true;
                     break;
                 }

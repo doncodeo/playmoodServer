@@ -30,9 +30,15 @@ const createFeedPost = asyncHandler(async (req, res) => {
             item.thumbnail.url = item.thumbnail.url.replace(/^http:\/\//i, 'https://');
         }
 
-        const provider = item.provider || 'cloudinary';
+        let provider = item.provider || 'cloudinary';
+        const url = item.url || '';
 
-        if (type === 'video' && !item.thumbnail && provider === 'cloudinary' && item.public_id) {
+        // Self-correct provider if URL is obviously R2
+        if (url.includes('r2.dev') || url.includes('r2.playmoodtv.com')) {
+            provider = 'r2';
+        }
+
+        if ((type === 'video' || url.match(/\.(mp4|mov|avi|wmv|flv|mkv|webm)(\?.*)?$/i)) && !item.thumbnail && provider === 'cloudinary' && item.public_id) {
             const thumbnailUrl = `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/video/upload/so_1/${item.public_id}.jpg`;
             return {
                 ...item,
@@ -49,10 +55,14 @@ const createFeedPost = asyncHandler(async (req, res) => {
     const hasVideo = processedMedia.some(item => {
         const url = item.url || '';
         const key = item.key || '';
-        const isVideo = url.match(/\.(mp4|mov|avi|wmv|flv|mkv|webm)(\?.*)?$/i) || key.match(/\.(mp4|mov|avi|wmv|flv|mkv|webm)$/i);
+        // Robust video detection
+        const isVideo = url.toLowerCase().includes('.mp4') ||
+                        url.toLowerCase().includes('.mov') ||
+                        url.toLowerCase().includes('.webm') ||
+                        key.toLowerCase().includes('.mp4') ||
+                        key.toLowerCase().includes('.mov');
+
         const missingThumb = !item.thumbnail || !item.thumbnail.url;
-        // Also consider R2 videos marked as Cloudinary but needing a thumb
-        const isR2Url = url.includes('r2.dev') || url.includes('r2.playmoodtv.com');
         return isVideo && missingThumb;
     });
 

@@ -118,12 +118,18 @@ const processFeedPost = async (job) => {
             const item = media[i];
             const url = item.url || '';
             const key = item.key || '';
-            const isVideo = url.match(/\.(mp4|mov|avi|wmv|flv|mkv|webm)(\?.*)?$/i) || key.match(/\.(mp4|mov|avi|wmv|flv|mkv|webm)$/i);
+
+            // Robust video detection
+            const isVideo = url.toLowerCase().includes('.mp4') ||
+                            url.toLowerCase().includes('.mov') ||
+                            url.toLowerCase().includes('.webm') ||
+                            key.toLowerCase().includes('.mp4') ||
+                            key.toLowerCase().includes('.mov');
 
             if (isVideo && (!item.thumbnail || !item.thumbnail.url)) {
-                // Determine actual provider based on URL if possible (e.g. pub-*.r2.dev)
+                // Determine actual provider based on URL content
                 let actualProvider = item.provider;
-                if (url.includes('r2.dev') || url.includes('r2.playmoodtv.com') || key.startsWith('raw/') || key.startsWith('processed/')) {
+                if (url.includes('r2.dev') || url.includes('r2.playmoodtv.com')) {
                     actualProvider = 'r2';
                 } else if (url.includes('cloudinary.com')) {
                     actualProvider = 'cloudinary';
@@ -141,39 +147,48 @@ const processFeedPost = async (job) => {
                     continue;
                 }
 
-                if (actualProvider !== 'r2' || !key) continue;
+                // If it's R2 (or mislabeled as Cloudinary but has R2 URL)
+                if (actualProvider === 'r2' || url.includes('r2.dev') || url.includes('r2.playmoodtv.com')) {
+                    const r2Key = item.key || url.split('.dev/').pop().split('.com/').pop();
 
-                console.log(`[Worker] Generating thumbnail for R2 video in post ${postId}, item ${i}`);
-                media[i].provider = 'r2'; // Ensure provider is correctly set
+                    if (!r2Key) {
+                        console.warn(`[Worker] Could not determine R2 key for item ${i} in post ${postId}`);
+                        continue;
+                    }
 
-                const tempVideoPath = path.join(os.tmpdir(), `v-feed-${Date.now()}.mp4`);
-                let thumbPath = null;
-                try {
-                    await storageService.downloadFromR2(item.key, tempVideoPath);
-                    thumbPath = await mediaProcessor.extractThumbnail(tempVideoPath);
-                    const thumbStream = fs.createReadStream(thumbPath);
+                    console.log(`[Worker] Generating thumbnail for R2 video in post ${postId}, item ${i} using key: ${r2Key}`);
+                    media[i].provider = 'r2';
+                    media[i].key = r2Key;
 
-                    const userId = post.user._id ? post.user._id.toString() : post.user.toString();
-                    const thumbName = storageService.generateFileName('thumb.jpg', `${userId}/`);
-                    const uploadResult = await storageService.uploadToR2(
-                        thumbStream,
-                        thumbName,
-                        'image/jpeg',
-                        storageService.namespaces.THUMBNAILS
-                    );
+                    const tempVideoPath = path.join(os.tmpdir(), `v-feed-${Date.now()}.mp4`);
+                    let thumbPath = null;
+                    try {
+                        await storageService.downloadFromR2(r2Key, tempVideoPath);
+                        thumbPath = await mediaProcessor.extractThumbnail(tempVideoPath);
+                        const thumbStream = fs.createReadStream(thumbPath);
 
-                    media[i].thumbnail = {
-                        url: uploadResult.url,
-                        key: uploadResult.key
-                    };
-                    updated = true;
+                        const userId = post.user._id ? post.user._id.toString() : post.user.toString();
+                        const thumbName = storageService.generateFileName('thumb.jpg', `${userId}/`);
+                        const uploadResult = await storageService.uploadToR2(
+                            thumbStream,
+                            thumbName,
+                            'image/jpeg',
+                            storageService.namespaces.THUMBNAILS
+                        );
 
-                    console.log(`[Worker] Generated and uploaded thumbnail to ${uploadResult.key}`);
-                } catch (err) {
-                    console.error(`[Worker] Error generating thumbnail for post ${postId}, item ${i}:`, err);
-                } finally {
-                    if (thumbPath && fs.existsSync(thumbPath)) fs.unlinkSync(thumbPath);
-                    if (fs.existsSync(tempVideoPath)) fs.unlinkSync(tempVideoPath);
+                        media[i].thumbnail = {
+                            url: uploadResult.url,
+                            key: uploadResult.key
+                        };
+                        updated = true;
+
+                        console.log(`[Worker] Generated and uploaded thumbnail to ${uploadResult.key}`);
+                    } catch (err) {
+                        console.error(`[Worker] Error generating thumbnail for post ${postId}, item ${i}:`, err);
+                    } finally {
+                        if (thumbPath && fs.existsSync(thumbPath)) fs.unlinkSync(thumbPath);
+                        if (fs.existsSync(tempVideoPath)) fs.unlinkSync(tempVideoPath);
+                    }
                 }
             }
         }
