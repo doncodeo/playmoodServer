@@ -8,6 +8,7 @@ const mongoose = require('mongoose');
 const asyncHandler = require('express-async-handler');
 const { getWss, sendToUser } = require('../websocket');
 const WebSocket = require('ws');
+const uploadQueue = require('../config/queue');
 
 // @desc    Create a new feed post
 // @route   POST /api/feed
@@ -45,12 +46,32 @@ const createFeedPost = asyncHandler(async (req, res) => {
         return { ...item, provider };
     });
 
+    const hasVideo = processedMedia.some(item => {
+        const isVideo = item.url && (item.url.match(/\.(mp4|mov|avi|wmv|flv|mkv|webm)$/i) || item.provider === 'r2' && item.key && item.key.match(/\.(mp4|mov|avi|wmv|flv|mkv|webm)$/i));
+        const missingThumb = !item.thumbnail || !item.thumbnail.url;
+        return isVideo && item.provider === 'r2' && missingThumb;
+    });
+
     const post = await FeedPost.create({
         user: req.user._id,
         caption,
         type,
         media: processedMedia,
+        status: hasVideo ? 'processing' : 'completed',
     });
+
+    if (hasVideo) {
+        await uploadQueue.add('process-feed-post', {
+            postId: post._id,
+        }, {
+            attempts: 3,
+            backoff: {
+                type: 'exponential',
+                delay: 5000,
+            },
+            removeOnComplete: true,
+        });
+    }
 
     res.status(201).json(post);
 });
