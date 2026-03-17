@@ -126,7 +126,12 @@ const processFeedPost = async (job) => {
                             key.toLowerCase().includes('.mp4') ||
                             key.toLowerCase().includes('.mov');
 
-            if (isVideo && (!item.thumbnail || !item.thumbnail.url)) {
+            const thumbUrl = (item.thumbnail && item.thumbnail.url) || '';
+            const isBrokenThumb = !thumbUrl ||
+                                 thumbUrl.toLowerCase().includes('.mp4') ||
+                                 thumbUrl.toLowerCase().includes('.mov');
+
+            if (isVideo && isBrokenThumb) {
                 // Determine actual provider based on URL content
                 let actualProvider = item.provider;
                 if (url.includes('r2.dev') || url.includes('r2.playmoodtv.com')) {
