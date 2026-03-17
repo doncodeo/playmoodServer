@@ -116,12 +116,35 @@ const processFeedPost = async (job) => {
 
         for (let i = 0; i < media.length; i++) {
             const item = media[i];
-            // Only generate thumbnail for R2 videos that don't have one
-            // Note: We check if it's a video file regardless of post.type for robustness
-            const isVideo = item.url && (item.url.match(/\.(mp4|mov|avi|wmv|flv|mkv|webm)$/i) || item.provider === 'r2' && item.key && item.key.match(/\.(mp4|mov|avi|wmv|flv|mkv|webm)$/i));
+            const url = item.url || '';
+            const key = item.key || '';
+            const isVideo = url.match(/\.(mp4|mov|avi|wmv|flv|mkv|webm)(\?.*)?$/i) || key.match(/\.(mp4|mov|avi|wmv|flv|mkv|webm)$/i);
 
-            if (isVideo && item.provider === 'r2' && (!item.thumbnail || !item.thumbnail.url)) {
+            if (isVideo && (!item.thumbnail || !item.thumbnail.url)) {
+                // Determine actual provider based on URL if possible (e.g. pub-*.r2.dev)
+                let actualProvider = item.provider;
+                if (url.includes('r2.dev') || url.includes('r2.playmoodtv.com') || key.startsWith('raw/') || key.startsWith('processed/')) {
+                    actualProvider = 'r2';
+                } else if (url.includes('cloudinary.com')) {
+                    actualProvider = 'cloudinary';
+                }
+
+                if (actualProvider === 'cloudinary' && item.public_id) {
+                    console.log(`[Worker] Setting Cloudinary thumbnail for post ${postId}, item ${i}`);
+                    const thumbnailUrl = `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/video/upload/so_1/${item.public_id}.jpg`;
+                    media[i].thumbnail = {
+                        url: thumbnailUrl,
+                        public_id: ''
+                    };
+                    media[i].provider = 'cloudinary';
+                    updated = true;
+                    continue;
+                }
+
+                if (actualProvider !== 'r2' || !key) continue;
+
                 console.log(`[Worker] Generating thumbnail for R2 video in post ${postId}, item ${i}`);
+                media[i].provider = 'r2'; // Ensure provider is correctly set
 
                 const tempVideoPath = path.join(os.tmpdir(), `v-feed-${Date.now()}.mp4`);
                 let thumbPath = null;

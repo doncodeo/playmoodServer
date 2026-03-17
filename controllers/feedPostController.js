@@ -47,9 +47,11 @@ const createFeedPost = asyncHandler(async (req, res) => {
     });
 
     const hasVideo = processedMedia.some(item => {
-        const isVideo = item.url && (item.url.match(/\.(mp4|mov|avi|wmv|flv|mkv|webm)$/i) || item.provider === 'r2' && item.key && item.key.match(/\.(mp4|mov|avi|wmv|flv|mkv|webm)$/i));
+        const url = item.url || '';
+        const key = item.key || '';
+        const isVideo = url.match(/\.(mp4|mov|avi|wmv|flv|mkv|webm)(\?.*)?$/i) || key.match(/\.(mp4|mov|avi|wmv|flv|mkv|webm)$/i);
         const missingThumb = !item.thumbnail || !item.thumbnail.url;
-        return isVideo && item.provider === 'r2' && missingThumb;
+        return isVideo && missingThumb;
     });
 
     const post = await FeedPost.create({
