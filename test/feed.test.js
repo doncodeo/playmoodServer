@@ -7,6 +7,7 @@ const Highlight = require('../models/highlightModel');
 const jwt = require('jsonwebtoken');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const sinon = require('sinon');
+const uploadQueue = require('../config/queue');
 const { initWebSocket, closeWebSocket } = require('../websocket');
 
 describe('Feed API', function() {
@@ -17,6 +18,7 @@ describe('Feed API', function() {
   let creatorId;
   let mongoServer;
   let runningServer;
+  let addStub;
 
   before(async () => {
     mongoServer = await MongoMemoryServer.create();
@@ -50,10 +52,15 @@ describe('Feed API', function() {
     token = jwt.sign({ id: creatorId, role: creator.role }, process.env.JWT_SECRET, {
       expiresIn: '1h',
     });
+
+    addStub = sinon.stub(uploadQueue, 'add');
   });
 
   after(function(done) {
     this.timeout(20000);
+
+    if (addStub) addStub.restore();
+
     closeWebSocket(() => {
         if (runningServer) {
             runningServer.close(async () => {
@@ -247,6 +254,38 @@ describe('Feed API', function() {
         const post = await FeedPost.findById(postId);
         if (post.views !== 1) {
             throw new Error(`Expected 1 view, got ${post.views}`);
+        }
+    });
+
+    it('should queue a background job for video posts', async () => {
+        addStub.resetHistory();
+        const videoMedia = [{
+            url: 'https://r2.playmoodtv.com/raw/video.mp4',
+            key: 'raw/video.mp4',
+            provider: 'r2'
+        }];
+
+        const res = await request(app)
+            .post('/api/feed')
+            .set('Authorization', `Bearer ${token}`)
+            .send({
+                caption: 'Video Post',
+                type: 'video',
+                media: videoMedia
+            })
+            .expect(201);
+
+        if (res.body.status !== 'processing') {
+            throw new Error('Post status should be processing');
+        }
+
+        sinon.assert.calledOnce(addStub);
+        const args = addStub.getCall(0).args;
+        if (args[0] !== 'process-feed-post') {
+            throw new Error(`Expected process-feed-post job, got ${args[0]}`);
+        }
+        if (args[1].postId.toString() !== res.body._id.toString()) {
+            throw new Error('Incorrect postId in job data');
         }
     });
   });

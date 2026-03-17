@@ -63,6 +63,11 @@ const feedPostSchema = new mongoose.Schema(
             type: Number,
             default: 0,
         },
+        status: {
+            type: String,
+            enum: ['processing', 'completed', 'failed'],
+            default: 'completed',
+        },
     },
     {
         timestamps: true,

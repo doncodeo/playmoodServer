@@ -10,6 +10,7 @@ const axios = require('axios');
 const ffmpeg = require('fluent-ffmpeg');
 const cloudinary = require('./config/cloudinary');
 const contentSchema = require('./models/contentModel');
+const FeedPost = require('./models/feedPostModel');
 const userSchema = require('./models/userModel');
 const Highlight = require('./models/highlightModel');
 const LiveProgram = require('./models/liveProgramModel');
@@ -52,6 +53,8 @@ const mainProcessor = async (job) => {
             return await aggregatePlatformStats(job);
         case 'generate-short-preview':
             return await processShortPreviewGeneration(job);
+        case 'process-feed-post':
+            return await processFeedPost(job);
         default:
             throw new Error(`Unknown job name: ${job.name}`);
     }
@@ -97,6 +100,81 @@ const processEmbeddingGeneration = async (job) => {
     return { success: true };
 };
 
+
+const processFeedPost = async (job) => {
+    const { postId } = job.data;
+    console.log(`[Worker] Starting 'process-feed-post' for post ID: ${postId}`);
+
+    try {
+        const post = await FeedPost.findById(postId);
+        if (!post) {
+            throw new Error(`FeedPost with ID ${postId} not found.`);
+        }
+
+        let updated = false;
+        const media = post.media;
+
+        for (let i = 0; i < media.length; i++) {
+            const item = media[i];
+            // Only generate thumbnail for R2 videos that don't have one
+            // Note: We check if it's a video file regardless of post.type for robustness
+            const isVideo = item.url && (item.url.match(/\.(mp4|mov|avi|wmv|flv|mkv|webm)$/i) || item.provider === 'r2' && item.key && item.key.match(/\.(mp4|mov|avi|wmv|flv|mkv|webm)$/i));
+
+            if (isVideo && item.provider === 'r2' && (!item.thumbnail || !item.thumbnail.url)) {
+                console.log(`[Worker] Generating thumbnail for R2 video in post ${postId}, item ${i}`);
+
+                const tempVideoPath = path.join(os.tmpdir(), `v-feed-${Date.now()}.mp4`);
+                let thumbPath = null;
+                try {
+                    await storageService.downloadFromR2(item.key, tempVideoPath);
+                    thumbPath = await mediaProcessor.extractThumbnail(tempVideoPath);
+                    const thumbStream = fs.createReadStream(thumbPath);
+
+                    const userId = post.user._id ? post.user._id.toString() : post.user.toString();
+                    const thumbName = storageService.generateFileName('thumb.jpg', `${userId}/`);
+                    const uploadResult = await storageService.uploadToR2(
+                        thumbStream,
+                        thumbName,
+                        'image/jpeg',
+                        storageService.namespaces.THUMBNAILS
+                    );
+
+                    media[i].thumbnail = {
+                        url: uploadResult.url,
+                        key: uploadResult.key
+                    };
+                    updated = true;
+
+                    console.log(`[Worker] Generated and uploaded thumbnail to ${uploadResult.key}`);
+                } catch (err) {
+                    console.error(`[Worker] Error generating thumbnail for post ${postId}, item ${i}:`, err);
+                } finally {
+                    if (thumbPath && fs.existsSync(thumbPath)) fs.unlinkSync(thumbPath);
+                    if (fs.existsSync(tempVideoPath)) fs.unlinkSync(tempVideoPath);
+                }
+            }
+        }
+
+        if (updated) {
+            post.media = media;
+            post.markModified('media');
+        }
+        post.status = 'completed';
+        await post.save();
+
+        console.log(`[Worker] Finished 'process-feed-post' for post ID: ${postId}`);
+        return { success: true };
+    } catch (error) {
+        console.error(`[Worker] Error in 'process-feed-post' for job ${job.id}:`, error);
+
+        const failedPost = await FeedPost.findById(postId);
+        if (failedPost) {
+            failedPost.status = 'failed';
+            await failedPost.save();
+        }
+        throw error;
+    }
+};
 
 const processVideoCombination = async (job) => {
     // ... (existing implementation)
