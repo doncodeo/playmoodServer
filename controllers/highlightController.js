@@ -2,21 +2,74 @@ const asyncHandler = require('express-async-handler');
 const Highlight = require('../models/highlightModel');
 const Content = require('../models/contentModel');
 const mongoose = require('mongoose');
+const storageService = require('../services/storageService');
+const uploadQueue = require('../config/queue');
 
 // @desc    Create a new highlight
 // @route   POST /api/highlights
 // @access  Private (Creator or Admin)
 const createHighlight = asyncHandler(async (req, res) => {
-    const { contentId, startTime, endTime, title } = req.body;
+    const { contentId, startTime, endTime, title, videoKey, thumbnailKey } = req.body;
     const userId = req.user.id;
     const userRole = req.user.role;
 
-    if (typeof startTime === 'undefined' || typeof endTime === 'undefined' || startTime >= endTime) {
-        return res.status(400).json({ error: 'Valid start and end times are required.' });
+    // 1. Standalone Upload Flow
+    if (videoKey) {
+        if (!title) {
+            return res.status(400).json({ error: 'Title is required for standalone highlights.' });
+        }
+
+        // Validate R2 video key
+        const videoExists = await storageService.checkFileExists(videoKey);
+        if (!videoExists) {
+            return res.status(400).json({ error: `The specified video key '${videoKey}' does not exist in R2.` });
+        }
+
+        // Validate R2 thumbnail key if provided
+        if (thumbnailKey) {
+            const thumbExists = await storageService.checkFileExists(thumbnailKey);
+            if (!thumbExists) {
+                return res.status(400).json({ error: `The specified thumbnail key '${thumbnailKey}' does not exist in R2.` });
+            }
+        }
+
+        const highlight = new Highlight({
+            user: userId,
+            title,
+            videoKey,
+            thumbnailKey,
+            storageProvider: 'r2',
+            status: 'processing',
+            isApproved: userRole === 'admin', // Auto-approve for admins
+        });
+
+        const createdHighlight = await highlight.save();
+
+        // Queue background processing
+        await uploadQueue.add('process-highlight', {
+            highlightId: createdHighlight._id,
+            videoKey,
+            thumbnailKey,
+        }, {
+            attempts: 3,
+            backoff: { type: 'exponential', delay: 5000 },
+            removeOnComplete: true,
+        });
+
+        return res.status(201).json({
+            message: 'Highlight upload received and is being processed.',
+            highlightId: createdHighlight._id,
+            status: 'processing'
+        });
     }
 
-    if (!mongoose.Types.ObjectId.isValid(contentId)) {
-        return res.status(400).json({ error: 'Invalid content ID.' });
+    // 2. Timeframe-based Flow (Existing)
+    if (typeof startTime === 'undefined' || typeof endTime === 'undefined' || startTime >= endTime) {
+        return res.status(400).json({ error: 'Valid start and end times are required for timeframe highlights.' });
+    }
+
+    if (!contentId || !mongoose.Types.ObjectId.isValid(contentId)) {
+        return res.status(400).json({ error: 'Invalid or missing content ID.' });
     }
 
     const content = await Content.findById(contentId).populate('highlights');
@@ -42,11 +95,6 @@ const createHighlight = asyncHandler(async (req, res) => {
     let highlightUrl = null;
     if (content.storageProvider === 'cloudinary' && content.cloudinary_video_id) {
         highlightUrl = `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/video/upload/e_accelerate:50,so_${startTime},eo_${endTime}/${content.cloudinary_video_id}.mp4`;
-    } else if (content.storageProvider === 'r2' && content.videoKey) {
-        // For R2, manual highlight creation via API doesn't automatically trigger the media processor
-        // to cut the video. In a real-world scenario, we'd either queue a job or handle it here.
-        // For now, we'll mark the URL if we can, but usually manual highlights might need processing.
-        // If there's no storageKey yet, it won't have a URL.
     }
 
     const highlight = new Highlight({
@@ -57,6 +105,8 @@ const createHighlight = asyncHandler(async (req, res) => {
         title: title || content.title,
         storageProvider: content.storageProvider,
         highlightUrl: highlightUrl,
+        status: content.storageProvider === 'r2' ? 'processing' : 'completed',
+        isApproved: content.isApproved || userRole === 'admin',
     });
 
     const createdHighlight = await highlight.save();
@@ -66,6 +116,26 @@ const createHighlight = asyncHandler(async (req, res) => {
         content.highlightUrl = highlightUrl;
     }
     await content.save();
+
+    // For R2, timeframe highlights also need background processing to cut the video
+    if (content.storageProvider === 'r2') {
+        await uploadQueue.add('process-highlight', {
+            highlightId: createdHighlight._id,
+            contentId: content._id,
+            startTime,
+            endTime,
+        }, {
+            attempts: 3,
+            backoff: { type: 'exponential', delay: 5000 },
+            removeOnComplete: true,
+        });
+
+        return res.status(201).json({
+            message: 'Highlight timeframe received and is being processed.',
+            highlightId: createdHighlight._id,
+            status: 'processing'
+        });
+    }
 
     res.status(201).json(createdHighlight);
 });
@@ -80,10 +150,16 @@ const getHighlightsByCreator = asyncHandler(async (req, res) => {
         return res.status(400).json({ error: 'Invalid creator ID.' });
     }
 
-    // Find approved content for the creator
-    const approvedContentIds = await Content.find({ user: creatorId, isApproved: true }).distinct('_id');
+    // Find highlights for the creator that are either standalone and approved OR linked to approved content
+    const creatorApprovedContentIds = await Content.find({ user: creatorId, isApproved: true }).distinct('_id');
 
-    const highlights = await Highlight.find({ user: creatorId, content: { $in: approvedContentIds } })
+    const highlights = await Highlight.find({
+        user: creatorId,
+        $or: [
+            { content: { $in: creatorApprovedContentIds } },
+            { content: { $exists: false }, isApproved: true }
+        ]
+    })
         .populate({
             path: 'content',
             select: 'title thumbnail views description category createdAt likesCount commentsCount comments likes',
@@ -101,10 +177,16 @@ const getHighlightsByCreator = asyncHandler(async (req, res) => {
 // @route GET /api/highlights/recent
 // @access Public
 const getRecentHighlights = asyncHandler(async (req, res) => {
-    // Find IDs of all approved content
-    const approvedContentIds = await Content.find({ isApproved: true }).distinct('_id');
+    // We use a query with $in which is generally efficient as long as the array isn't massive.
+    // To keep it safe and scalable, we limit the search space for content IDs.
+    const approvedContentIds = await Content.find({ isApproved: true }).sort({ createdAt: -1 }).limit(1000).distinct('_id');
 
-    const highlights = await Highlight.find({ content: { $in: approvedContentIds } })
+    const highlights = await Highlight.find({
+        $or: [
+            { content: { $in: approvedContentIds } },
+            { content: { $exists: false }, isApproved: true }
+        ]
+    })
         .sort({ createdAt: -1 })
         .limit(10)
         .populate({
@@ -124,10 +206,15 @@ const getRecentHighlights = asyncHandler(async (req, res) => {
 // @route GET /api/highlights/all
 // @access Public
 const getAllHighlights = asyncHandler(async (req, res) => {
-    // Find IDs of all approved content
-    const approvedContentIds = await Content.find({ isApproved: true }).distinct('_id');
+    // For "all" feed, we also limit to a reasonable number of recent approved content IDs for performance
+    const approvedContentIds = await Content.find({ isApproved: true }).sort({ createdAt: -1 }).limit(2000).distinct('_id');
 
-    const highlights = await Highlight.find({ content: { $in: approvedContentIds } })
+    const highlights = await Highlight.find({
+        $or: [
+            { content: { $in: approvedContentIds } },
+            { content: { $exists: false }, isApproved: true }
+        ]
+    })
         .sort({ createdAt: -1 })
         .populate({
             path: 'content',
@@ -165,11 +252,19 @@ const deleteHighlight = asyncHandler(async (req, res) => {
         return res.status(403).json({ message: 'User not authorized to delete this highlight' });
     }
 
-    // Find the content associated with the highlight and remove the reference
-    await Content.updateOne(
-        { highlights: highlightId },
-        { $pull: { highlights: highlightId } }
-    );
+    // If it was linked to content, remove the reference
+    if (highlight.content) {
+        await Content.updateOne(
+            { _id: highlight.content },
+            { $pull: { highlights: highlightId } }
+        );
+    }
+
+    // Delete R2 assets if they exist
+    if (highlight.storageProvider === 'r2') {
+        if (highlight.storageKey) await storageService.delete(highlight.storageKey, 'r2');
+        if (highlight.thumbnailKey) await storageService.delete(highlight.thumbnailKey, 'r2');
+    }
 
     await Highlight.findByIdAndDelete(highlightId);
 

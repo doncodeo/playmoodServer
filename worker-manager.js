@@ -55,6 +55,8 @@ const mainProcessor = async (job) => {
             return await processShortPreviewGeneration(job);
         case 'process-feed-post':
             return await processFeedPost(job);
+        case 'process-highlight':
+            return await processHighlight(job);
         default:
             throw new Error(`Unknown job name: ${job.name}`);
     }
@@ -237,6 +239,119 @@ const processFeedPost = async (job) => {
             failedPost.status = 'failed';
             await failedPost.save();
         }
+        throw error;
+    }
+};
+
+const processHighlight = async (job) => {
+    const { highlightId, contentId, startTime, endTime, videoKey, thumbnailKey } = job.data;
+    console.log(`[Worker] Starting 'process-highlight' for highlight ID: ${highlightId}`);
+
+    try {
+        const highlight = await Highlight.findById(highlightId);
+        if (!highlight) {
+            throw new Error(`Highlight with ID ${highlightId} not found.`);
+        }
+
+        const userId = highlight.user._id ? highlight.user._id.toString() : highlight.user.toString();
+        const tempVideoPath = path.join(os.tmpdir(), `v-h-proc-${Date.now()}.mp4`);
+
+        try {
+            // Case 1: Timeframe-based highlight (needs cutting)
+            if (contentId) {
+                const content = await contentSchema.findById(contentId);
+                if (!content) throw new Error(`Content ${contentId} not found for highlight.`);
+
+                await storageService.downloadFromR2(content.videoKey, tempVideoPath);
+                const duration = endTime - startTime;
+                const highlightPath = await mediaProcessor.extractHighlight(tempVideoPath, startTime, duration);
+
+                const highlightStream = fs.createReadStream(highlightPath);
+                const highlightName = storageService.generateFileName('highlight.mp4', `${userId}/`);
+                const uploadResult = await storageService.uploadToR2(
+                    highlightStream,
+                    highlightName,
+                    'video/mp4',
+                    storageService.namespaces.HIGHLIGHTS
+                );
+
+                highlight.storageKey = uploadResult.key;
+                highlight.highlightUrl = uploadResult.url;
+                highlight.status = 'completed';
+                await highlight.save();
+
+                if (fs.existsSync(highlightPath)) fs.unlinkSync(highlightPath);
+                console.log(`[Worker] Timeframe-based highlight ${highlightId} processed.`);
+            }
+            // Case 2: Standalone upload
+            else if (videoKey) {
+                await storageService.downloadFromR2(videoKey, tempVideoPath);
+
+                // 1. Extract Metadata
+                const metadata = await mediaProcessor.getMetadata(tempVideoPath);
+                highlight.duration = metadata.format.duration;
+
+                // 2. Handle Thumbnail
+                if (thumbnailKey) {
+                    const tempThumbPath = path.join(os.tmpdir(), `t-h-${Date.now()}.jpg`);
+                    try {
+                        await storageService.downloadFromR2(thumbnailKey, tempThumbPath);
+                        const thumbStream = fs.createReadStream(tempThumbPath);
+                        const thumbName = storageService.generateFileName('thumb.jpg', `${userId}/`);
+                        const thumbUpload = await storageService.uploadToR2(
+                            thumbStream,
+                            thumbName,
+                            'image/jpeg',
+                            storageService.namespaces.THUMBNAILS
+                        );
+                        highlight.thumbnail = thumbUpload.url;
+                        highlight.thumbnailKey = thumbUpload.key;
+                        await storageService.delete(thumbnailKey); // Clean up raw
+                    } finally {
+                        if (fs.existsSync(tempThumbPath)) fs.unlinkSync(tempThumbPath);
+                    }
+                } else {
+                    // Extract from video
+                    const thumbPath = await mediaProcessor.extractThumbnail(tempVideoPath);
+                    const thumbStream = fs.createReadStream(thumbPath);
+                    const thumbName = storageService.generateFileName('thumb.jpg', `${userId}/`);
+                    const thumbUpload = await storageService.uploadToR2(
+                        thumbStream,
+                        thumbName,
+                        'image/jpeg',
+                        storageService.namespaces.THUMBNAILS
+                    );
+                    highlight.thumbnail = thumbUpload.url;
+                    highlight.thumbnailKey = thumbUpload.key;
+                    if (fs.existsSync(thumbPath)) fs.unlinkSync(thumbPath);
+                }
+
+                // 3. Move video to processed
+                const videoStream = fs.createReadStream(tempVideoPath);
+                const videoName = storageService.generateFileName('highlight.mp4', `${userId}/`);
+                const videoUpload = await storageService.uploadToR2(
+                    videoStream,
+                    videoName,
+                    'video/mp4',
+                    storageService.namespaces.HIGHLIGHTS
+                );
+
+                highlight.storageKey = videoUpload.key;
+                highlight.highlightUrl = videoUpload.url;
+                highlight.status = 'completed';
+                await highlight.save();
+
+                await storageService.delete(videoKey); // Clean up raw
+                console.log(`[Worker] Standalone highlight ${highlightId} processed.`);
+            }
+        } finally {
+            if (fs.existsSync(tempVideoPath)) fs.unlinkSync(tempVideoPath);
+        }
+
+        return { success: true };
+    } catch (error) {
+        console.error(`[Worker] Error in 'process-highlight' for job ${job.id}:`, error);
+        await Highlight.findByIdAndUpdate(highlightId, { status: 'failed' });
         throw error;
     }
 };

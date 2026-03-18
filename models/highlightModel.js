@@ -18,30 +18,53 @@ const highlightSchema = new mongoose.Schema(
         content: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'Contents',
-            required: true,
+            required: false, // Now optional for standalone highlights
         },
         title: {
             type: String,
+            required: true,
         },
         startTime: {
             type: Number,
-            required: true,
+            required: false, // Optional for standalone highlights
         },
         endTime: {
             type: Number,
-            required: true,
+            required: false, // Optional for standalone highlights
         },
         storageProvider: {
             type: String,
             enum: ['cloudinary', 'r2'],
-            default: 'cloudinary'
+            default: 'r2',
         },
         storageKey: {
+            type: String,
+        },
+        videoKey: {
             type: String,
         },
         highlightUrl: {
             type: String,
             get: enforceHttps,
+        },
+        thumbnail: {
+            type: String,
+            get: enforceHttps,
+        },
+        thumbnailKey: {
+            type: String,
+        },
+        duration: {
+            type: Number,
+        },
+        status: {
+            type: String,
+            enum: ['processing', 'completed', 'failed'],
+            default: 'completed',
+        },
+        isApproved: {
+            type: Boolean,
+            default: false,
         },
     },
     {
