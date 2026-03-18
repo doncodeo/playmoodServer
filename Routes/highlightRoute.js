@@ -44,7 +44,12 @@ router.route('/:id').delete(protect, deleteHighlight);
  * /api/highlights:
  *   post:
  *     summary: Create a new highlight
- *     description: Creates a new highlight for a video. This is available to the content creator or an admin. Timelines of highlights for the same content cannot overlap.
+ *     description: |
+ *       Creates a new highlight. Supports two methods:
+ *       1. **Timeframe-based:** Select a segment from existing content.
+ *       2. **Standalone Upload:** Upload a new video file specifically as a highlight.
+ *
+ *       Standalone highlights are not linked to existing content and can be uploaded directly to R2.
  *     tags: [Highlights]
  *     security:
  *       - bearerAuth: []
@@ -54,23 +59,31 @@ router.route('/:id').delete(protect, deleteHighlight);
  *         application/json:
  *           schema:
  *             type: object
- *             required:
- *               - contentId
- *               - startTime
- *               - endTime
  *             properties:
- *               contentId:
- *                 type: string
- *                 description: The ID of the content to create a highlight for.
- *               startTime:
- *                 type: number
- *                 description: The start time of the highlight in seconds.
- *               endTime:
- *                 type: number
- *                 description: The end time of the highlight in seconds.
  *               title:
  *                 type: string
- *                 description: An optional custom title for the highlight.
+ *                 description: The title of the highlight (Required for standalone).
+ *                 example: "Incredible Goal!"
+ *               contentId:
+ *                 type: string
+ *                 description: (Timeframe only) The ID of the content to create a highlight from.
+ *                 example: "60d0fe4f5311236168a109ca"
+ *               startTime:
+ *                 type: number
+ *                 description: (Timeframe only) Start time in seconds.
+ *                 example: 10
+ *               endTime:
+ *                 type: number
+ *                 description: (Timeframe only) End time in seconds.
+ *                 example: 20
+ *               videoKey:
+ *                 type: string
+ *                 description: (Standalone only) The R2 key of the uploaded video file.
+ *                 example: "raw/user123/123456789-abc.mp4"
+ *               thumbnailKey:
+ *                 type: string
+ *                 description: (Standalone only) Optional R2 key for a custom thumbnail.
+ *                 example: "raw/user123/123456789-thumb.jpg"
  *     responses:
  *       201:
  *         description: Highlight created successfully.
