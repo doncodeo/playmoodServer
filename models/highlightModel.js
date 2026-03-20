@@ -64,7 +64,7 @@ const highlightSchema = new mongoose.Schema(
         },
         isApproved: {
             type: Boolean,
-            default: false,
+            default: true, // Default to true for all highlights (clipping or standalone)
         },
     },
     {
