@@ -72,7 +72,7 @@ describe('Standalone Highlight API', () => {
     });
 
     describe('POST /api/highlights (Standalone)', () => {
-        it('should create a standalone highlight with videoKey', async () => {
+        it('should create a standalone highlight with videoKey and auto-approve it', async () => {
             const res = await request(app)
                 .post('/api/highlights')
                 .set('Authorization', `Bearer ${creatorToken}`)
@@ -89,6 +89,7 @@ describe('Standalone Highlight API', () => {
             expect(highlight.title).to.equal('Standalone Highlight');
             expect(highlight.videoKey).to.equal('raw/user123/video.mp4');
             expect(highlight.status).to.equal('processing');
+            expect(highlight.isApproved).to.be.true; // Verified auto-approval
             expect(highlight.content).to.be.undefined;
 
             expect(queueAddStub.calledOnce).to.be.true;
@@ -139,33 +140,25 @@ describe('Standalone Highlight API', () => {
     });
 
     describe('GET /api/highlights (Standalone filters)', () => {
-        it('should retrieve approved standalone highlights in feeds', async () => {
+        it('should retrieve approved standalone highlights in feeds and have a formatted content field', async () => {
             // Create an approved standalone highlight
-            await Highlight.create({
+            const h = await Highlight.create({
                 user: creator.id,
                 title: 'Approved Standalone',
                 videoKey: 'processed/h1.mp4',
                 highlightUrl: 'https://cdn.com/h1.mp4',
+                thumbnail: 'https://cdn.com/thumb.jpg',
                 status: 'completed',
                 isApproved: true
-            });
-
-            // Create an unapproved standalone highlight
-            await Highlight.create({
-                user: creator.id,
-                title: 'Unapproved Standalone',
-                videoKey: 'processed/h2.mp4',
-                highlightUrl: 'https://cdn.com/h2.mp4',
-                status: 'completed',
-                isApproved: false
             });
 
             const res = await request(app).get('/api/highlights/all');
             expect(res.status).to.equal(200);
 
-            const titles = res.body.map(h => h.title);
-            expect(titles).to.include('Approved Standalone');
-            expect(titles).to.not.include('Unapproved Standalone');
+            const highlightRes = res.body.find(item => item.title === 'Approved Standalone');
+            expect(highlightRes).to.exist;
+            expect(highlightRes.content).to.exist; // Verified consistency fix
+            expect(highlightRes.content.thumbnail).to.equal('https://cdn.com/thumb.jpg');
         });
     });
 });

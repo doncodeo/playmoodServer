@@ -40,7 +40,7 @@ const createHighlight = asyncHandler(async (req, res) => {
             thumbnailKey,
             storageProvider: 'r2',
             status: 'processing',
-            isApproved: userRole === 'admin', // Auto-approve for admins
+            isApproved: true, // Auto-approve all highlights per feedback
         });
 
         const createdHighlight = await highlight.save();
@@ -106,7 +106,7 @@ const createHighlight = asyncHandler(async (req, res) => {
         storageProvider: content.storageProvider,
         highlightUrl: highlightUrl,
         status: content.storageProvider === 'r2' ? 'processing' : 'completed',
-        isApproved: content.isApproved || userRole === 'admin',
+        isApproved: true, // Auto-approve all highlights per feedback
     });
 
     const createdHighlight = await highlight.save();
@@ -140,6 +140,33 @@ const createHighlight = asyncHandler(async (req, res) => {
     res.status(201).json(createdHighlight);
 });
 
+/**
+ * Helper to ensure standalone highlights have a consistent structure for the frontend,
+ * especially regarding the "content" field and thumbnails.
+ */
+const formatHighlightResponse = (highlight) => {
+    const h = highlight.toObject();
+
+    // If standalone (no linked content), create a mock content object
+    // to prevent frontend "Cannot read property of undefined" errors.
+    if (!h.content) {
+        h.content = {
+            _id: h._id,
+            title: h.title,
+            thumbnail: h.thumbnail,
+            user: h.user,
+            createdAt: h.createdAt,
+            // Standalone highlights act as their own content
+            video: h.highlightUrl,
+            description: 'Standalone Highlight',
+            views: 0,
+            likesCount: 0,
+            commentsCount: 0
+        };
+    }
+    return h;
+};
+
 // @desc Get all highlights for a specific creator
 // @route GET /api/highlights/creator/:creatorId
 // @access Public
@@ -170,15 +197,13 @@ const getHighlightsByCreator = asyncHandler(async (req, res) => {
         })
         .populate('user', 'name profileImage');
 
-    res.status(200).json(highlights);
+    res.status(200).json(highlights.map(formatHighlightResponse));
 });
 
 // @desc Get recent highlights
 // @route GET /api/highlights/recent
 // @access Public
 const getRecentHighlights = asyncHandler(async (req, res) => {
-    // We use a query with $in which is generally efficient as long as the array isn't massive.
-    // To keep it safe and scalable, we limit the search space for content IDs.
     const approvedContentIds = await Content.find({ isApproved: true }).sort({ createdAt: -1 }).limit(1000).distinct('_id');
 
     const highlights = await Highlight.find({
@@ -199,14 +224,13 @@ const getRecentHighlights = asyncHandler(async (req, res) => {
         })
         .populate('user', 'name profileImage');
 
-    res.status(200).json(highlights);
+    res.status(200).json(highlights.map(formatHighlightResponse));
 });
 
 // @desc Get all highlights
 // @route GET /api/highlights/all
 // @access Public
 const getAllHighlights = asyncHandler(async (req, res) => {
-    // For "all" feed, we also limit to a reasonable number of recent approved content IDs for performance
     const approvedContentIds = await Content.find({ isApproved: true }).sort({ createdAt: -1 }).limit(2000).distinct('_id');
 
     const highlights = await Highlight.find({
@@ -226,7 +250,7 @@ const getAllHighlights = asyncHandler(async (req, res) => {
         })
         .populate('user', 'name profileImage');
 
-    res.status(200).json(highlights);
+    res.status(200).json(highlights.map(formatHighlightResponse));
 });
 
 // @desc    Delete a highlight

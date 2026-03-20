@@ -259,7 +259,7 @@ const processHighlight = async (job) => {
         try {
             // Case 1: Timeframe-based highlight (needs cutting)
             if (contentId) {
-                const content = await contentSchema.findById(contentId);
+                const content = await mongoose.model('Contents').findById(contentId);
                 if (!content) throw new Error(`Content ${contentId} not found for highlight.`);
 
                 await storageService.downloadFromR2(content.videoKey, tempVideoPath);
@@ -278,6 +278,7 @@ const processHighlight = async (job) => {
                 highlight.storageKey = uploadResult.key;
                 highlight.highlightUrl = uploadResult.url;
                 highlight.status = 'completed';
+                highlight.isApproved = true; // Ensure isApproved is true after processing
                 await highlight.save();
 
                 if (fs.existsSync(highlightPath)) fs.unlinkSync(highlightPath);
@@ -339,6 +340,7 @@ const processHighlight = async (job) => {
                 highlight.storageKey = videoUpload.key;
                 highlight.highlightUrl = videoUpload.url;
                 highlight.status = 'completed';
+                highlight.isApproved = true; // Ensure isApproved is true after processing
                 await highlight.save();
 
                 await storageService.delete(videoKey); // Clean up raw
