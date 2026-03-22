@@ -226,11 +226,12 @@ const getCreatorFeed = asyncHandler(async (req, res) => {
         throw new Error('Creator not found');
     }
 
-    const { feedPosts, thumbnails, shortPreviews, highlights } = creator.feedSettings || {
+    const { feedPosts, thumbnails, shortPreviews, highlights } = {
         feedPosts: true,
         thumbnails: true,
         shortPreviews: true,
-        highlights: true
+        highlights: true,
+        ...(creator.feedSettings || {})
     };
 
     // Exclude content scheduled for future live programs
@@ -238,7 +239,9 @@ const getCreatorFeed = asyncHandler(async (req, res) => {
     const upcomingPrograms = await LiveProgram.find({
         scheduledStart: { $gt: now }
     }).select('contentId');
-    const scheduledContentIds = upcomingPrograms.map(p => p.contentId);
+    const scheduledContentIds = upcomingPrograms
+        .map(p => p.contentId)
+        .filter(id => id != null);
 
     const pipeline = [];
 
@@ -362,7 +365,13 @@ const getAllCreatorsFeed = asyncHandler(async (req, res) => {
     };
 
     creators.forEach(creator => {
-        const settings = creator.feedSettings || { feedPosts: true, thumbnails: true, shortPreviews: true, highlights: true };
+        const settings = {
+            feedPosts: true,
+            thumbnails: true,
+            shortPreviews: true,
+            highlights: true,
+            ...(creator.feedSettings || {})
+        };
         if (settings.feedPosts) settingsMap.feedPosts.push(creator._id);
         if (settings.thumbnails) settingsMap.thumbnails.push(creator._id);
         if (settings.shortPreviews) settingsMap.shortPreviews.push(creator._id);
@@ -374,7 +383,9 @@ const getAllCreatorsFeed = asyncHandler(async (req, res) => {
     const upcomingPrograms = await LiveProgram.find({
         scheduledStart: { $gt: now }
     }).select('contentId');
-    const scheduledContentIds = upcomingPrograms.map(p => p.contentId);
+    const scheduledContentIds = upcomingPrograms
+        .map(p => p.contentId)
+        .filter(id => id != null);
 
     const pipeline = [];
 
