@@ -201,7 +201,7 @@ const processFeedPost = async (job) => {
                             // Try to find a fallback thumbnail from other media items if available
                             const imageItem = media.find(m => {
                                 const mUrl = m.url || '';
-                                return mUrl.match(/\.(jpg|jpeg|png|webp|gif)(\?.*)?$/i);
+                                return mUrl.match(/\.(jpg|jpeg|png|webp|gif|heic|heif)(\?.*)?$/i);
                             });
 
                             if (imageItem) {
