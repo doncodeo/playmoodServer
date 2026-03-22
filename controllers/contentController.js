@@ -28,7 +28,9 @@ const getContent = asyncHandler(async (req, res) => {
     const upcomingPrograms = await LiveProgram.find({
         scheduledStart: { $gt: now }
     }).select('contentId');
-    const scheduledContentIds = upcomingPrograms.map(p => p.contentId);
+    const scheduledContentIds = upcomingPrograms
+        .map(p => p.contentId)
+        .filter(id => id != null);
 
     const content = await contentSchema.find({
         isApproved: true,
@@ -59,7 +61,9 @@ const getRecentContent = asyncHandler(async (req, res) => {
         const upcomingPrograms = await LiveProgram.find({
             scheduledStart: { $gt: now }
         }).select('contentId');
-        const scheduledContentIds = upcomingPrograms.map(p => p.contentId);
+        const scheduledContentIds = upcomingPrograms
+            .map(p => p.contentId)
+            .filter(id => id != null);
 
         const recentContents = await contentSchema.find({
             isApproved: true,
@@ -103,7 +107,9 @@ const getTopTenContent = asyncHandler(async (req, res) => {
         const upcomingPrograms = await LiveProgram.find({
             scheduledStart: { $gt: now }
         }).select('contentId');
-        const scheduledContentIds = upcomingPrograms.map(p => p.contentId);
+        const scheduledContentIds = upcomingPrograms
+            .map(p => p.contentId)
+            .filter(id => id != null);
 
         const topContents = await contentSchema.find({
             isApproved: true,
@@ -186,7 +192,9 @@ const getRecentCreatorContent = asyncHandler(async (req, res) => {
         const upcomingPrograms = await LiveProgram.find({
             scheduledStart: { $gt: now }
         }).select('contentId');
-        const scheduledContentIds = upcomingPrograms.map(p => p.contentId);
+        const scheduledContentIds = upcomingPrograms
+            .map(p => p.contentId)
+            .filter(id => id != null);
 
         // Fetch the most recent approved content
         const recentContent = await contentSchema.findOne({
@@ -1082,7 +1090,9 @@ const ContinueWatching = asyncHandler(async (req, res) => {
         const upcomingPrograms = await LiveProgram.find({
             scheduledStart: { $gt: now }
         }).select('contentId');
-        const scheduledContentIds = upcomingPrograms.map(p => p.contentId);
+        const scheduledContentIds = upcomingPrograms
+            .map(p => p.contentId)
+            .filter(id => id != null);
 
         const user = await userSchema.findById(userId).populate({
             path: 'videoProgress.contentId',
@@ -1215,7 +1225,9 @@ const getWatchlist = asyncHandler(async (req, res) => {
         const upcomingPrograms = await LiveProgram.find({
             scheduledStart: { $gt: now }
         }).select('contentId');
-        const scheduledContentIds = upcomingPrograms.map(p => p.contentId);
+        const scheduledContentIds = upcomingPrograms
+            .map(p => p.contentId)
+            .filter(id => id != null);
 
         const user = await userSchema.findById(userId).populate({
             path: 'watchlist',
@@ -1452,7 +1464,9 @@ const getOnlyOnPlaymoodContent = asyncHandler(async (req, res) => {
     const upcomingPrograms = await LiveProgram.find({
         scheduledStart: { $gt: now }
     }).select('contentId');
-    const scheduledContentIds = upcomingPrograms.map(p => p.contentId);
+    const scheduledContentIds = upcomingPrograms
+        .map(p => p.contentId)
+        .filter(id => id != null);
 
     const content = await contentSchema.find({
         isApproved: true,

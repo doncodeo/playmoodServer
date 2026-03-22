@@ -37,7 +37,9 @@ class RecommendationService {
         const upcomingPrograms = await LiveProgram.find({
             scheduledStart: { $gt: now }
         }).select('contentId');
-        const scheduledContentIds = upcomingPrograms.map(p => p.contentId);
+        const scheduledContentIds = upcomingPrograms
+            .map(p => p.contentId)
+            .filter(id => id != null);
 
         // OPTIMIZATION: In production, use a more restricted query or vector database.
         // For now, we fetch a limited set of recent/popular content to score to avoid OOM.
