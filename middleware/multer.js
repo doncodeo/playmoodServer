@@ -11,6 +11,8 @@ const fileFilter = (req, file, cb) => {
         'image/gif', // .gif
         'image/bmp', // .bmp
         'image/webp', // .webp
+        'image/heic', // .heic
+        'image/heif', // .heif
         'video/mp4', // .mp4
         'video/mpeg', // .mpeg
         'video/quicktime', // .mov

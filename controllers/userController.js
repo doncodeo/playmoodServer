@@ -519,7 +519,7 @@ const updateUser = asyncHandler(async (req, res) => {
             const file64 = parser.format(fileExtension, fileBuffer);
 
             // Validate file type
-            const allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
+            const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/heic', 'image/heif'];
             if (!allowedTypes.includes(file64.mimetype)) {
                 console.log(
                     `[${getTimestamp()}] WARN: Invalid file type for profile image - userId: ${userId}, mimetype: ${
