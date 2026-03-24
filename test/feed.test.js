@@ -111,8 +111,47 @@ describe('Feed API', function() {
       }
 
       const feedTypes = res.body.map(item => item.feedType);
-      if (!feedTypes.includes('feedPost') || !feedTypes.includes('thumbnail')) {
+      if (!feedTypes.includes('feedPost') || !feedTypes.includes('content')) {
           throw new Error('Missing expected feed types');
+      }
+    });
+
+    it('should merge content and highlights for the same content ID', async () => {
+      // Create a Content
+      const content = await Content.create({
+        user: creatorId,
+        title: 'Merge Video',
+        category: 'Test',
+        description: 'Test',
+        credit: 'Test',
+        video: 'http://example.com/video.mp4',
+        thumbnail: 'http://example.com/thumb.jpg',
+        isApproved: true,
+        createdAt: new Date(Date.now() - 10000) // 10 seconds ago
+      });
+
+      // Create a Highlight for that content
+      await Highlight.create({
+        user: creatorId,
+        content: content._id,
+        title: 'Merge Highlight',
+        startTime: 0,
+        endTime: 10,
+        isApproved: true,
+        createdAt: new Date() // Now
+      });
+
+      const res = await request(app)
+        .get(`/api/feed/user/${creatorId}`)
+        .expect(200);
+
+      // Should be 1 merged item, not 2 separate items
+      if (res.body.length !== 1) {
+          throw new Error(`Expected 1 merged item, got ${res.body.length}`);
+      }
+
+      if (res.body[0].feedType !== 'content') {
+          throw new Error(`Expected feedType 'content', got ${res.body[0].feedType}`);
       }
     });
 

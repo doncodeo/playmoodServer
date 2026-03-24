@@ -211,7 +211,7 @@ const addCommentToFeedPost = asyncHandler(async (req, res) => {
 const getCreatorFeed = asyncHandler(async (req, res) => {
     const { userId } = req.params;
     const pageNum = parseInt(req.query.page) || 1;
-    const limitNum = parseInt(req.query.limit) || 10;
+    const limitNum = parseInt(req.query.limit) || 20;
     const skipNum = (pageNum - 1) * limitNum;
 
     if (!mongoose.Types.ObjectId.isValid(userId)) {
@@ -260,7 +260,7 @@ const getCreatorFeed = asyncHandler(async (req, res) => {
         pipeline.push({ $match: { _id: null } });
     }
 
-    if (thumbnails) {
+    if (thumbnails || shortPreviews) {
         pipeline.push({
             $unionWith: {
                 coll: 'contents',
@@ -269,7 +269,6 @@ const getCreatorFeed = asyncHandler(async (req, res) => {
                         $match: {
                             user: new mongoose.Types.ObjectId(userId),
                             isApproved: true,
-                            thumbnail: { $ne: null },
                             _id: { $nin: scheduledContentIds },
                             $or: [
                                 { scheduledReleaseDate: { $exists: false } },
@@ -277,32 +276,25 @@ const getCreatorFeed = asyncHandler(async (req, res) => {
                             ]
                         }
                     },
-                    { $addFields: { feedType: 'thumbnail' } },
-                    { $project: { user: 1, title: 1, thumbnail: 1, createdAt: 1, feedType: 1 } }
-                ]
-            }
-        });
-    }
-
-    if (shortPreviews) {
-        pipeline.push({
-            $unionWith: {
-                coll: 'contents',
-                pipeline: [
+                    { $addFields: { feedType: 'content' } },
                     {
-                        $match: {
-                            user: new mongoose.Types.ObjectId(userId),
-                            isApproved: true,
-                            shortPreview: { $ne: null },
-                            _id: { $nin: scheduledContentIds },
-                            $or: [
-                                { scheduledReleaseDate: { $exists: false } },
-                                { scheduledReleaseDate: { $lte: now } }
-                            ]
+                        $project: {
+                            user: 1,
+                            title: 1,
+                            thumbnail: 1,
+                            shortPreview: 1,
+                            shortPreviewUrl: 1,
+                            shortPreviewViews: 1,
+                            highlightUrl: 1,
+                            createdAt: 1,
+                            feedType: 1,
+                            views: 1,
+                            likes: 1,
+                            comments: 1,
+                            category: 1,
+                            description: 1
                         }
-                    },
-                    { $addFields: { feedType: 'shortPreview' } },
-                    { $project: { user: 1, title: 1, shortPreview: 1, shortPreviewUrl: 1, shortPreviewViews: 1, highlightUrl: 1, createdAt: 1, feedType: 1 } }
+                    }
                 ]
             }
         });
@@ -324,6 +316,54 @@ const getCreatorFeed = asyncHandler(async (req, res) => {
             }
         });
     }
+
+    // Sort such that 'content' type is preferred as the primary document when grouping
+    pipeline.push({
+        $addFields: {
+            priority: {
+                $switch: {
+                    branches: [
+                        { case: { $eq: ["$feedType", "content"] }, then: 1 },
+                        { case: { $eq: ["$feedType", "feedPost"] }, then: 2 },
+                        { case: { $eq: ["$feedType", "highlight"] }, then: 3 }
+                    ],
+                    default: 4
+                }
+            }
+        }
+    });
+    pipeline.push({ $sort: { priority: 1, createdAt: -1 } });
+
+    // Group by content ID to merge multiple highlights and content entries into a single feed item per upload
+    // Standalone highlights and FeedPosts will have null for 'content', so we use their own '_id' as the fallback grouping key.
+    pipeline.push({
+        $group: {
+            _id: { $ifNull: ["$content", "$_id"] },
+            doc: { $first: "$$ROOT" },
+            // Collect fields from the original Content document if it's merged with a Highlight
+            mergedShortPreviewUrl: { $max: "$shortPreviewUrl" },
+            mergedThumbnail: { $max: "$thumbnail" },
+            mergedViews: { $max: "$views" },
+            // Use the most recent activity date (e.g. from a new highlight) as the sorting date
+            latestCreatedAt: { $max: "$createdAt" }
+        }
+    });
+
+    pipeline.push({
+        $replaceRoot: {
+            newRoot: {
+                $mergeObjects: [
+                    "$doc",
+                    {
+                        shortPreviewUrl: { $ifNull: ["$doc.shortPreviewUrl", "$mergedShortPreviewUrl"] },
+                        thumbnail: { $ifNull: ["$doc.thumbnail", "$mergedThumbnail"] },
+                        views: { $ifNull: ["$doc.views", "$mergedViews"] },
+                        createdAt: "$latestCreatedAt"
+                    }
+                ]
+            }
+        }
+    });
 
     pipeline.push({ $sort: { createdAt: -1 } });
     pipeline.push({ $skip: skipNum });
@@ -347,13 +387,13 @@ const getCreatorFeed = asyncHandler(async (req, res) => {
 // @access  Public
 const getAllCreatorsFeed = asyncHandler(async (req, res) => {
     const pageNum = parseInt(req.query.page) || 1;
-    const limitNum = parseInt(req.query.limit) || 10;
+    const limitNum = parseInt(req.query.limit) || 20;
     const { seed: querySeed } = req.query;
     const seed = querySeed ? parseInt(querySeed) : Math.floor(Math.random() * 10000);
 
     // To ensure scalability, we limit the number of items we fetch for the randomized pool.
     // A real-world application might use a dedicated feed service or more complex caching.
-    const POOL_LIMIT = 1000;
+    const POOL_LIMIT = 2000;
 
     const creators = await User.find({ role: 'creator' }).select('_id feedSettings').lean();
 
@@ -397,16 +437,15 @@ const getAllCreatorsFeed = asyncHandler(async (req, res) => {
         pipeline.push({ $match: { _id: null } });
     }
 
-    if (settingsMap.thumbnails.length > 0) {
+    if (settingsMap.thumbnails.length > 0 || settingsMap.shortPreviews.length > 0) {
         pipeline.push({
             $unionWith: {
                 coll: 'contents',
                 pipeline: [
                     {
                         $match: {
-                            user: { $in: settingsMap.thumbnails },
+                            user: { $in: [...new Set([...settingsMap.thumbnails, ...settingsMap.shortPreviews])] },
                             isApproved: true,
-                            thumbnail: { $ne: null },
                             _id: { $nin: scheduledContentIds },
                             $or: [
                                 { scheduledReleaseDate: { $exists: false } },
@@ -414,32 +453,25 @@ const getAllCreatorsFeed = asyncHandler(async (req, res) => {
                             ]
                         }
                     },
-                    { $addFields: { feedType: 'thumbnail' } },
-                    { $project: { user: 1, title: 1, thumbnail: 1, createdAt: 1, feedType: 1 } }
-                ]
-            }
-        });
-    }
-
-    if (settingsMap.shortPreviews.length > 0) {
-        pipeline.push({
-            $unionWith: {
-                coll: 'contents',
-                pipeline: [
+                    { $addFields: { feedType: 'content' } },
                     {
-                        $match: {
-                            user: { $in: settingsMap.shortPreviews },
-                            isApproved: true,
-                            shortPreview: { $ne: null },
-                            _id: { $nin: scheduledContentIds },
-                            $or: [
-                                { scheduledReleaseDate: { $exists: false } },
-                                { scheduledReleaseDate: { $lte: now } }
-                            ]
+                        $project: {
+                            user: 1,
+                            title: 1,
+                            thumbnail: 1,
+                            shortPreview: 1,
+                            shortPreviewUrl: 1,
+                            shortPreviewViews: 1,
+                            highlightUrl: 1,
+                            createdAt: 1,
+                            feedType: 1,
+                            views: 1,
+                            likes: 1,
+                            comments: 1,
+                            category: 1,
+                            description: 1
                         }
-                    },
-                    { $addFields: { feedType: 'shortPreview' } },
-                    { $project: { user: 1, title: 1, shortPreview: 1, shortPreviewUrl: 1, shortPreviewViews: 1, highlightUrl: 1, createdAt: 1, feedType: 1 } }
+                    }
                 ]
             }
         });
@@ -462,7 +494,52 @@ const getAllCreatorsFeed = asyncHandler(async (req, res) => {
         });
     }
 
-    // Fetch the pool of items (e.g., 1000 most recent items across all types)
+    // Sort such that 'content' type is preferred as the primary document when grouping
+    pipeline.push({
+        $addFields: {
+            priority: {
+                $switch: {
+                    branches: [
+                        { case: { $eq: ["$feedType", "content"] }, then: 1 },
+                        { case: { $eq: ["$feedType", "feedPost"] }, then: 2 },
+                        { case: { $eq: ["$feedType", "highlight"] }, then: 3 }
+                    ],
+                    default: 4
+                }
+            }
+        }
+    });
+    pipeline.push({ $sort: { priority: 1, createdAt: -1 } });
+
+    // Group by content ID to merge multiple highlights and content entries into a single feed item per upload
+    pipeline.push({
+        $group: {
+            _id: { $ifNull: ["$content", "$_id"] },
+            doc: { $first: "$$ROOT" },
+            mergedShortPreviewUrl: { $max: "$shortPreviewUrl" },
+            mergedThumbnail: { $max: "$thumbnail" },
+            mergedViews: { $max: "$views" },
+            latestCreatedAt: { $max: "$createdAt" }
+        }
+    });
+
+    pipeline.push({
+        $replaceRoot: {
+            newRoot: {
+                $mergeObjects: [
+                    "$doc",
+                    {
+                        shortPreviewUrl: { $ifNull: ["$doc.shortPreviewUrl", "$mergedShortPreviewUrl"] },
+                        thumbnail: { $ifNull: ["$doc.thumbnail", "$mergedThumbnail"] },
+                        views: { $ifNull: ["$doc.views", "$mergedViews"] },
+                        createdAt: "$latestCreatedAt"
+                    }
+                ]
+            }
+        }
+    });
+
+    // Re-sort and apply POOL_LIMIT
     pipeline.push({ $sort: { createdAt: -1 } });
     pipeline.push({ $limit: POOL_LIMIT });
 
