@@ -83,7 +83,38 @@ const createHighlight = asyncHandler(async (req, res) => {
         return res.status(403).json({ error: 'User not authorized to create a highlight for this content.' });
     }
 
-    // Check for overlapping highlights
+    // Check for exact duplicate timeline (ensure numeric comparison)
+    const duplicateHighlight = content.highlights.find(h =>
+        Number(h.startTime) === Number(startTime) && Number(h.endTime) === Number(endTime)
+    );
+
+    if (duplicateHighlight) {
+        // Update existing highlight instead of creating a new one
+        duplicateHighlight.title = title || duplicateHighlight.title;
+        duplicateHighlight.status = content.storageProvider === 'r2' ? 'processing' : 'completed';
+        await duplicateHighlight.save();
+
+        if (content.storageProvider === 'r2') {
+            await uploadQueue.add('process-highlight', {
+                highlightId: duplicateHighlight._id,
+                contentId: content._id,
+                startTime,
+                endTime,
+            }, {
+                attempts: 3,
+                backoff: { type: 'exponential', delay: 5000 },
+                removeOnComplete: true,
+            });
+        }
+
+        return res.status(200).json({
+            message: 'Existing highlight timeline updated and is being re-processed.',
+            highlightId: duplicateHighlight._id,
+            status: 'processing'
+        });
+    }
+
+    // Check for overlapping highlights (excluding exact duplicates which we handled above)
     const isOverlapping = content.highlights.some(highlight =>
         (startTime < highlight.endTime && endTime > highlight.startTime)
     );

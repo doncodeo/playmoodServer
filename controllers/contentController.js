@@ -961,6 +961,9 @@ const deleteContent = asyncHandler(async (req, res) => {
         // Delete any associated live programs
         await LiveProgram.deleteMany({ contentId: id });
 
+        // Delete any associated highlights
+        await Highlight.deleteMany({ content: id });
+
         await contentSchema.findByIdAndDelete(id);
         res.status(200).json({ message: 'Content deleted successfully' });
     } catch (error) {
