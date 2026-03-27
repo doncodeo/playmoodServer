@@ -21,6 +21,11 @@ const createFeedPost = asyncHandler(async (req, res) => {
         throw new Error('Please provide a type and at least one media item');
     }
 
+    if (type === 'image' && process.env.ENABLE_IMAGE_FEEDPOSTS !== 'true') {
+        res.status(400);
+        throw new Error('Image posts are temporarily disabled. Please upload a video instead.');
+    }
+
     const processedMedia = media.map(item => {
         // Enforce HTTPS
         if (item.url) {
@@ -252,6 +257,10 @@ const getCreatorFeed = asyncHandler(async (req, res) => {
     let baseCollection = FeedPost;
     let baseMatch = { user: new mongoose.Types.ObjectId(userId) };
 
+    if (process.env.ENABLE_IMAGE_FEEDPOSTS !== 'true') {
+        baseMatch.type = { $ne: 'image' };
+    }
+
     if (feedPosts) {
         pipeline.push({ $match: baseMatch });
         pipeline.push({ $addFields: { feedType: 'feedPost' } });
@@ -431,7 +440,11 @@ const getAllCreatorsFeed = asyncHandler(async (req, res) => {
 
     // Start with FeedPosts from all relevant creators
     if (settingsMap.feedPosts.length > 0) {
-        pipeline.push({ $match: { user: { $in: settingsMap.feedPosts } } });
+        const matchQuery = { user: { $in: settingsMap.feedPosts } };
+        if (process.env.ENABLE_IMAGE_FEEDPOSTS !== 'true') {
+            matchQuery.type = { $ne: 'image' };
+        }
+        pipeline.push({ $match: matchQuery });
         pipeline.push({ $addFields: { feedType: 'feedPost' } });
     } else {
         pipeline.push({ $match: { _id: null } });

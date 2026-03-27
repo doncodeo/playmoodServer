@@ -14,6 +14,14 @@ describe('Feed API', function() {
   this.timeout(60000);
 
   let app, server;
+
+  before(() => {
+    process.env.ENABLE_IMAGE_FEEDPOSTS = 'true';
+  });
+
+  after(() => {
+    delete process.env.ENABLE_IMAGE_FEEDPOSTS;
+  });
   let token;
   let creatorId;
   let mongoServer;
