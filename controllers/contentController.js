@@ -464,7 +464,7 @@ const createContent = asyncHandler(async (req, res) => {
             title,
             category,
             description,
-            credit,
+            credit: req.user.name || credit || 'PlaymoodTv',
             shortPreview: { start, end },
             status: 'processing',
             processingStatus,

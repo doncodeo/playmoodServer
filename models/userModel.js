@@ -216,4 +216,30 @@ const userSchema = new mongoose.Schema(
     }
 );
 
+// Automatically update credits on all content if user name changes
+userSchema.post('save', async function (doc, next) {
+    if (this._nameChanged) {
+        try {
+            const Content = mongoose.model('Contents');
+            if (Content) {
+                await Content.updateMany(
+                    { user: doc._id },
+                    { $set: { credit: doc.name } }
+                );
+                console.log(`Updated credits for all content by user: ${doc.name}`);
+            }
+        } catch (error) {
+            console.error('Error updating content credits on user name change:', error);
+        }
+    }
+    next();
+});
+
+userSchema.pre('save', function (next) {
+    if (this.isModified('name')) {
+        this._nameChanged = true;
+    }
+    next();
+});
+
 module.exports = mongoose.model('profiles', userSchema);
