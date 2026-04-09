@@ -280,9 +280,14 @@ const getContentById = asyncHandler(async (req, res) => {
     const userId = req.user ? req.user._id : null;
     const viewerIP = req.ip;
 
-    const content = await contentSchema.findById(id).select('title thumbnail user views createdAt category video description credit likes comments updatedAt shortPreview shortPreviewUrl shortPreviewViews highlightUrl highlights viewers viewerIPs captions scheduledReleaseDate').populate('user', 'name');
+    const content = await contentSchema.findById(id).select('title thumbnail user views createdAt category video description credit likes comments updatedAt shortPreview shortPreviewUrl shortPreviewViews highlightUrl highlights viewers viewerIPs captions scheduledReleaseDate isApproved').populate('user', 'name');
     if (!content) {
         return res.status(404).json({ error: 'Content not found' });
+    }
+
+    // Check if content is approved - restrict to Admin and Owner if not
+    if (!content.isApproved && (!req.user || (req.user.role !== 'admin' && req.user._id.toString() !== content.user._id.toString()))) {
+        return res.status(403).json({ error: 'This content is awaiting approval.' });
     }
 
     const now = new Date();
