@@ -255,7 +255,10 @@ const getCreatorFeed = asyncHandler(async (req, res) => {
     // Otherwise, we use an empty array match on FeedPost or another collection.
 
     let baseCollection = FeedPost;
-    let baseMatch = { user: new mongoose.Types.ObjectId(userId) };
+    let baseMatch = {
+        user: new mongoose.Types.ObjectId(userId),
+        status: 'completed'
+    };
 
     if (process.env.ENABLE_IMAGE_FEEDPOSTS !== 'true') {
         baseMatch.type = { $ne: 'image' };
@@ -317,7 +320,25 @@ const getCreatorFeed = asyncHandler(async (req, res) => {
                     {
                         $match: {
                             user: new mongoose.Types.ObjectId(userId),
+                            isApproved: true,
                             content: { $nin: scheduledContentIds }
+                        }
+                    },
+                    {
+                        $lookup: {
+                            from: 'contents',
+                            localField: 'content',
+                            foreignField: '_id',
+                            as: 'parentContent'
+                        }
+                    },
+                    {
+                        $match: {
+                            $or: [
+                                { content: { $exists: false } },
+                                { content: null },
+                                { 'parentContent.isApproved': true }
+                            ]
                         }
                     },
                     { $addFields: { feedType: 'highlight' } }
@@ -440,7 +461,10 @@ const getAllCreatorsFeed = asyncHandler(async (req, res) => {
 
     // Start with FeedPosts from all relevant creators
     if (settingsMap.feedPosts.length > 0) {
-        const matchQuery = { user: { $in: settingsMap.feedPosts } };
+        const matchQuery = {
+            user: { $in: settingsMap.feedPosts },
+            status: 'completed'
+        };
         if (process.env.ENABLE_IMAGE_FEEDPOSTS !== 'true') {
             matchQuery.type = { $ne: 'image' };
         }
@@ -498,7 +522,25 @@ const getAllCreatorsFeed = asyncHandler(async (req, res) => {
                     {
                         $match: {
                             user: { $in: settingsMap.highlights },
+                            isApproved: true,
                             content: { $nin: scheduledContentIds }
+                        }
+                    },
+                    {
+                        $lookup: {
+                            from: 'contents',
+                            localField: 'content',
+                            foreignField: '_id',
+                            as: 'parentContent'
+                        }
+                    },
+                    {
+                        $match: {
+                            $or: [
+                                { content: { $exists: false } },
+                                { content: null },
+                                { 'parentContent.isApproved': true }
+                            ]
                         }
                     },
                     { $addFields: { feedType: 'highlight' } }

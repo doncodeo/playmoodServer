@@ -375,6 +375,7 @@ const generateShortPreviewForContent = async (content) => {
         }
 
         const tempVideoPath = path.join(os.tmpdir(), `v-pre-${Date.now()}.mp4`);
+        const userId = content.user._id ? content.user._id.toString() : content.user.toString();
         try {
             await storageService.downloadFromR2(content.videoKey, tempVideoPath);
 
@@ -383,7 +384,6 @@ const generateShortPreviewForContent = async (content) => {
 
             const previewPath = await mediaProcessor.extractHighlight(tempVideoPath, startTime, duration);
             const previewStream = fs.createReadStream(previewPath);
-            const userId = content.user._id ? content.user._id.toString() : content.user.toString();
             const previewFileName = storageService.generateFileName('preview.mp4', `${userId}/`);
 
             const uploadResult = await storageService.uploadToR2(
@@ -635,23 +635,34 @@ const handleR2UploadProcessing = async (content, video, thumbnail) => {
             if (fs.existsSync(tempVideoPath)) {
                 const startTime = content.shortPreview.start;
                 const duration = content.shortPreview.end - content.shortPreview.start;
-                const previewPath = await mediaProcessor.extractHighlight(tempVideoPath, startTime, duration);
-                const previewStream = fs.createReadStream(previewPath);
-                const previewFileName = storageService.generateFileName('preview.mp4', `${userId}/`);
+                try {
+                    const previewPath = await mediaProcessor.extractHighlight(tempVideoPath, startTime, duration);
+                    const previewStream = fs.createReadStream(previewPath);
+                    const previewFileName = storageService.generateFileName('preview.mp4', `${userId}/`);
 
-                const uploadResult = await storageService.uploadToR2(
-                    previewStream,
-                    previewFileName,
-                    'video/mp4',
-                    storageService.namespaces.SHORT_PREVIEWS
-                );
+                    const uploadResult = await storageService.uploadToR2(
+                        previewStream,
+                        previewFileName,
+                        'video/mp4',
+                        storageService.namespaces.SHORT_PREVIEWS
+                    );
 
-                await contentSchema.findByIdAndUpdate(content._id, {
-                    shortPreviewUrl: uploadResult.url,
-                    shortPreviewKey: uploadResult.key
-                });
-                fs.unlinkSync(previewPath);
-                console.log(`[Worker] Generated short preview: ${uploadResult.key}`);
+                    await contentSchema.findByIdAndUpdate(content._id, {
+                        shortPreviewUrl: uploadResult.url,
+                        shortPreviewKey: uploadResult.key
+                    });
+                    if (fs.existsSync(previewPath)) fs.unlinkSync(previewPath);
+                    console.log(`[Worker] Generated short preview: ${uploadResult.key}`);
+                } catch (previewErr) {
+                    console.error(`[Worker] Failed to generate short preview for content ${content._id}:`, previewErr);
+                    // Ensure the field is explicitly set to empty if it fails, to avoid stale/null states
+                    await contentSchema.findByIdAndUpdate(content._id, {
+                        shortPreviewUrl: '',
+                        shortPreviewKey: ''
+                    });
+                }
+            } else {
+                console.warn(`[Worker] tempVideoPath missing, cannot generate short preview for ${content._id}`);
             }
         }
 
