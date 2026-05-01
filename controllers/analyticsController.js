@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const User = require('../models/userModel');
 const Content = require('../models/contentModel');
 const Analytics = require('../models/analyticsModel');
+const UserSessionEvent = require('../models/userSessionEventModel');
 
 // Helper function to get date ranges
 const getDateRanges = () => {
@@ -243,6 +244,20 @@ const getWatchTimeAnalytics = asyncHandler(async (req, res) => {
     });
 });
 
+
+const getUserTelemetrySummary = asyncHandler(async (req, res) => {
+    const days = Math.max(1, Math.min(parseInt(req.query.days || '30', 10), 180));
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+    const [osBreakdown, deviceBreakdown, countryBreakdown] = await Promise.all([
+        UserSessionEvent.aggregate([{ $match: { createdAt: { $gte: since } } }, { $group: { _id: '$os', count: { $sum: 1 } } }, { $sort: { count: -1 } }]),
+        UserSessionEvent.aggregate([{ $match: { createdAt: { $gte: since } } }, { $group: { _id: '$device', count: { $sum: 1 } } }, { $sort: { count: -1 } }]),
+        UserSessionEvent.aggregate([{ $match: { createdAt: { $gte: since } } }, { $group: { _id: '$country', count: { $sum: 1 } } }, { $sort: { count: -1 } }, { $limit: 20 }]),
+    ]);
+
+    res.status(200).json({ days, since, osBreakdown, deviceBreakdown, countryBreakdown });
+});
+
 module.exports = {
     getPlatformAnalytics,
     getUserDemographics,
@@ -250,5 +265,6 @@ module.exports = {
     getCreatorDashboard,
     getVideoPerformanceComparison,
     getEngagementTrends,
-    getWatchTimeAnalytics
+    getWatchTimeAnalytics,
+    getUserTelemetrySummary
 };

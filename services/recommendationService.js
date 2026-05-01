@@ -1,6 +1,7 @@
 const Content = require('../models/contentModel');
 const User = require('../models/userModel');
 const LiveProgram = require('../models/liveProgramModel');
+const ForcedRecommendation = require('../models/forcedRecommendationModel');
 
 const WEIGHTS = {
     LIKE: 50,
@@ -16,6 +17,35 @@ const WEIGHTS = {
 const DECAY_LAMBDA = 0.1; // Halves approx every 7 days
 
 class RecommendationService {
+
+    async getForcedRecommendations(limit = 3) {
+        const now = new Date();
+        const items = await ForcedRecommendation.find({
+            isActive: true,
+            startsAt: { $lte: now },
+            $or: [
+                { endsAt: null },
+                { endsAt: { $gte: now } }
+            ]
+        })
+            .sort({ priority: -1, createdAt: -1 })
+            .limit(limit)
+            .lean();
+
+        if (items.length === 0) return [];
+
+        const ids = items.map(i => i.contentId);
+        const contents = await Content.find({ _id: { $in: ids }, isApproved: true })
+            .select('title thumbnail user views createdAt category video description credit likes updatedAt shortPreviewUrl shortPreviewViews highlightUrl duration')
+            .populate('user', 'name')
+            .lean();
+
+        const map = new Map(contents.map(c => [c._id.toString(), c]));
+        return items
+            .map(i => map.get(i.contentId.toString()))
+            .filter(Boolean)
+            .map(c => ({ ...c, recommendationSource: 'admin_forced' }));
+    }
     /**
      * Get personalized recommendations for a user
      * @param {string} userId
@@ -86,8 +116,12 @@ class RecommendationService {
         // 4. Apply Diversity Control
         const diverseContent = this.applyDiversity(scoredContent, limit);
 
-        // 5. Populate user field for the final results
-        return await Content.populate(diverseContent, { path: 'user', select: 'name' });
+        // 5. Merge in admin-managed forced recommendations at the top.
+        const forcedContent = await this.getForcedRecommendations(Math.min(3, limit));
+        const forcedIds = new Set(forcedContent.map(c => c._id.toString()));
+        const dedupedPersonalized = diverseContent.filter(c => !forcedIds.has(c._id.toString()));
+
+        return [...forcedContent, ...await Content.populate(dedupedPersonalized, { path: 'user', select: 'name' })].slice(0, limit);
     }
 
     precalculateUserVector(user) {

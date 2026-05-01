@@ -1410,6 +1410,24 @@ const getHomepageFeed = asyncHandler(async (req, res) => {
     }
 });
 
+
+// @desc Get canonical share link for content with optional timestamp
+// @route GET /api/content/:id/share-link
+// @access Public
+const getShareLink = asyncHandler(async (req, res) => {
+    const contentId = req.params.id;
+    const seconds = Math.max(0, parseInt(req.query.t || req.query.seconds || '0', 10) || 0);
+
+    const content = await contentSchema.findById(contentId).select('title');
+    if (!content) return res.status(404).json({ error: 'Content not found' });
+
+    const slug = generateSlug(content.title || 'content');
+    const frontendUrl = process.env.FRONTEND_URL || 'https://playmoodtv.com';
+    const shareUrl = `${frontendUrl}/movie/${slug}-${content._id}${seconds > 0 ? `?t=${seconds}s` : ''}`;
+
+    res.status(200).json({ shareUrl, seconds });
+});
+
 // @desc    Unlike a piece of content
 // @route   PUT /api/content/:id/unlike
 // @access  Private
@@ -1583,7 +1601,8 @@ module.exports = {
     trackShortPreviewView,
     getOnlyOnPlaymoodContent,
     getSoonOnPlaymoodContent,
-}
+    getShareLink,
+};
 
 function cosineSimilarity(vecA, vecB) {
     if (!vecA || !vecB || vecA.length !== vecB.length) {
