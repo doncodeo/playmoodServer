@@ -8,7 +8,8 @@ const {
     getCreatorDashboard,
     getVideoPerformanceComparison,
     getEngagementTrends,
-    getWatchTimeAnalytics
+    getWatchTimeAnalytics,
+    getUserTelemetrySummary
 } = require('../controllers/analyticsController');
 
 /**
@@ -80,6 +81,7 @@ router.route('/admin/user-demographics').get(protect, admin, getUserDemographics
  *         description: Server error.
  */
 router.route('/admin/moderation').get(protect, admin, getModerationAnalytics);
+router.route('/admin/user-telemetry').get(protect, admin, getUserTelemetrySummary);
 
 /**
  * @swagger

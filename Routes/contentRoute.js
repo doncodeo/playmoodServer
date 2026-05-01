@@ -29,9 +29,11 @@ const {
     trackShortPreviewView,
     getOnlyOnPlaymoodContent,
     getSoonOnPlaymoodContent,
+    getShareLink,
 } = require('../controllers/contentController');
 const { protect, admin, optionalProtect } = require('../middleware/authmiddleware');
 const upload = require('../middleware/multer');
+const { listForcedRecommendations, createForcedRecommendation, updateForcedRecommendation, deleteForcedRecommendation } = require('../controllers/forcedRecommendationController');
 
 /**
  * @swagger
@@ -1582,5 +1584,9 @@ router.route('/progress/:contentId').get(protect, getVideoProgress);
  */
 router.route('/:id/preview-view').post(optionalProtect, trackShortPreviewView);
 
+
+router.route('/:id/share-link').get(getShareLink);
+router.route('/admin/forced-recommendations').get(protect, admin, listForcedRecommendations).post(protect, admin, createForcedRecommendation);
+router.route('/admin/forced-recommendations/:id').put(protect, admin, updateForcedRecommendation).delete(protect, admin, deleteForcedRecommendation);
 
 module.exports = router;
